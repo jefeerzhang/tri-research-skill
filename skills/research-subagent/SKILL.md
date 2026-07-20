@@ -111,6 +111,35 @@ Think critically about search results:
 - **Verify recency**: Prioritize recent information for time-sensitive topics
 - **Cross-reference**: Compare multiple sources when facts conflict
 
+### Time Range Filtering
+
+**Default behavior**: Search across **ALL years** (no time filter).
+
+**User-specified time ranges**: If the user's query contains time keywords, extract and apply them:
+
+| User Query Pattern | Time Filter | Example |
+|---|---|---|
+| (no time keyword) | All years | "AI在医疗中的应用" |
+| Explicit year(s) | Specific year(s) | "2024年AI医疗进展"、"2020-2025年研究" |
+| "最新"/"近期"/"recent"/"latest" | Last 1 year | "AI医疗最新进展" |
+| "近X年"/"past X years" | Last X years | "近5年的研究"、"past 3 years" |
+| "前"/"before"/"until" | Until that year | "2020年前的抑郁症治疗" |
+| "X-Y年代" / decade | Year range | "90年代的研究" |
+
+**How to apply**: Add year/date qualifiers to your search queries:
+
+```
+# Example: User asks "近3年的AI医疗研究"
+Original query: "AI医疗研究"
+Updated query with time filter: "AI医疗研究" + freshness filter (Tavily: "year", AnySearch: filter)
+
+# Example: User asks "2020-2025年气候政策"
+Original query: "气候政策"
+Updated query: "气候政策" + date range 2020..2025 (SciVerse: year_from/year_to)
+```
+
+**Priority**: Time filters from user query > default (all years). If conflicting, ask user to clarify.
+
 **Flag potential issues** in your report rather than presenting uncertain info as facts.
 
 ### 5. Reporting

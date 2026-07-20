@@ -195,7 +195,25 @@ Use your framework's subagent dispatch mechanism to launch research subagents. T
 - Relevant background context
 - Key questions to answer
 - Suggested sources or search strategies
+- **Time range** (if user specified) — see "Time Range Handling" below
 - Scope boundaries to prevent drift
+
+### Time Range Handling
+
+**Default**: Search **all years** (no time filter).
+
+**User-specified time ranges** must be propagated to subagents:
+
+| User Query Pattern | Time Filter | Subagent Instruction |
+|---|---|---|
+| (no time keyword) | All years | (no time filter in search) |
+| Explicit year(s) | Specific year(s) | Add year qualifiers to queries |
+| "最新"/"近期"/"recent" | Last 1 year | Use Tavily freshness="year" |
+| "近X年"/"past X years" | Last X years | Calculate date range |
+| "前"/"before" | Until that year | Use date range upper bound |
+| Decade (e.g., "90年代") | Year range | Use specific year range |
+
+When dispatching subagents, include the time range in the task description so each subagent applies the same filter.
 
 **Example Task Description**:
 ```
