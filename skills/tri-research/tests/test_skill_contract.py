@@ -35,6 +35,14 @@ class SkillContractTests(unittest.TestCase):
             keys = set(re.findall(r"^([A-Za-z][A-Za-z0-9_-]*):", frontmatter, re.MULTILINE))
             self.assertEqual(keys, {"name", "description"})
 
+    def test_public_docs_do_not_embed_private_or_retired_repo_paths(self) -> None:
+        root_readme = (ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
+        public_text = "\n".join((root_readme, self.readme, self.skill, self.subagent))
+        self.assertNotIn("C:\\Users\\jefeer", public_text)
+        self.assertNotIn(".claude\\skills\\tri-research", public_text)
+        self.assertNotIn("& $python", self.readme)
+        self.assertIn("& $env:CONDA_PYTHON", self.readme)
+
     def test_report_contract_requires_citations(self) -> None:
         self.assertNotIn("Do NOT include citations", self.skill)
         self.assertIn("参考文献", self.skill)

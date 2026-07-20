@@ -208,7 +208,7 @@ $report = "DEEP_RESEARCH_ai-labor-allocation_2026-07-20.md"
 & $env:CONDA_PYTHON $state --session $session advance DONE --report $report --min-sources 12
 ```
 
-在本仓库中，`CONDA_PYTHON=C:\Users\jefeer\an\python.exe`。其他环境使用已激活 conda 环境或该环境批准的 Python 3.8+。
+在 Windows/PowerShell 中，先激活获准的 conda 环境，再设置 `$env:CONDA_PYTHON = (Get-Command python).Source`。其他环境使用已激活的 conda Python 3.8+。
 
 **硬性规则**：
 1. **每次操作前必须 `check`**：派发子代理前检查当前状态

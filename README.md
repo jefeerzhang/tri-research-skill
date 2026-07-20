@@ -122,7 +122,7 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 | 派生与重派发 | 派生代理 0，重复派发 0 |
 | 循环安全 | 空循环 0，死循环 0 |
 | 状态机 | 仅一次 `SUBAGENTS_DISPATCHED`，最终 `DONE` |
-| 自动化测试 | 21/21 通过 |
+| 自动化测试 | 22/22 通过 |
 
 本轮后端状态：
 
@@ -136,16 +136,16 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 
 ## 测试
 
-Windows / PowerShell 必须使用已配置的 conda Python：
+Windows / PowerShell 使用已配置的 conda 环境；将 `<env-name>` 替换为环境名：
 
 ```powershell
-& 'C:\Users\jefeer\an\python.exe' -m unittest discover -s 'skills\tri-research\tests' -v
+conda run -n <env-name> python -m unittest discover -s 'skills\tri-research\tests' -v
 ```
 
 验证生成的研究报告：
 
 ```powershell
-& 'C:\Users\jefeer\an\python.exe' 'skills\tri-research\scripts\validate_report.py' '<report.md>' --min-sources 12
+conda run -n <env-name> python 'skills\tri-research\scripts\validate_report.py' '<report.md>' --min-sources 12
 ```
 
 ## 文件结构
