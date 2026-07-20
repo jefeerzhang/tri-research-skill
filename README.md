@@ -11,49 +11,57 @@
 
 ## 🏗️ 架构总览
 
-四源搜索按类型分工，互补不重叠：
+**Lead Agent 双源直接搜索 + 子代理三源并行 + Citation 补强**
 
 ```mermaid
 graph TB
     User[用户查询]
     Lead[Lead Agent<br/>主导代理]
-    
-    subgraph FourSources["四源搜索架构"]
-        direction TB
-        AS[AnySearch<br/>🟦 通用+23垂直领域<br/>CLI Skill]
-        TV[Tavily<br/>🟩 深度网页<br/>MCP Server]
-        SV[SciVerse<br/>🟪 学术论文<br/>MCP Server]
-        SP[SerpApi<br/>🟧 结构化SERP<br/>CLI Skill]
+
+    subgraph LeadSources["Lead Agent 双源直接搜索"]
+        direction LR
+        SP[🟧 SerpApi<br/>结构化SERP<br/>+ Scholar + 100+引擎]
+        WS[🟦 WebSearch<br/>通用补充<br/>无配额]
     end
-    
-    subgraph Subs["子代理层（3源）"]
+
+    subgraph SubSources["子代理三源并行"]
+        direction TB
+        AS[AnySearch<br/>🟦 通用+23垂直]
+        TV[Tavily<br/>🟩 深度网页]
+        SV[SciVerse<br/>🟪 学术论文]
+    end
+
+    subgraph Subs["子代理层（并行）"]
         SA1[Subagent 1]
         SA2[Subagent 2]
         SA3[Subagent 3]
     end
-    
+
     Cit[Citation Agent]
     Report[最终报告<br/>DEEP_RESEARCH_*.md]
-    
+
     User --> Lead
-    Lead -.->|仅Lead调用| SP
-    Lead --> SA1
-    Lead --> SA2
-    Lead --> SA3
+    Lead --> SP & WS
+    Lead --> SA1 & SA2 & SA3
     SA1 --> AS & TV & SV
     SA2 --> AS & TV & SV
     SA3 --> AS & TV & SV
     Lead --> Cit
     Cit --> Report
-    
+
     style AS fill:#e3f2fd
     style TV fill:#e8f5e9
     style SV fill:#f3e5f5
     style SP fill:#fff3e0
+    style WS fill:#e0f7fa
     style Lead fill:#fff9c4
     style Report fill:#ffebee
 ```
 
+**关键设计**：
+- **Lead Agent** 直接用 SerpApi + WebSearch 双源，覆盖最广
+- **子代理** 用 AnySearch + Tavily + SciVerse 三源，互补性强
+- **Lead + 子代理** 合计 **5源协同**（不是5选1）
 ## 🔍 四源分工
 
 | 搜索源 | 强项 | 弱项 | 典型场景 | 调用层 |
