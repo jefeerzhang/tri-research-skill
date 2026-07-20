@@ -6,6 +6,32 @@
 [![Framework-agnostic](https://img.shields.io/badge/Framework-agnostic-green)](skills/tri-research/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](skills/tri-research/LICENSE)
 
+
+### 端到端运行流程
+
+**1. 技能加载与状态展示**
+
+![技能加载与Phase 1研究计划](assets/screenshots/01-skill-loaded-and-phase1.png)
+
+技能加载后自动检测三个搜索工具的可用性，输出研究计划。用户可看到工具状态、6个关键领域和子代理分配。
+
+**2. 并行子代理派发**
+
+![3个子代理并行运行](assets/screenshots/02-3-subagents-parallel.png)
+
+主导代理并行派发3个子代理，每个使用三源搜索工具组合。
+
+**3. 子代理完成状态**
+
+![3个子代理完成](assets/screenshots/03-subagents-completed.png)
+
+3个子代理全部在8分钟内完成，共收集60个来源。
+
+**4. 最终报告生成**
+
+![报告摘要](assets/screenshots/04-final-report-summary.png)
+
+主导代理综合所有发现，生成带TL;DR、Executive Summary、6大章节和60个引用的Markdown报告。
 ---
 
 ## 你什么时候需要它？
