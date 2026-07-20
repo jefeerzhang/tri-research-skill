@@ -1,0 +1,69 @@
+{
+  "version": "5.0.0",
+  "description": "Deep Research Skill 测试用例。用于验证安装后技能是否正常工作。",
+  "usage": "运行任意测试查询，检查是否生成带引用的Markdown报告。",
+  "prompts": [
+    {
+      "id": "simple-fact",
+      "type": "straightforward",
+      "prompt": "tri-research 东京当前的人口是多少？",
+      "expected_subagents": 1,
+      "expected_sources_min": 5,
+      "expected_sections": ["TL;DR", "参考文献"],
+      "timeout_seconds": 120,
+      "description": "简单事实查询，1个子代理，验证基本功能"
+    },
+    {
+      "id": "breadth-comparison",
+      "type": "breadth-first",
+      "prompt": "tri-research 比较 AWS、Azure 和 Google Cloud 的计算实例定价",
+      "expected_subagents": 3,
+      "expected_sources_min": 15,
+      "expected_sections": ["TL;DR", "Executive Summary", "参考文献"],
+      "timeout_seconds": 300,
+      "description": "广度优先查询，3个子代理分别研究一个云厂商"
+    },
+    {
+      "id": "depth-analysis",
+      "type": "depth-first",
+      "prompt": "tri-research 2008年金融危机的根本原因是什么？",
+      "expected_subagents": 4,
+      "expected_sources_min": 20,
+      "expected_sections": ["TL;DR", "Executive Summary", "1.", "2.", "参考文献"],
+      "timeout_seconds": 480,
+      "description": "深度优先查询，4个子代理从不同视角分析"
+    },
+    {
+      "id": "academic-research",
+      "type": "depth-first",
+      "prompt": "tri-research 大语言模型的幻觉问题有哪些最新的缓解方法？",
+      "expected_subagents": 3,
+      "expected_sources_min": 15,
+      "expected_sections": ["TL;DR", "参考文献"],
+      "expected_tools": ["sciverse", "tavily"],
+      "timeout_seconds": 480,
+      "description": "学术研究类查询，验证SciVerse学术搜索是否生效"
+    },
+    {
+      "id": "degradation-test",
+      "type": "straightforward",
+      "prompt": "tri-research 全球最大的10个城市",
+      "setup": "禁用AnySearch和SciVerse，仅保留Tavily",
+      "expected_subagents": 1,
+      "expected_sources_min": 5,
+      "expected_behavior": "降级到Tavily+WebSearch，仍能生成报告",
+      "timeout_seconds": 120,
+      "description": "降级测试：验证单工具可用时的降级策略"
+    }
+  ],
+  "validation_checklist": [
+    "报告文件 DEEP_RESEARCH_*.md 是否生成？",
+    "报告是否包含 TL;DR 章节？",
+    "报告是否包含 参考文献 章节？",
+    "参考文献中的 [N] 编号是否连续无跳号？",
+    "正文中的 [N] 引用是否都能在参考文献中找到对应条目？",
+    "每个来源是否标注了 Tier 和 Found by？",
+    "子代理是否在8分钟内完成（无超时）？",
+    "报告语言是否与用户查询语言一致？"
+  ]
+}
