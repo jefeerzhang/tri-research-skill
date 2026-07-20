@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -12,6 +13,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from validate_report import validate as validate_report
 
 
 PHASES = ("S0", "S1", "S2", "S3", "DONE")
@@ -23,6 +26,7 @@ EVENTS = {
     "S3": "SUBAGENTS_RETURNED",
     "DONE": "REPORT_VALIDATED",
 }
+MIN_REPORT_SOURCES = 10
 MESSAGES = {
     "S0": "Phase 0 CLARIFY: waiting for scope confirmation. Do not dispatch subagents.",
     "S1": "Scope confirmed. Complete assessment and planning before advancing to S2.",
@@ -54,6 +58,15 @@ def validate_session_id(session_id: str) -> str:
             "session id must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}"
         )
     return session_id
+
+
+def source_threshold(value: str) -> int:
+    parsed = int(value)
+    if parsed < MIN_REPORT_SOURCES:
+        raise argparse.ArgumentTypeError(
+            f"must be at least {MIN_REPORT_SOURCES}"
+        )
+    return parsed
 
 
 class StateStore:
@@ -104,6 +117,11 @@ def emit_state(data: dict[str, Any], store: StateStore) -> None:
     print(f"SESSION:{data['session_id']}")
     print(f"FILE:{store.state_path(data['session_id'])}")
     print(f"MESSAGE:{MESSAGES[phase]}")
+    proof = data.get("report_validation")
+    if phase == "DONE" and proof:
+        print(f"REPORT:{proof['path']}")
+        print(f"REPORT_SHA256:{proof['sha256']}")
+        print(f"MIN_SOURCES:{proof['min_sources']}")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -119,6 +137,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     advance_parser = subparsers.add_parser("advance")
     advance_parser.add_argument("phase", choices=PHASES[1:])
+    advance_parser.add_argument("--report", type=Path)
+    advance_parser.add_argument("--min-sources", type=source_threshold)
 
     subparsers.add_parser("get_phase")
 
@@ -171,12 +191,44 @@ def run(args: argparse.Namespace) -> int:
             if current == "DONE":
                 raise StateError("research session is already DONE")
             raise StateError(f"cannot advance from {current} to {args.phase}; expected {expected}")
+        validation_proof = None
+        if args.phase == "DONE":
+            if args.report is None:
+                raise StateError(
+                    "advancing to DONE requires --report; the report must pass validation"
+                )
+            report_path = args.report.expanduser().resolve()
+            if not report_path.is_file():
+                raise StateError(f"report does not exist: {report_path}")
+            try:
+                report_bytes = report_path.read_bytes()
+                report_text = report_bytes.decode("utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                raise StateError(f"cannot read report as UTF-8: {exc}") from exc
+            min_sources = args.min_sources or MIN_REPORT_SOURCES
+            validation_errors = validate_report(report_text, min_sources)
+            if validation_errors:
+                raise StateError(
+                    "report validation failed: " + "; ".join(validation_errors)
+                )
+            validation_proof = {
+                "path": str(report_path),
+                "sha256": hashlib.sha256(report_bytes).hexdigest(),
+                "min_sources": min_sources,
+            }
+        elif args.report is not None or args.min_sources is not None:
+            raise StateError("--report and --min-sources are only valid when advancing to DONE")
+
         timestamp = now_iso()
         data["phase"] = args.phase
         data["updated_at"] = timestamp
-        data["history"].append(
-            {"phase": args.phase, "event": EVENTS[args.phase], "at": timestamp}
-        )
+        history_entry = {"phase": args.phase, "event": EVENTS[args.phase], "at": timestamp}
+        if validation_proof is not None:
+            validation_proof["validated_at"] = timestamp
+            data["report_validation"] = validation_proof
+            history_entry["report_sha256"] = validation_proof["sha256"]
+            history_entry["min_sources"] = validation_proof["min_sources"]
+        data["history"].append(history_entry)
         store.save(data)
         print(f"OK:Advanced research session {session_id} to {args.phase}")
         emit_state(data, store)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-VERSION = "5.6.0"
+VERSION = "5.7.0"
 
 
 class SkillContractTests(unittest.TestCase):
@@ -30,6 +30,7 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("Do NOT include citations", self.skill)
         self.assertIn("参考文献", self.skill)
         self.assertIn("Found by", self.skill)
+        self.assertIn("advance DONE --report", self.skill)
 
     def test_state_directory_is_separate_from_skill_home(self) -> None:
         self.assertIn("TRI_RESEARCH_STATE_DIR", self.skill)

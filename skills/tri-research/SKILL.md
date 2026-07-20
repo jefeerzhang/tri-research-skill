@@ -1,6 +1,6 @@
 ---
 name: tri-research
-version: 5.6.0
+version: 5.7.0
 description: "Conduct cited deep research using parallel subagents, four optional external search backends (AnySearch + Tavily + SciVerse + SerpApi), and a runtime WebSearch fallback."
 triggers:
   - "tri-research"
@@ -233,6 +233,7 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 ```powershell
 $state = "$env:TRI_RESEARCH_HOME\scripts\state_machine.py"
 $session = "ai-labor-allocation"
+$report = "DEEP_RESEARCH_ai-labor-allocation_2026-07-20.md"
 
 & $env:CONDA_PYTHON $state --session $session init
 & $env:CONDA_PYTHON $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
@@ -240,7 +241,7 @@ $session = "ai-labor-allocation"
 & $env:CONDA_PYTHON $state --session $session check
 & $env:CONDA_PYTHON $state --session $session advance S2
 & $env:CONDA_PYTHON $state --session $session advance S3
-& $env:CONDA_PYTHON $state --session $session advance DONE
+& $env:CONDA_PYTHON $state --session $session advance DONE --report $report --min-sources 12
 ```
 
 在本仓库中，`CONDA_PYTHON=C:\Users\jefeer\an\python.exe`。其他环境使用已激活 conda 环境或该环境批准的 Python 3.8+。
@@ -251,9 +252,9 @@ $session = "ai-labor-allocation"
 3. **S2 状态下禁止重新派发子代理**
 4. **脚本报错时停止操作，不要绕过**
 5. **所有命令必须复用同一 `--session`**：禁止依赖“最近修改的状态文件”
-6. **只有报告文件已写入且验收通过后才能推进到 `DONE`**
+6. **推进到 `DONE` 必须传入 `--report`**：状态机调用验收器，失败时保持 `S3`；成功时记录报告路径、SHA-256、来源门槛和验收时间
 
-验收命令：`python ${TRI_RESEARCH_HOME}/scripts/validate_report.py <report.md> --min-sources <N>`。在本仓库必须使用 conda Python。
+可单独预检报告：`python ${TRI_RESEARCH_HOME}/scripts/validate_report.py <report.md> --min-sources <N>`。最终仍必须通过 `advance DONE --report <report.md> --min-sources <N>` 完成状态转换。
 
 ### Phase 0: CLARIFY — 确认研究范围（必须在检索前完成）
 

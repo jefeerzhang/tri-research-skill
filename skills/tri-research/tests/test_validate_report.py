@@ -40,6 +40,12 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertTrue(any("no URL" in error for error in errors))
         self.assertTrue(any("no reference entries" in error for error in errors))
 
+    def test_rejects_duplicate_reference_urls(self) -> None:
+        report = valid_report().replace("https://example.cn/two", "https://example.com/one")
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(any("URLs are not unique" in error for error in errors))
+        self.assertTrue(any("unique reference URLs" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`5.6.0`
+当前版本：`5.7.0`
 
 ## 能力边界
 
@@ -78,7 +78,12 @@ $session = 'ai-labor-allocation'
 & $python $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
 & $python $state --session $session advance S1
 & $python $state --session $session check
+& $python $state --session $session advance S2
+& $python $state --session $session advance S3
+& $python $state --session $session advance DONE --report '<report.md>' --min-sources 12
 ```
+
+进入 `DONE` 时，状态机必须实际读取并验收报告；通过后在状态文件中记录报告路径、SHA-256、来源门槛和验收时间。缺报告或验收失败都会保持 `S3`。
 
 Unix 环境可调用 `scripts/state_machine.sh` 兼容包装器，也可直接运行 Python 实现。
 
