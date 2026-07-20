@@ -206,22 +206,40 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 
 ## Research Process
 
-### ⚠️ 状态管理规则（必须遵守）
+### ⚠️ 状态管理（通过脚本强制执行）
 
-**本技能有严格的状态机，防止循环派发。**
+**本技能使用 bash 脚本强制执行状态机，防止循环派发。每次阶段转换必须调用脚本。**
 
+脚本路径：`${TRI_RESEARCH_HOME:-~/.claude/skills/tri-research}/scripts/state_machine.sh`
+
+**状态机**：
 | 状态 | 描述 | 允许的下一步 |
 |------|------|------------|
-| **S0** | Phase 0: 等待用户确认 | → S1（确认后）或保持S0（用户未确认） |
+| **S0** | Phase 0: 等待用户确认 | → S1（确认后） |
 | **S1** | Step 1-3: 评估与规划 | → S2 |
 | **S2** | Step 4: 派发子代理 | → S3 |
 | **S3** | Step 5: 综合报告 | → 完成 |
 
+**每次阶段转换必须执行以下命令**：
+```bash
+# 开始新研究
+bash scripts/state_machine.sh init
+
+# 检查当前状态（派发子代理前必须检查）
+bash scripts/state_machine.sh check
+
+# 推进到下一阶段（确认后执行）
+bash scripts/state_machine.sh advance S1
+bash scripts/state_machine.sh advance S2
+bash scripts/state_machine.sh advance S3
+bash scripts/state_machine.sh advance DONE
+```
+
 **硬性规则**：
-1. **状态只能前进，不能后退**：S1→S2→S3→完成，永远不要从 S2 回到 S0
-2. **Phase 0 只执行一次**：用户确认后立即进入 S1，不再询问
-3. **子代理只派发一次**：进入 S2 后只派发一次，等所有子代理返回后直接进入 S3
-4. **不要在子代理返回后重新派发**：收到子代理结果后，直接进入综合阶段
+1. **每次操作前必须 `check`**：派发子代理前检查当前状态
+2. **状态只能前进，不能后退**
+3. **S2 状态下禁止重新派发子代理**
+4. **脚本报错时停止操作，不要绕过**
 
 ### Phase 0: CLARIFY — 确认研究范围（必须在检索前完成）
 
