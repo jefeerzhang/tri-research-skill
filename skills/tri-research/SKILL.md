@@ -85,7 +85,7 @@ This skill relies on **three search backends** for maximum coverage. Before usin
 
 | # | Tool | Type | How to Configure | Purpose |
 |---|------|------|-----------------|---------|
-| 1 | **AnySearch** | CLI Skill | Install at `~/.claude/skills/anysearch/`（或设置环境变量 `ANYSEARCH_SKILL_DIR` 指向自定义路径）。See `SKILL.md` in that directory for setup. Requires Python 3.6+ or Node.js. Optional API key for higher rate limits. | General web search, 23 vertical domains, batch search, URL extraction |
+| 1 | **AnySearch** | CLI Skill | Install at框架默认skills目录（如 `~/.claude/skills/anysearch/` 或 `~/.hermes/skills/anysearch/`）。可通过 `ANYSEARCH_HOME` 环境变量自定义路径。See `SKILL.md` in that directory for setup. Requires Python 3.6+ or Node.js. Optional API key for higher rate limits. | General web search, 23 vertical domains, batch search, URL extraction |
 | 2 | **Tavily** | MCP Server | Add Tavily MCP server to `~/.claude/mcp.json` with your API key. See [tavily.com](https://tavily.com) for key setup. | Deep web search with advanced depth, auto-summarization |
 | 3 | **SciVerse** | MCP Server | Provided by the OpenSpace MCP server or standalone SciVerse MCP. Requires SciVerse API access. | Academic paper search, citation metadata, semantic search |
 
@@ -100,7 +100,7 @@ This skill relies on **three search backends** for maximum coverage. Before usin
 在派发子代理之前，主导代理自动检测三个搜索工具的可用性，并**始终提醒用户建议配置**：
 
 **检测方法**（主导代理在内部执行）：
-1. 检查 AnySearch CLI：`python ${ANYSEARCH_SKILL_DIR:-~/.claude/skills/anysearch}/scripts/anysearch_cli.py search "test" --max_results 1`
+1. 检查 AnySearch CLI：`python ${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}/scripts/anysearch_cli.py search "test" --max_results 1`
 2. 检查 Tavily MCP：尝试调用 `mcp__tavily__tavily_search`
 3. 检查 SciVerse MCP：尝试调用 `mcp__sciverse__semantic_search`
 
@@ -231,16 +231,75 @@ After subagents complete:
 - Do NOT include citations - a separate citations agent will handle that
 - Make the report comprehensive but concise
 
-## Tool Abstraction Layer
+## Tool Abstraction Layer (Framework-Agnostic)
 
-All subagents operate through three abstract interfaces. The framework adapter maps these to concrete tools:
+All subagents operate through abstract interfaces. The framework adapter maps these to concrete tools based on runtime environment.
 
-| Abstract Interface | Purpose | Framework Adapter Examples |
+### Core Abstract Interfaces
+
+| Abstract Interface | Purpose | Parameter Convention |
 |---|---|---|
-| **SEARCH**(query) | Search the internet, return result list | Claude Code: `web_search` / Codex: `WebSearch` / Custom: Tavily API |
-| **FETCH**(url) | Retrieve full content from a URL | Claude Code: `web_fetch` / Codex: `requests` / Custom: Tavily extract |
-| **RENDER**(url) | Render JavaScript-heavy pages (optional) | Claude Code: Playwright MCP / Custom: Playwright / Puppeteer |
-| **DISPATCH**(prompt, type) | Launch a subagent with a task | Claude Code: `Task` tool / Codex: `handoff()` / Custom: agent framework |
+| **SEARCH**(query) | Search the internet, return result list | `query: string`, `top_k: int` |
+| **FETCH**(url) | Retrieve full content from a URL | `url: string` |
+| **RENDER**(url) | Render JavaScript-heavy pages (optional) | `url: string` |
+| **DISPATCH**(prompt, type) | Launch a subagent with a task | `prompt: string`, `type: string` |
+
+### Framework Adapter Examples
+
+The same abstract interface maps to different concrete implementations:
+
+| Abstract | Claude Code | Hermes Agent | Codex / OpenCode |
+|----------|-------------|--------------|-------------------|
+| **SEARCH** | `web_search` / `mcp__tavily__tavily_search` | `tavily.search` | `WebSearch` / Tavily API |
+| **FETCH** | `web_fetch` / `mcp__tavily__tavily_extract` | `tavily.extract` | `WebFetch` / `requests` |
+| **RENDER** | Playwright MCP | Playwright MCP | Playwright |
+| **DISPATCH** | `Task(subagent_type="general-purpose", prompt)` | `delegate_to_agent(agent_type, prompt)` | `handoff(agent_type, prompt)` |
+
+### Path Resolution (Cross-Platform)
+
+**Problem**: Skill directories differ across frameworks:
+- Claude Code: `~/.claude/skills/`
+- Hermes Agent: `~/.hermes/skills/` (or `~/.config/hermes/skills/`)
+- Codex: `~/.codex/skills/` (or `~/.agents/skills/`)
+- OpenCode: `~/.config/opencode/skills/`
+
+**Solution**: Use environment variables with sensible defaults:
+
+```bash
+# Skill root (this skill's installation directory)
+export TRI_RESEARCH_HOME="${TRI_RESEARCH_HOME:-$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/..}"
+
+# AnySearch installation directory
+export ANYSEARCH_HOME="${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}"
+
+# Invocation pattern in skill files:
+python "${ANYSEARCH_HOME}/scripts/anysearch_cli.py" search "$1"
+```
+
+**Fallback chain**: Always use `${ANYSEARCH_HOME:-default}` syntax to provide a default if env var not set.
+
+### MCP Tool Name Resolution
+
+MCP tool names follow the convention `mcp__<server>__<tool>` in Claude Code, but other frameworks may use simpler names:
+
+| Framework | Tavily tool name | SciVerse tool name |
+|-----------|------------------|---------------------|
+| Claude Code | `mcp__tavily__tavily_search` | `mcp__sciverse__semantic_search` |
+| Hermes Agent | `tavily_search` | `sciverse_semantic_search` |
+| Codex | `tavily.search` | `sciverse.semantic_search` |
+
+**Best practice**: Skill files reference tools by their MCP server name + tool name. The runtime adapter translates based on detected framework.
+
+### Subagent Type Resolution
+
+| Framework | Subagent type |
+|-----------|---------------|
+| Claude Code | `general-purpose` |
+| Hermes Agent | `general` |
+| Codex | `general-purpose` |
+| OpenCode | `worker` |
+
+---
 
 Subagents should use SEARCH → FETCH as the default pattern, and fall back to RENDER when FETCH returns incomplete content.
 

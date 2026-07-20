@@ -382,6 +382,52 @@ Citations Agent（可选，添加引用）
 
 ---
 
+---
+
+## 跨平台兼容性
+
+本技能已适配多个 Agent 框架：
+
+| 框架 | 安装路径 | 工具调用方式 | subagent_type |
+|------|---------|------------|---------------|
+| Claude Code | `~/.claude/skills/` | `Task(subagent_type="general-purpose")` | `general-purpose` |
+| Hermes Agent | `~/.hermes/skills/` | `delegate_to_agent(agent_type, prompt)` | `general` |
+| Codex | `~/.codex/skills/` | `handoff(agent_type, prompt)` | `general-purpose` |
+| OpenCode | `~/.config/opencode/skills/` | framework-specific | `worker` |
+
+### 路径解析（跨平台）
+
+所有路径通过环境变量解析，避免硬编码：
+
+```bash
+# 设置自定义安装路径（可选）
+export TRI_RESEARCH_HOME="/path/to/tri-research"
+export ANYSEARCH_HOME="/path/to/anysearch"
+
+# 技能文件中的调用模式
+python "${ANYSEARCH_HOME}/scripts/anysearch_cli.py" search "$1"
+```
+
+### MCP 工具命名适配
+
+| 工具 | Claude Code | Hermes Agent | Codex |
+|------|-------------|--------------|-------|
+| Tavily 搜索 | `mcp__tavily__tavily_search` | `tavily_search` | `tavily.search` |
+| SciVerse 学术 | `mcp__sciverse__semantic_search` | `sciverse_semantic_search` | `sciverse.semantic_search` |
+
+技能文件使用 MCP server + tool 名称的方式引用，运行时由框架适配器翻译。
+
+### 在 Hermes Agent 上安装
+
+```bash
+# Hermes Agent 标准安装
+git clone https://github.com/jefeerzhang/tri-research-skill.git /tmp/tri-research
+cp -r /tmp/tri-research/skills/* ~/.hermes/skills/
+
+# 设置 AnySearch 路径（如果未在默认位置）
+export ANYSEARCH_HOME="$HOME/.hermes/skills/anysearch"
+```
+
 ## 文件结构
 
 ```

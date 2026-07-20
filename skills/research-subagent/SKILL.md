@@ -24,7 +24,7 @@ This subagent uses **three search backends** for maximum coverage. Use whichever
 
 | # | Tool | Invocation | Strength |
 |---|------|-----------|----------|
-| 1 | **AnySearch** | CLI: `python ${ANYSEARCH_SKILL_DIR}/scripts/anysearch_cli.py <command>` （默认 `~/.claude/skills/anysearch/`） | General web, 23 vertical domains, batch search, URL extract |
+| 1 | **AnySearch** | CLI: `python ${ANYSEARCH_HOME}/scripts/anysearch_cli.py <command>` （跨平台路径：`${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}`） | General web, 23 vertical domains, batch search, URL extract |
 | 2 | **Tavily** | MCP: `mcp__tavily__tavily_search` (search_depth="advanced") + `mcp__tavily__tavily_extract` | Deep web search, auto-summarization |
 | 3 | **SciVerse** | MCP: `mcp__sciverse__semantic_search` + `mcp__sciverse__search_papers` | Academic papers, citation metadata |
 
@@ -80,7 +80,7 @@ Repeat this loop efficiently.
 ### 3. Tool Usage Strategy
 
 **Step-by-step workflow**:
-1. Run **AnySearch `batch_search`** with 3 parallel queries (fastest, ~1-3s) — 使用 `${ANYSEARCH_SKILL_DIR:-~/.claude/skills/anysearch}/scripts/anysearch_cli.py`
+1. Run **AnySearch `batch_search`** with 3 parallel queries (fastest, ~1-3s) — 使用 `${ANYSEARCH_HOME}/scripts/anysearch_cli.py`
 2. Run **Tavily `tavily_search`** with search_depth="advanced" for 2 queries (~2-4s)
 3. Run **SciVerse `semantic_search`** for 2 academic queries (~2-5s)
 4. For the 3-5 most relevant results across all tools, use **FETCH** to get full content
@@ -88,7 +88,7 @@ Repeat this loop efficiently.
 6. **Tag source origin** — note which tool found each source (AnySearch/Tavily/SciVerse)
 
 **Tool budgets**:
-- AnySearch: max 3 batch_search calls (each with 3 queries = 9 queries total)，路径使用 `${ANYSEARCH_SKILL_DIR:-~/.claude/skills/anysearch}`
+- AnySearch: max 3 batch_search calls (each with 3 queries = 9 queries total)，路径使用 `${ANYSEARCH_HOME}` 环境变量
 - Tavily: max 3 search calls + 2 extract calls
 - SciVerse: max 3 search calls
 - **Hard limit: 20 tool calls total** (you will be blocked if exceeded)
