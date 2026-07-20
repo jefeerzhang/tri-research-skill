@@ -206,13 +206,66 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 
 ## Research Process
 
+### Phase 0: CLARIFY — 确认研究范围（必须在检索前完成）
+
+**在启动任何检索之前，必须先向用户确认以下 3 个问题。** 不要跳过，不要假设。
+
+#### 问题模板
+
+```
+🔍 开始检索前，需要确认几个信息：
+
+1️⃣ 研究主题确认
+   您想研究的是"XXX"，是否准确？
+   [是的，就这个] / [需要调整]
+
+2️⃣ 关键词（中英文）
+   建议关键词：
+   中文：[根据主题生成2-3个中文关键词]
+   英文：[根据主题生成2-3个英文关键词]
+   [关键词没问题] / [我来补充]
+
+3️⃣ 时间范围
+   [根据主题建议]（如："全部年份" 或 "近5年"）
+   [用这个] / [我指定其他范围]
+```
+
+#### 示例
+
+**用户输入**："tri-research 企业资产搁浅风险"
+
+**Lead Agent 回复**：
+```
+🔍 开始检索前，需要确认几个信息：
+
+1️⃣ 研究主题确认
+   您想研究的是"企业资产搁浅风险（Corporate Asset Stranding Risk）"，是否准确？
+   [是的，就这个] / [需要调整]
+
+2️⃣ 关键词（中英文）
+   建议关键词：
+   中文：资产搁浅、碳泡沫、气候转型风险
+   英文：stranded assets, carbon bubble, climate transition risk
+   [关键词没问题] / [我来补充]
+
+3️⃣ 时间范围
+   全部年份（不限制）
+   [用这个] / [我指定其他范围]
+```
+
+#### 规则
+- **必须等用户确认后才启动检索**
+- 用户可以直接回答"是的""没问题""全部年份"来确认
+- 用户可以修改任何一个问题的答案
+- 用户也可以跳过，直接给研究问题——此时按默认值运行（主题=用户原始问题，关键词=自动生成，时间=全部年份）
+
 ### Step 1: Assessment and Breakdown
 
-Analyze the user's question thoroughly:
-- Identify main concepts, key entities, and relationships
-- List specific facts or data points needed
-- Note any temporal constraints (e.g., "as of 2025")
-- Determine what form the answer should take (detailed report, comparison, list, analysis)
+分析用户确认后的研究问题：
+- 识别主要概念、实体和关系
+- 列出需要的具体事实或数据
+- 注意任何时间约束
+- 确定报告形式（详细报告、对比分析、列表等）
 
 ### Step 2: Query Type Determination
 
