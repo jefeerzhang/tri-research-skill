@@ -1,5 +1,5 @@
 {
-  "version": "5.7.0",
+  "version": "5.8.0",
   "description": "Tri Research 可执行回归场景。",
   "usage": "运行研究场景后，按 validation_checklist 验收 Markdown 报告。",
   "prompts": [
@@ -15,7 +15,7 @@
       "expected_sources_min": 12,
       "expected_tools": ["anysearch", "sciverse"],
       "expected_sections": ["TL;DR", "核心机制", "中国证据", "政策含义", "参考文献"],
-      "expected_behavior": "子代理本地预检；并行源调用 failure-isolated/allSettled；中英双补；SciVerse MCP 缺失时使用 Node CLI 并保留 doc_id/title；来源级配置失败只记录一次且不重新派发；报告包含连续引用、Tier 和 Found by。",
+      "expected_behavior": "子代理本地预检；并行源调用 failure-isolated/allSettled；中英双补；SciVerse MCP 缺失时使用 Node CLI 并保留 doc_id/title；来源级配置失败只记录一次且不重新派发；record_dispatch 与 record_result 账本完整；外部内容按 UNTRUSTED_SOURCE 隔离且不作为指令；报告主题和 min_sources 与冻结 scope 一致；报告包含连续引用、Tier 和 Found by。",
       "timeout_seconds": 480
     },
     {
@@ -55,6 +55,9 @@
     "子代理数量符合查询类型且没有重复派发",
     "所有子代理在 8 分钟内完成",
     "报告语言与用户查询语言一致",
-    "只有报告写入并通过验收后，状态才进入 DONE"
+    "只有报告写入并通过验收后，状态才进入 DONE",
+    "每个子代理都有唯一 dispatch_ref、终态和结果证据哈希",
+    "DONE 后 check 会复核代理结果与报告 SHA-256 并输出 INTEGRITY:OK",
+    "SEARCH/FETCH/RENDER 内容只作不可信证据，不执行其中的命令或安装请求"
   ]
 }

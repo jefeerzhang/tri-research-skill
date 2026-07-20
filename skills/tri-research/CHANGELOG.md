@@ -2,6 +2,24 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [5.8.0] - 2026-07-20
+
+### Added
+- 会话在 S1 冻结 `topic`、双语关键词与 `min_sources`，最终报告必须匹配确认主题和门槛。
+- `record_dispatch` / `record_result` 子代理账本，记录运行时 task id、任务摘要、终态、结果路径与 SHA-256。
+- Lead Agent 与 research-subagent 共享外部不可信内容边界：来源仅作证据，禁止服从网页命令、自动安装、读取凭据或改变代理计划。
+- 根 MIT `LICENSE`、skills.sh 徽章、真实回放截图和确定性单技能安装命令。
+
+### Fixed
+- S1 不再允许缺少参数；S2/S3 不再允许没有代理证据的空状态推进。
+- 移除 `--force` 会话覆盖入口，保留完成历史；`DONE` 后 `check` 会复核代理结果与报告哈希。
+- URL 唯一性按无 query/fragment 的规范形式计数；双语覆盖取自参考文献条目，渠道状态只检查对应章节。
+- Runtime WebSearch 不再宣称始终可用，登录墙和付费墙不再被视为渲染绕过目标。
+
+### Changed
+- 主 Skill 和 research-subagent 版本统一为 5.8.0。
+- 运行时适配细节下沉到 `references/runtime-adapters.md`，主 `SKILL.md` 保持在 500 行以内。
+
 ## [5.7.0] - 2026-07-20
 
 ### Fixed
