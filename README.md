@@ -1,244 +1,164 @@
 # Tri Research Skill
 
-> **五源并行搜索，深度研究框架。** Lead Agent 双源（SerpApi+WebSearch）+ 子代理三源（AnySearch+Tavily+SciVerse）。
+> 多源并行、中英双补、带可核验引用的深度研究工作流。
 
+[![Version](https://img.shields.io/badge/version-5.6.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
-[![Framework-agnostic](https://img.shields.io/badge/Framework-agnostic-green)](skills/tri-research/SKILL.md)
-[![Search Sources](https://img.shields.io/badge/Search%20Sources-5-orange)](skills/tri-research/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](skills/tri-research/LICENSE)
 
----
+## 核心能力
 
-## 🏗️ 架构总览
+Tri Research 由主导代理规划和综合，并行派发独立研究子代理。它支持四个可选外部后端，以及宿主框架提供的 Runtime WebSearch：
 
-**Lead Agent 双源直接搜索 + 子代理三源并行 + Citation 补强**
+| 渠道 | 调用者 | 主要用途 | 不可用时 |
+|---|---|---|---|
+| AnySearch | 子代理 | 通用网页、批量检索、正文提取 | 跳过 |
+| Tavily | 子代理 | 深度网页搜索与提取 | 跳过 |
+| SciVerse | 子代理 | 学术论文、语义片段、引用元数据 | MCP 缺失时尝试 Node CLI，再失败则跳过 |
+| SerpApi | 主导代理 | 中英文 Google 与 Google Scholar 补强 | 跳过 |
+| Runtime WebSearch | 主导代理 | 宿主框架内置补充渠道 | 使用其余可用渠道 |
 
-```mermaid
-graph TB
-    User[用户查询]
-    Clarify["🔍 Phase 0: CLARIFY<br/>确认主题/关键词/时间"]
-    Lead[Lead Agent<br/>主导代理]
+计数规则是 `4 个可选外部后端 + 1 个运行时渠道`。发现命令或检测到环境变量不等于可用，只有轻量真实查询成功才标记为 `available`。
 
-    subgraph LeadSources["Lead Agent 双源直接搜索"]
-        direction LR
-        SP[🟧 SerpApi<br/>结构化SERP<br/>+ Scholar + 100+引擎]
-        WS[🟦 WebSearch<br/>通用补充<br/>无配额]
-    end
+## v5.6.0 调度防护
 
-    subgraph SubSources["子代理三源并行"]
-        direction TB
-        AS[AnySearch<br/>🟦 通用+23垂直]
-        TV[Tavily<br/>🟩 深度网页]
-        SV[SciVerse<br/>🟪 学术论文]
-    end
+- 使用跨平台 Python 状态机约束 `S0 -> S1 -> S2 -> S3 -> DONE`，并用显式 session id 隔离并发研究。
+- 每轮研究只允许一次子代理派发；进入 `S2` 后禁止重新派发。
+- 每个子代理在自己的进程内预检 AnySearch、Tavily 和 SciVerse，不复用主进程的凭据判断。
+- 独立来源采用 `Promise.allSettled` 或框架等价语义，单源失败不会丢弃其他源的成功结果。
+- 凭据、配置或配额错误触发来源级熔断，本子任务不再重试该来源，也不会因此派生或重新派发代理。
+- 子代理限制为 8 分钟和 20 次工具调用；6 分钟后停止扩展检索并返回已有结果。
+- 最终报告必须通过引用闭环、来源元数据、中英覆盖和渠道状态验收，才能进入 `DONE`。
 
-    subgraph Subs["子代理层（并行）"]
-        SA1[Subagent 1]
-        SA2[Subagent 2]
-        SA3[Subagent 3]
-    end
+## 工作流
 
-    Cit[Citation Agent]
-    Report[最终报告<br/>DEEP_RESEARCH_*.md]
-
-    User --> Clarify
-    Clarify -->|用户确认| Lead
-    Lead --> SP & WS
-    Lead --> SA1 & SA2 & SA3
-    SA1 --> AS & TV & SV
-    SA2 --> AS & TV & SV
-    SA3 --> AS & TV & SV
-    Lead --> Cit
-    Cit --> Report
-
-    style Clarify fill:#fff9c4,stroke:#f9a825
-    style AS fill:#e3f2fd
-    style TV fill:#e8f5e9
-    style SV fill:#f3e5f5
-    style SP fill:#fff3e0
-    style WS fill:#e0f7fa
-    style Lead fill:#fff9c4
-    style Report fill:#ffebee
+```text
+用户确认或直接给出研究问题
+  -> 真实探测搜索渠道并报告一次状态
+  -> S0: 确认主题、双语关键词、时间范围
+  -> S1: 评估、分类、规划
+  -> 主导代理执行 SerpApi / Runtime WebSearch 补强（可用时）
+  -> S2: 一次性并行派发 1-6 个子代理
+       -> 子代理本地预检 AnySearch / Tavily / SciVerse
+       -> 故障隔离并行检索，中英双补
+       -> 单源失败熔断，保留其余结果
+  -> S3: 主导代理综合、写报告、加引用、验收
+  -> DONE
 ```
 
-> **Phase 0 CLARIFY**：每次研究启动前，Lead Agent 会先确认 3 个问题：① 主题是否准确 ② 中英文关键词 ③ 时间范围。用户确认后才开始检索。
+简单问题使用 1 个子代理，非简单问题使用 2-6 个。主导代理负责最终综合与写作，不把最终报告再次委派出去。
 
-**关键设计**：
-- **Lead Agent** 直接用 SerpApi + WebSearch 双源，覆盖最广
-- **子代理** 用 AnySearch + Tavily + SciVerse 三源，互补性强
-- **Lead + 子代理** 合计 **5源协同**（不是5选1）
-## 🔍 五源分工
+## 安装
 
-| 搜索源 | 强项 | 弱项 | 典型场景 | 调用层 |
-|--------|------|------|---------|--------|
-| **🟦 AnySearch** | 通用网页、23个垂直领域、批量搜索、URL提取 | 无学术专门优化 | 行业分析、新闻、事实查证 | 子代理 |
-| **🟩 Tavily** | 深度网页搜索、自动摘要、引用链 | 不适合学术数据库 | 智库报告、深度文章 | 子代理 |
-| **🟪 SciVerse** | 学术论文、引用元数据、语义搜索 | 不擅长通用网页 | 文献综述、学术研究 | 子代理 |
-| **🟧 SerpApi** | Google/Scholar结构化JSON、100+垂直引擎 | 需API Key、配额有限 | 中文搜索、Google Scholar、SEO | **仅Lead** |
-
-**为什么SerpApi只给Lead？**
-- 需要API Key（250次/月免费额度）
-- 自动处理HTTP代理环境（避免SSL握手失败）
-- 避免子代理重复调用浪费配额
-- Lead直接获取SERP结构化数据并整合
-
-## ⚡ 完整工作流程
-
-```
-1️⃣ 用户：tri-research <问题>
-   ↓
-2️⃣ Phase 0 CLARIFY：确认主题/关键词/时间范围
-   ↓
-3️⃣ Lead Agent：解析查询 + 检测5个工具状态 + 输出建议
-   ↓
-4️⃣ Lead 双源直接搜索（并行）
-   ├─ SerpApi：Google中/英 + Scholar + 100+垂直SERP
-   └─ WebSearch：补充覆盖新闻、博客
-   ↓
-5️⃣ Lead 并行派发 2-6 个 Subagent
-   ├─ Subagent 1：AnySearch + Tavily + SciVerse
-   ├─ Subagent 2：AnySearch + Tavily + SciVerse
-   └─ Subagent 3：AnySearch + Tavily + SciVerse
-   ↓
-6️⃣ Lead 综合 5 源 + 写入报告
-   ↓
-7️⃣ Citation Agent：添加引用（可选）
-   ↓
-8️⃣ 输出：DEEP_RESEARCH_[TOPIC].md
-```
-
-## 🚀 一条命令安装
+安装主技能：
 
 ```bash
 npx skills add jefeerzhang/tri-research-skill
 ```
 
-## 🔧 搜索工具配置（可选，有降级策略）
+安装可选搜索后端：
 
-| 工具 | 类型 | 安装方式 | 必需？ |
-|------|------|---------|--------|
-| [AnySearch](https://github.com/LearnPrompt/anysearch) | CLI Skill | `npx skills add LearnPrompt/anysearch` | 否 |
-| [Tavily](https://tavily.com) | MCP Server | `mcp.json` + API Key | 否 |
-| SciVerse | MCP Server | OpenSpace MCP | 否 |
-| [SerpApi](https://serpapi.com) | CLI Skill | 设置 `SERPAPI_KEY` 环境变量 | 否 |
-
-## 🎯 触发条件
-
-| ✅ 该用 | ❌ 不该用 |
-|--------|----------|
-| 需要10+来源的深度研究 | 简单事实查询 |
-| 多视角/多实体对比分析 | 代码调试 |
-| 学术文献综述 | 本仓库问题 |
-| 行业/政策风险分析 | 一句话回答 |
-
-**触发词**：`tri-research` / `多元研究` / `多源研究` / `深度研究` / `research` / `研究报告` / `全面分析` / `文献综述` / `对比分析`
-
-## ⏰ 时间范围控制
-
-| 用户输入 | 时间范围 |
-|---------|---------|
-| （无时间词） | 全部年份（默认） |
-| `2024年AI医疗进展` | 2024年 |
-| `2020-2025年研究` | 2020-2025 |
-| `最新气候政策` | 最近1年 |
-| `近5年的进展` | 最近5年 |
-| `90年代的研究` | 1990-1999 |
-
-## 🛡️ 降级策略（每次都建议配置，不阻断）
-
-| 可用源 | 效果 | 预期来源数 |
-|--------|------|-----------|
-| 4个全用 | 最佳 | ~50-70 |
-| 3个（缺SerpApi） | 良好 | ~40-50 |
-| 2个 | 可用 | ~25-30 |
-| 1个 | 基础 | ~10-15 |
-| 0个 | 内置WebSearch | ~5-10 |
-
-```
-🔍 搜索工具状态：AnySearch [✅] | Tavily [✅] | SciVerse [✅] | SerpApi [❌]
-
-💡 建议配置四个搜索工具以获得最佳效果
-当前可用工具 3/5 个，将使用 AnySearch + Tavily + SciVerse 继续研究。
+```bash
+npx skills add LearnPrompt/anysearch
+npx skills add https://sciverse.space
 ```
 
-## 🌍 跨平台兼容
+Tavily 通过宿主 MCP 配置。SerpApi 使用仓库中的 `skills/serpapi`，从 `SERPAPI_KEY` 读取凭据。SciVerse 从 `SCIVERSE_API_TOKEN` 读取凭据，需要 Node.js 18 或更高版本来运行 CLI fallback。
 
-| 框架 | 安装路径 | DISPATCH | subagent_type |
-|------|---------|----------|---------------|
-| Claude Code | `~/.claude/skills/` | `Task` | `general-purpose` |
-| Hermes Agent | `~/.hermes/skills/` | `delegate_to_agent` | `general` |
-| Codex | `~/.codex/skills/` | `handoff()` | `general-purpose` |
-| OpenCode | `~/.config/opencode/skills/` | framework-specific | `worker` |
+所有密钥只从环境变量读取，不写入仓库、日志或研究报告。
 
-## 📊 实测验证：五轮迭代
+## 使用
 
-| 指标 | v1 (web_search) | v2 (抽象接口) | v3 (Tavily) | v4 (三源) | v5 (五源+8min) |
-|------|----------------|--------------|-------------|-----------|-----------------|
-| 搜索源数 | 1 | 1 | 2 | 3 | **4** |
-| 来源总数 | 24 | 27 | 34 | 23* | **39-50** |
-| 顶刊文献 | 0 | 0 | 5 | 4 | **6+** |
-| 央行/监管文件 | 3 | 3 | 6 | 7 | **8+** |
-| 超时率 | 0% | 0% | 0% | 33% | **0%** |
-
-*v4因无时间约束被中止
-
-**五源互补率**：约70%（来源来自单一工具独占）
-
-## 🔒 安全边界
-
-- 不自动发布报告到外部服务
-- 不存储用户查询历史
-- 搜索内容会发送到四个搜索API
-- SerpApi只在Lead调用，避免子代理浪费配额
-- 子代理有8分钟超时限制
-
-## 📁 文件结构
-
+```text
+tri-research 人工智能与劳动分配
 ```
+
+也可使用 `多元研究`、`多源研究`、`深度研究`、`研究报告` 或 `文献综述` 等触发词。研究开始前会确认主题、中英文关键词和时间范围；用户直接给出完整约束时可按原请求继续。
+
+默认输出：
+
+```text
+DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
+```
+
+报告包含 `TL;DR`、结构化正文、句末 `[N]` 引用、参考文献，以及每条来源的 URL、Tier 和 `Found by` 元数据。
+
+## 搜索降级
+
+| 状态 | 含义 | 行为 |
+|---|---|---|
+| `available` | 轻量真实查询成功 | 参与本轮研究 |
+| `unavailable` | 未安装、未暴露、无凭据或网络失败 | 本轮跳过 |
+| `quota_exhausted` | HTTP 429 或服务商明确返回用量上限 | 本轮熔断，不重试 |
+
+任一单源失败都不阻断报告。所有渠道均不可用时，流程会明确说明阻塞，不伪造来源。
+
+## 真实回归测试
+
+2026-07-20 以“人工智能与劳动分配”为主题完成端到端回归：
+
+| 检查项 | 结果 |
+|---|---|
+| 子代理派发 | 3 个一次性并行派发，3/3 完成 |
+| 子代理收敛 | 每个 2 个 OODA 循环，约 2-5 分钟完成 |
+| 派生与重派发 | 派生代理 0，重复派发 0 |
+| 循环安全 | 空循环 0，死循环 0 |
+| 状态机 | 仅一次 `SUBAGENTS_DISPATCHED`，最终 `DONE` |
+| 自动化测试 | 15/15 通过 |
+
+本轮后端状态：
+
+- AnySearch：可用。
+- SciVerse：主代理和 2/3 子代理可用；1 个子代理未继承凭据，按设计熔断并降级，未触发重派发。
+- Tavily：`quota_exhausted`，按设计跳过。
+- SerpApi：测试进程未检测到凭据，因此本轮未验证真实查询。
+- Runtime WebSearch：当前宿主未暴露。
+
+因此，本轮验证的是“核心调度、真实子代理工作、来源故障隔离和降级流程全部跑通”，不宣称所有外部来源均已成功调用。
+
+## 测试
+
+Windows / PowerShell 必须使用已配置的 conda Python：
+
+```powershell
+& 'C:\Users\jefeer\an\python.exe' -m unittest discover -s 'skills\tri-research\tests' -v
+```
+
+验证生成的研究报告：
+
+```powershell
+& 'C:\Users\jefeer\an\python.exe' 'skills\tri-research\scripts\validate_report.py' '<report.md>' --min-sources 12
+```
+
+## 文件结构
+
+```text
 tri-research-skill/
-├── README.md                    # 本文件
-├── skills/
-│   ├── tri-research/            # 主导代理（v5.2.0）
-│   │   ├── SKILL.md
-│   │   ├── README.md
-│   │   ├── test-prompts.json
-│   │   ├── CHANGELOG.md
-│   │   └── LICENSE
-│   ├── research-subagent/       # 子代理
-│   │   └── SKILL.md
-│   ├── citations/               # 引用代理
-│   │   └── SKILL.md
-│   └── serpapi/                 # SerpApi 技能（v1.0.0）
-│       ├── SKILL.md
-│       ├── README.md
-│       ├── scripts/serpapi_cli.py
-│       ├── .env.example
-│       └── LICENSE
-└── assets/screenshots/          # 端到端运行截图
-    ├── 01-skill-loaded-and-phase1.png
-    ├── 02-3-subagents-parallel.png
-    ├── 03-subagents-completed.png
-    └── 04-final-report-summary.png
+|-- README.md
+|-- skills/
+|   |-- tri-research/
+|   |   |-- SKILL.md
+|   |   |-- README.md
+|   |   |-- CHANGELOG.md
+|   |   |-- test-prompts.json
+|   |   |-- scripts/
+|   |   |   |-- state_machine.py
+|   |   |   |-- state_machine.sh
+|   |   |   `-- validate_report.py
+|   |   `-- tests/
+|   |       |-- test_skill_contract.py
+|   |       |-- test_state_machine.py
+|   |       `-- test_validate_report.py
+|   |-- research-subagent/
+|   |   `-- SKILL.md
+|   |-- citations/
+|   |   `-- SKILL.md
+|   `-- serpapi/
+|       |-- SKILL.md
+|       `-- scripts/serpapi_cli.py
+`-- assets/screenshots/
 ```
 
-## 🖼️ 端到端运行截图
-
-**1. 技能加载与状态展示**
-
-![技能加载](assets/screenshots/01-skill-loaded-and-phase1.png)
-
-**2. 并行子代理派发**
-
-![并行运行](assets/screenshots/02-3-subagents-parallel.png)
-
-**3. 子代理完成**
-
-![完成状态](assets/screenshots/03-subagents-completed.png)
-
-**4. 最终报告生成**
-
-![报告摘要](assets/screenshots/04-final-report-summary.png)
-
-## 📜 License
+## License
 
 MIT

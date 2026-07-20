@@ -2,6 +2,44 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [5.6.0] - 2026-07-20
+
+### Fixed
+- 子代理必须本地预检后端，避免把主进程可用状态错误外推为凭据已继承。
+- 并行源调用改为 failure-isolated / `allSettled` 语义，单源失败不再丢弃其他源的成功输出。
+- 凭据、配置或配额失败按来源熔断，本子代理立即跳过该源剩余查询，不重试、不重新派发。
+
+### Verified
+- 3 个子代理一次性派发并全部返回，无子代理派生、无重复派发、无空循环或死循环。
+- 每个子代理 2 个 OODA 循环后收束，完成时间约 2–5 分钟。
+
+## [5.5.0] - 2026-07-20
+
+### Fixed
+- SciVerse 不再依赖宿主必须暴露 MCP；未暴露时自动使用官方 skill 的 Node.js CLI。
+- 可用性探测改为验证 CLI 退出码、`biz_code: 0` 和 `hits`，避免“Token 已配置但后端不可达”的假阳性。
+- 子代理必须保留 SciVerse 返回的 `doc_id`、题名与原文片段，确保学术证据可复现。
+
+### Added
+- 官方安装命令 `npx skills add https://sciverse.space` 与 `SCIVERSE_API_TOKEN` 配置说明。
+- 中英文语义检索实测通过，MCP 缺失时 CLI fallback 可用。
+
+## [5.4.0] - 2026-07-20
+
+### Fixed
+- 将 Bash 专用状态机改为跨平台 Python 实现；`state_machine.sh` 仅保留兼容转发。
+- 使用显式 `--session` 隔离并发研究，移除“读取最近状态文件”造成的串会话风险。
+- 将运行状态目录从 `TRI_RESEARCH_HOME` 分离为 `TRI_RESEARCH_STATE_DIR`，不再污染技能安装目录。
+- 重复初始化默认报错，不再静默删除已有状态；增加原子写入和 session id 路径校验。
+- 修正“最终报告不要引用”与验收清单要求引用之间的冲突，主导代理必须生成完整引用。
+- 修正四个外部后端与运行时 WebSearch 被混称“四源/五源”的计数歧义。
+- 工具预检改为轻量真实查询，区分 `available`、`unavailable`、`quota_exhausted`。
+
+### Added
+- 6 个状态机自动化测试，以及技能版本、引用、路径和测试主题的契约检查。
+- “人工智能与劳动分配”端到端测试用例，要求中英双补和带引用 Markdown 报告。
+- `validate_report.py` 报告验收器，检查章节、引用闭环、来源元数据、双语覆盖与渠道状态。
+
 ## [5.3.0] - 2026-07-20
 
 ### Changed

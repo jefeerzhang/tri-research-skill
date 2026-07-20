@@ -1,6 +1,6 @@
 ---
 name: research-subagent
-version: 5.0.0
+version: 5.2.0
 description: "Internal skill - Research subagent that executes focused research tasks using three search backends (AnySearch + Tavily + SciVerse). Called automatically by the tri-research lead agent."
 dependencies:
   - name: anysearch
@@ -10,7 +10,7 @@ dependencies:
     type: mcp-server
     required: false
   - name: sciverse
-    type: mcp-server
+    type: cli-skill-or-mcp-server
     required: false
 ---
 
@@ -26,9 +26,11 @@ This subagent uses **three search backends** for maximum coverage. Use whichever
 |---|------|-----------|----------|
 | 1 | **AnySearch** | CLI: `python ${ANYSEARCH_HOME}/scripts/anysearch_cli.py <command>` （跨平台路径：`${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}`） | General web, 23 vertical domains, batch search, URL extract |
 | 2 | **Tavily** | MCP: `mcp__tavily__tavily_search` (search_depth="advanced") + `mcp__tavily__tavily_extract` | Deep web search, auto-summarization |
-| 3 | **SciVerse** | MCP: `mcp__sciverse__semantic_search` + `mcp__sciverse__search_papers` | Academic papers, citation metadata |
+| 3 | **SciVerse** | Prefer MCP; fallback: `node ${SCIVERSE_HOME:-${TRI_RESEARCH_HOME}/../sciverse}/scripts/semantic_search.mjs '<json>'`, then `read_content.mjs` | Academic papers, citation metadata, semantic chunks |
 
 **Strategy**: Use all three tools in parallel for maximum source diversity. Deduplicate results by URL (keep richer extract). Note which tool found each source for traceability.
+
+**Failure isolation**: Preflight each allowed backend once in this child process. Run independent backends with `Promise.allSettled` or the framework equivalent, never fail-fast `Promise.all`. Preserve every successful backend result even if another backend fails. A credential, configuration, or quota error disables that backend for the remainder of this subtask; do not retry its second language query.
 
 **Fallback**: If a tool is unavailable, skip it and use the remaining tools. If ALL tools are unavailable, use built-in WebSearch/WebFetch.
 
@@ -42,7 +44,7 @@ All research operates through three abstract interfaces, mapped to concrete tool
 
 | Abstract Interface | Concrete Tool | Usage |
 |---|---|---|
-| **SEARCH**(query) | AnySearch CLI (`batch_search`) + Tavily MCP (`tavily_search`) + SciVerse MCP (`semantic_search`) | Initial discovery, parallel across all 3 tools |
+| **SEARCH**(query) | AnySearch CLI (`batch_search`) + Tavily MCP (`tavily_search`) + SciVerse MCP or Node CLI (`semantic_search`) | Initial discovery, parallel across all 3 tools |
 | **FETCH**(url) | AnySearch CLI (`extract`) + Tavily MCP (`tavily_extract`) | Get complete page content after SEARCH |
 | **RENDER**(url) | Playwright MCP (fallback) | JavaScript-heavy pages only |
 
@@ -80,12 +82,13 @@ Repeat this loop efficiently.
 ### 3. Tool Usage Strategy
 
 **Step-by-step workflow**:
-1. Run **AnySearch `batch_search`** with 3 parallel queries (fastest, ~1-3s) — 使用 `${ANYSEARCH_HOME}/scripts/anysearch_cli.py`
-2. Run **Tavily `tavily_search`** with search_depth="advanced" for 2 queries (~2-4s)
-3. Run **SciVerse `semantic_search`** for 2 academic queries (~2-5s)
-4. For the 3-5 most relevant results across all tools, use **FETCH** to get full content
-5. **Deduplicate** by URL — if two tools found the same source, keep the richer extract
-6. **Tag source origin** — note which tool found each source (AnySearch/Tavily/SciVerse)
+1. Preflight AnySearch, Tavily, and SciVerse once inside this subagent; do not assume the lead agent's credentials were inherited.
+2. Run **AnySearch `batch_search`** with 3 parallel queries (fastest, ~1-3s) — 使用 `${ANYSEARCH_HOME}/scripts/anysearch_cli.py`
+3. Run **Tavily `tavily_search`** with search_depth="advanced" for 2 queries (~2-4s)
+4. Run **SciVerse `semantic_search`** for 2 academic queries (~2-5s). Prefer host MCP; if absent, use the installed skill's Node CLI. Preserve `doc_id`, title, score, offset, and chunk.
+5. For the 3-5 most relevant results across all tools, use **FETCH** to get full content
+6. **Deduplicate** by URL — if two tools found the same source, keep the richer extract
+7. **Tag source origin** — note which tool found each source (AnySearch/Tavily/SciVerse)
 
 **Tool budgets**:
 - AnySearch: max 3 batch_search calls (each with 3 queries = 9 queries total)，路径使用 `${ANYSEARCH_HOME}` 环境变量
@@ -111,36 +114,9 @@ Think critically about search results:
 - **Verify recency**: Prioritize recent information for time-sensitive topics
 - **Cross-reference**: Compare multiple sources when facts conflict
 
-### Time Range Filtering
-
-**Default behavior**: Search across **ALL years** (no time filter).
-
-**User-specified time ranges**: If the user's query contains time keywords, extract and apply them:
-
-| User Query Pattern | Time Filter | Example |
-|---|---|---|
-| (no time keyword) | All years | "AI在医疗中的应用" |
-| Explicit year(s) | Specific year(s) | "2024年AI医疗进展"、"2020-2025年研究" |
-| "最新"/"近期"/"recent"/"latest" | Last 1 year | "AI医疗最新进展" |
-| "近X年"/"past X years" | Last X years | "近5年的研究"、"past 3 years" |
-| "前"/"before"/"until" | Until that year | "2020年前的抑郁症治疗" |
-| "X-Y年代" / decade | Year range | "90年代的研究" |
-
-**How to apply**: Add year/date qualifiers to your search queries:
-
-```
-# Example: User asks "近3年的AI医疗研究"
-Original query: "AI医疗研究"
-Updated query with time filter: "AI医疗研究" + freshness filter (Tavily: "year", AnySearch: filter)
-
-# Example: User asks "2020-2025年气候政策"
-Original query: "气候政策"
-Updated query: "气候政策" + date range 2020..2025 (SciVerse: year_from/year_to)
-```
-
-**Priority**: Time filters from user query > default (all years). If conflicting, ask user to clarify.
-
 **Flag potential issues** in your report rather than presenting uncertain info as facts.
+
+**SciVerse metadata check**: Preserve `doc_id`, title, and excerpt, but treat automatic topic/domain/venue labels as potentially noisy. Verify DOI, title, venue, and source text before assigning Tier 1 or making a paper-specific claim.
 
 ### 5. Reporting
 
@@ -187,7 +163,9 @@ When you have sufficient information:
 | **AnySearch CLI 不存在** | `python: can't open file` 或 `No such file` | 跳过AnySearch，用Tavily+SciVerse继续 |
 | **AnySearch API 配额耗尽** | 返回 `quota exceeded` 或 HTTP 429 | 跳过AnySearch，用Tavily+SciVerse继续 |
 | **Tavily MCP 不可用** | 工具调用返回 error | 跳过Tavily，用AnySearch+SciVerse继续 |
-| **SciVerse MCP 不可用** | 工具调用返回 error | 跳过SciVerse，用AnySearch+Tavily继续 |
+| **SciVerse MCP 不可用** | 宿主未暴露工具 | 尝试 `${SCIVERSE_HOME}/scripts/semantic_search.mjs`，不要直接跳过 |
+| **SciVerse CLI 不可用** | 缺脚本、Token、网络失败或 API 错误 | 跳过 SciVerse，用 AnySearch+Tavily 继续；不得回显 Token |
+| **并行批次单源失败** | 一个 Promise/tool call 报错 | 使用 settled 结果继续；保留其他源输出，不让编排器丢弃整个批次 |
 | **全部工具不可用** | 所有搜索均失败 | 使用内置WebSearch/WebFetch作为最后降级 |
 | **FETCH 返回空内容** | 内容 < 200 字符或为空 | 跳过该来源，继续搜索下一个 |
 | **FETCH 返回 JS 占位符** | 内容含 "Enable JavaScript" | 尝试 RENDER，若也不可用则跳过 |
@@ -216,6 +194,8 @@ When you have sufficient information:
 - ❌ **不要把搜索摘要当全文**：摘要只是线索，重要发现要用FETCH获取全文验证
 - ❌ **不要超过20次工具调用**：硬限制，超出会被强制终止
 - ❌ **不要在同一轮混用不同工具的相同查询**：每个工具分配不同的搜索词，避免浪费
+- ❌ **不要用 fail-fast 聚合独立来源**：禁止因一个源失败而丢弃已成功的 AnySearch/SciVerse/Tavily 输出
+- ❌ **不要为环境错误重复双语轮次**：Token/配置/配额失败一次后，本子任务立即熔断该源
 
 ## Example Task
 
