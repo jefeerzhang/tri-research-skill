@@ -7,25 +7,80 @@ import argparse
 import re
 import sys
 from pathlib import Path
-
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 REFERENCE_RE = re.compile(r"^\[(\d+)]\s+(.+)$", re.MULTILINE)
 INLINE_RE = re.compile(r"\[(\d+)]")
 URL_RE = re.compile(r"https?://\S+")
+H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_RE = re.compile(r"\b[A-Za-z]{4,}\b")
+MIN_REPORT_SOURCES = 10
+TRACKING_QUERY_KEYS = {
+    "fbclid",
+    "gclid",
+    "mc_cid",
+    "mc_eid",
+    "ref",
+    "ref_src",
+}
 
 
-def validate(text: str, min_sources: int) -> list[str]:
+def normalize_topic(value: str) -> str:
+    return "".join(character.casefold() for character in value if character.isalnum())
+
+
+def canonicalize_url(value: str) -> str | None:
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return None
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+        return None
+    host = parsed.hostname.lower()
+    if port and not (
+        (parsed.scheme.lower() == "http" and port == 80)
+        or (parsed.scheme.lower() == "https" and port == 443)
+    ):
+        host = f"{host}:{port}"
+    path = re.sub(r"/{2,}", "/", parsed.path or "/").rstrip("/") or "/"
+    query = urlencode(
+        sorted(
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+            if not key.lower().startswith("utm_")
+            and key.lower() not in TRACKING_QUERY_KEYS
+        ),
+        doseq=True,
+    )
+    # Fragments and tracking parameters are not distinct evidence sources.
+    return urlunsplit((parsed.scheme.lower(), host, path, query, ""))
+
+
+def validate(
+    text: str, min_sources: int, *, expected_topic: str | None = None
+) -> list[str]:
     errors: list[str] = []
     required_headings = ("## TL;DR", "## 参考文献", "## 搜索与降级状态")
     for heading in required_headings:
         if heading not in text:
             errors.append(f"missing required heading: {heading}")
 
+    if expected_topic:
+        heading = H1_RE.search(text)
+        expected_normalized = normalize_topic(expected_topic)
+        actual_normalized = normalize_topic(heading.group(1)) if heading else ""
+        if not expected_normalized or expected_normalized not in actual_normalized:
+            errors.append(
+                "report H1 does not contain the confirmed topic: " + expected_topic
+            )
+
     references = {int(number): entry for number, entry in REFERENCE_RE.findall(text)}
     if len(references) < min_sources:
-        errors.append(f"expected at least {min_sources} references, found {len(references)}")
+        errors.append(
+            f"expected at least {min_sources} references, found {len(references)}"
+        )
 
     if references:
         expected = list(range(1, max(references) + 1))
@@ -39,7 +94,12 @@ def validate(text: str, min_sources: int) -> list[str]:
         if not url_match:
             errors.append(f"reference [{number}] has no URL")
         else:
-            reference_urls[number] = url_match.group(0).rstrip(".,;:)]}>").lower()
+            raw_url = url_match.group(0).rstrip(".,;:)]}>")
+            canonical_url = canonicalize_url(raw_url)
+            if canonical_url is None:
+                errors.append(f"reference [{number}] has an invalid http/https URL")
+            else:
+                reference_urls[number] = canonical_url
         if not re.search(r"\bTier:\s*[123]\b", entry):
             errors.append(f"reference [{number}] has no valid Tier")
         if not re.search(r"\bFound by:\s*[^—\n]+", entry):
@@ -67,14 +127,23 @@ def validate(text: str, min_sources: int) -> list[str]:
     if unused:
         errors.append(f"reference entries are not cited in the body: {unused}")
 
-    if not CHINESE_RE.search(text):
-        errors.append("report has no Chinese-language coverage")
-    if not ENGLISH_RE.search(text):
-        errors.append("report has no English-language coverage")
+    reference_entries = list(references.values())
+    if reference_entries and not any(
+        CHINESE_RE.search(entry) for entry in reference_entries
+    ):
+        errors.append("report has no Chinese-language reference")
+    if reference_entries and not any(
+        ENGLISH_RE.search(entry) for entry in reference_entries
+    ):
+        errors.append("report has no English-language reference")
 
-    status_section = text.split("## 搜索与降级状态", 1)
-    if len(status_section) == 2 and not re.search(
-        r"available|unavailable|quota_exhausted", status_section[1]
+    status_match = re.search(
+        r"^## 搜索与降级状态\s*$\n(?P<body>.*?)(?=^##\s|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if status_match and not re.search(
+        r"\b(?:available|unavailable|quota_exhausted)\b", status_match.group("body")
     ):
         errors.append("search status section has no normalized channel status")
 
@@ -88,8 +157,20 @@ def validate(text: str, min_sources: int) -> list[str]:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
-    parser.add_argument("--min-sources", type=int, default=10)
+    parser.add_argument(
+        "--min-sources", type=source_threshold, default=MIN_REPORT_SOURCES
+    )
+    parser.add_argument(
+        "--topic", help="Confirmed research topic that must appear in H1"
+    )
     return parser
+
+
+def source_threshold(value: str) -> int:
+    parsed = int(value)
+    if parsed < MIN_REPORT_SOURCES:
+        raise argparse.ArgumentTypeError(f"must be at least {MIN_REPORT_SOURCES}")
+    return parsed
 
 
 def main() -> int:
@@ -97,7 +178,11 @@ def main() -> int:
     if not args.report.is_file():
         print(f"ERROR:report does not exist: {args.report}", file=sys.stderr)
         return 1
-    errors = validate(args.report.read_text(encoding="utf-8"), args.min_sources)
+    errors = validate(
+        args.report.read_text(encoding="utf-8"),
+        args.min_sources,
+        expected_topic=args.topic,
+    )
     if errors:
         for error in errors:
             print(f"ERROR:{error}", file=sys.stderr)
