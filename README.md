@@ -39,6 +39,81 @@ tri-research 比较 AWS、Azure 和 Google Cloud 的计算实例定价
 
 ---
 
+---
+
+## 搜索工具配置（可选，有降级策略）
+
+三个搜索工具是增强项，不是前置条件。装了技能就能跑，配置后效果更好。
+
+### 1. AnySearch（通用搜索 + 23个垂直领域）
+
+**类型**：CLI Skill（本地脚本，无需API Key即可匿名使用）
+
+**安装**：
+```bash
+npx skills add LearnPrompt/anysearch
+```
+
+或手动安装：
+```bash
+git clone https://github.com/LearnPrompt/anysearch.git ~/.claude/skills/anysearch
+```
+
+**可选配置**（提升速率限制）：
+- 访问 https://anysearch.com/console/api-keys 创建免费 API Key
+- 在 `~/.claude/skills/anysearch/.env` 中添加：`ANYSEARCH_API_KEY=<your_key>`
+
+**能力**：通用网页搜索、23个垂直领域（学术/金融/法律/医疗等）、批量并行搜索、URL全文提取
+
+---
+
+### 2. Tavily（深度网页搜索）
+
+**类型**：MCP Server（需要 API Key）
+
+**安装**：
+1. 访问 https://tavily.com 注册并获取 API Key
+2. 在 `~/.claude/mcp.json` 中添加：
+
+```json
+{
+  "mcpServers": {
+    "tavily": {
+      "type": "streamableHttp",
+      "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=<YOUR_API_KEY>"
+    }
+  }
+}
+```
+
+**能力**：深度网页搜索（search_depth: advanced）、自动摘要、全文提取、支持学术引用链
+
+---
+
+### 3. SciVerse（学术论文搜索）
+
+**类型**：MCP Server（需要 SciVerse API 访问权限）
+
+**安装**：
+- 如果已安装 OpenSpace MCP：SciVerse 随 OpenSpace 自动可用
+- 独立安装：参考 https://sciverse.app 文档配置 MCP Server
+
+**能力**：学术论文语义搜索、结构化论文检索（按作者/期刊/年份/DOI）、引用关系分析、论文全文阅读
+
+---
+
+### 降级策略
+
+**不需要三个都装。** 技能自动检测可用性：
+
+| 你的配置 | 预期效果 |
+|---------|---------|
+| 三个都装了 | 最佳：~39来源，67%互补率 |
+| 只装了 Tavily + SciVerse | 良好：~25-30来源 |
+| 只装了 AnySearch | 可用：~10-15来源 |
+| 什么都没装 | 基础：~5-10来源（内置WebSearch） |
+
+
 ## 它和同类有什么不同？
 
 | 特性 | 本Skill | GPT Researcher | Perplexity |
