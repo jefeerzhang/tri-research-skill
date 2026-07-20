@@ -36,8 +36,11 @@ class SkillContractTests(unittest.TestCase):
             self.assertEqual(keys, {"name", "description"})
 
     def test_public_docs_do_not_embed_private_or_retired_repo_paths(self) -> None:
-        root_readme = (ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
-        public_text = "\n".join((root_readme, self.readme, self.skill, self.subagent))
+        documents = [self.readme, self.skill, self.subagent]
+        repo_readme = ROOT.parents[1] / "README.md"
+        if repo_readme.is_file():
+            documents.append(repo_readme.read_text(encoding="utf-8"))
+        public_text = "\n".join(documents)
         self.assertNotIn("C:\\Users\\jefeer", public_text)
         self.assertNotIn(".claude\\skills\\tri-research", public_text)
         self.assertNotIn("& $python", self.readme)
