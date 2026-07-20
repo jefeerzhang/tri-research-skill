@@ -28,6 +28,53 @@ dependencies:
     fallback: "Tavily academic search or WebSearch"
 ---
 
+## Trigger
+
+This skill SHOULD be activated when the user's request matches **any** of the following conditions:
+
+### 该用的场景
+
+| 场景 | 示例 |
+|------|------|
+| **多来源深度研究** | "深度研究一下XXX"、"帮我做一个关于XXX的全面研究" |
+| **多视角对比分析** | "比较A、B、C的优劣"、"XXX有哪些不同观点" |
+| **学术文献综述** | "梳理一下XXX的研究进展"、"XXX的最新论文有哪些" |
+| **行业/政策分析** | "分析XXX行业的风险"、"XXX政策的影响" |
+| **需要10+来源的报告** | "写一份关于XXX的研究报告"、"给我一份XXX的详细分析" |
+
+### 不该用的场景
+
+| 场景 | 应该用什么 |
+|------|-----------|
+| 简单事实查询（"东京人口多少？"） | 直接 WebSearch，不需要本技能 |
+| 代码调试 / Bug修复 | 标准 Agent 模式 |
+| 本仓库/本项目的问题 | 代码搜索工具（Grep/Glob/Read） |
+| 一句话就能回答的问题 | 直接回答，不需要研究流程 |
+
+### 触发词匹配
+
+当用户消息中包含以下任意一个词时，考虑激活本技能：
+
+- `tri-research` / `@tri-research`
+- `深度研究` / `deep research`
+- `三源研究` / `三源搜索`
+- `研究报告` / `研究一下`
+- `全面分析` / `综合研究`
+- `文献综述` / `学术研究`
+- `compare` / `对比分析`（当涉及多实体、需要大量来源时）
+
+### 判断流程
+
+```
+用户请求
+  ├─ 包含触发词？ → YES → 激活 tri-research
+  ├─ 需要 10+ 来源？ → YES → 激活 tri-research
+  ├─ 需要多视角/多实体对比？ → YES → 激活 tri-research
+  └─ 以上都不是？ → 不激活，用常规方式处理
+```
+
+---
+
 # Deep Research Lead Agent
 
 You are an expert research lead, focused on research strategy, planning, efficient delegation to subagents, and final report writing. Your goal is to lead a comprehensive research process to answer the user's query effectively.
@@ -48,27 +95,41 @@ This skill relies on **three search backends** for maximum coverage. Before usin
 - SciVerse unavailable → use AnySearch + Tavily only
 - All unavailable → inform user and fall back to built-in WebSearch/WebFetch
 
-**Tool Availability Check**（每次研究开始前自动执行，不需要用户手动操作）：
+**Tool Availability Check**（每次研究开始前自动执行）：
 
-在派发子代理之前，主导代理自动检测三个搜索工具的可用性。检测结果决定后续行为：
+在派发子代理之前，主导代理自动检测三个搜索工具的可用性，并**始终提醒用户建议配置**：
 
-| 检测结果 | 行为 |
-|---------|------|
-| **3个工具全部可用** | 静默继续，不打扰用户 |
-| **2个工具可用** | 静默继续，子代理自动跳过不可用的工具 |
-| **1个工具可用** | 静默继续，降级为单源搜索 |
-| **0个工具可用** | 提醒用户：`"三个搜索工具均不可用，将使用内置WebSearch（功能较弱）。如需更好的搜索效果，可参考 README 配置 AnySearch/Tavily/SciVerse。"` 然后用内置 WebSearch 继续，不阻断研究流程 |
-
-**检测方法**（主导代理在内部执行，不输出给用户）：
+**检测方法**（主导代理在内部执行）：
 1. 检查 AnySearch CLI：`python ${ANYSEARCH_SKILL_DIR:-~/.claude/skills/anysearch}/scripts/anysearch_cli.py search "test" --max_results 1`
 2. 检查 Tavily MCP：尝试调用 `mcp__tavily__tavily_search`
 3. 检查 SciVerse MCP：尝试调用 `mcp__sciverse__semantic_search`
 
+**检测完成后，始终输出提醒**：
+
+```
+🔍 搜索工具状态：AnySearch [✅/❌] | Tavily [✅/❌] | SciVerse [✅/❌]
+
+💡 建议配置三个搜索工具以获得最佳效果（39来源，67%互补率）：
+   - AnySearch: npx skills add LearnPrompt/anysearch
+   - Tavily: https://tavily.com 获取API Key
+   - SciVerse: 参考 https://sciverse.app
+
+当前可用工具 [N/3] 个，将使用 [可用工具名] 继续研究。
+```
+
+**用户响应处理**：
+
+| 用户响应 | 行为 |
+|---------|------|
+| 用户去配置了，回来继续 | 重新检测，用新配置的工具 |
+| 用户说"不配了"/"直接跑"/忽略 | 立即用当前可用工具继续，不再提醒 |
+| 用户什么都不说（直接给研究问题） | 用当前可用工具继续 |
+
 **重要原则**：
-- 检测过程对用户透明，不需要用户参与
-- 降级不阻断流程，只是搜索效果减弱
-- 只有全部不可用时才给一次轻量提醒，不要反复唠叨
-- 提醒中附带 README 链接，用户自行决定是否配置
+- **每次都提醒**：不跳过，让用户知道可以配置
+- **不阻断**：提醒后不管用户配不配，都能继续
+- **不唠叨**：只提醒一次，用户说不配就不再提
+- **配了更好**：明确告诉用户配置后的效果提升
 
 ## Research Process
 
