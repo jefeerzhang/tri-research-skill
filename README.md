@@ -16,6 +16,7 @@
 ```mermaid
 graph TB
     User[用户查询]
+    Clarify["🔍 Phase 0: CLARIFY<br/>确认主题/关键词/时间"]
     Lead[Lead Agent<br/>主导代理]
 
     subgraph LeadSources["Lead Agent 双源直接搜索"]
@@ -40,7 +41,8 @@ graph TB
     Cit[Citation Agent]
     Report[最终报告<br/>DEEP_RESEARCH_*.md]
 
-    User --> Lead
+    User --> Clarify
+    Clarify -->|用户确认| Lead
     Lead --> SP & WS
     Lead --> SA1 & SA2 & SA3
     SA1 --> AS & TV & SV
@@ -49,6 +51,7 @@ graph TB
     Lead --> Cit
     Cit --> Report
 
+    style Clarify fill:#fff9c4,stroke:#f9a825
     style AS fill:#e3f2fd
     style TV fill:#e8f5e9
     style SV fill:#f3e5f5
@@ -57,6 +60,8 @@ graph TB
     style Lead fill:#fff9c4
     style Report fill:#ffebee
 ```
+
+> **Phase 0 CLARIFY**：每次研究启动前，Lead Agent 会先确认 3 个问题：① 主题是否准确 ② 中英文关键词 ③ 时间范围。用户确认后才开始检索。
 
 **关键设计**：
 - **Lead Agent** 直接用 SerpApi + WebSearch 双源，覆盖最广
@@ -82,23 +87,24 @@ graph TB
 ```
 1️⃣ 用户：tri-research <问题>
    ↓
-2️⃣ Lead Agent：解析查询 + 检测工具状态 + 输出建议
+2️⃣ Phase 0 CLARIFY：确认主题/关键词/时间范围
    ↓
-3️⃣ Lead 调用 SerpApi（4源）
-   ├─ Google搜索（中文+英文）
-   ├─ Google Scholar搜索
-   └─ 100+垂直SERP（如News/Maps/YouTube）
+3️⃣ Lead Agent：解析查询 + 检测5个工具状态 + 输出建议
    ↓
-4️⃣ Lead 并行派发 2-6 个 Subagent
+4️⃣ Lead 双源直接搜索（并行）
+   ├─ SerpApi：Google中/英 + Scholar + 100+垂直SERP
+   └─ WebSearch：补充覆盖新闻、博客
+   ↓
+5️⃣ Lead 并行派发 2-6 个 Subagent
    ├─ Subagent 1：AnySearch + Tavily + SciVerse
    ├─ Subagent 2：AnySearch + Tavily + SciVerse
    └─ Subagent 3：AnySearch + Tavily + SciVerse
    ↓
-5️⃣ Lead 综合5个数据源 + 写入最终报告
+6️⃣ Lead 综合 5 源 + 写入报告
    ↓
-6️⃣ Citation Agent：添加引用（可选）
+7️⃣ Citation Agent：添加引用（可选）
    ↓
-7️⃣ 输出：DEEP_RESEARCH_[TOPIC].md
+8️⃣ 输出：DEEP_RESEARCH_[TOPIC].md
 ```
 
 ## 🚀 一条命令安装
