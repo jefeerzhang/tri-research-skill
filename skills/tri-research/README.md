@@ -1,6 +1,6 @@
 # Tri Research Skill
 
-> 三源并行搜索，一篇报告搞定。AnySearch通用 + Tavily深度 + SciVerse学术。
+> 多元搜索并行、中英双补，一篇报告搞定。AnySearch通用 + Tavily深度 + SciVerse学术 + SerpApi中文Google/Scholar，可继续扩展。
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](SKILL.md)
 [![Framework-agnostic](https://img.shields.io/badge/Framework-agnostic-green)](SKILL.md)
@@ -45,17 +45,21 @@ cp -r /tmp/tri-research/skills/* ~/.claude/skills/
 | [AnySearch](https://github.com/LearnPrompt/anysearch) | CLI Skill | `npx skills add LearnPrompt/anysearch` 或手动安装 |
 | [Tavily](https://tavily.com) | MCP Server | 添加到 `~/.claude/mcp.json`，需要 API Key |
 | SciVerse | MCP Server | OpenSpace MCP 或独立安装 |
+| SerpApi | CLI Skill | 内置 `serpapi` skill（`scripts/serpapi_cli.py`）+ `SERPAPI_KEY` 环境变量；仅由主导代理集中调用，中英文 Google/Scholar 补强 |
 
 ### 降级原则
 
-**装了技能就能跑，不需要先配工具。** 三个搜索工具是增强项，不是前置条件。技能会自动检测可用性并降级：
+**装了技能就能跑，不需要先配工具。** 四个搜索工具是增强项，不是前置条件。技能会自动检测可用性并降级：
 
 | 可用工具数 | 行为 | 用户体验 |
 |-----------|------|---------|
-| 3个 | 三源并行全速运行 | 最佳：39来源，67%互补率 |
-| 2个 | 静默跳过缺失工具 | 良好：约25-30来源 |
+| 4个 | 多元并行全速运行（SerpApi 由主导代理集中补强） | 最佳：最多来源，中英文/学术全覆盖 |
+| 3个 | 静默跳过缺失工具 | 良好：约25-30来源 |
+| 2个 | 静默跳过缺失工具 | 可用：约15-20来源 |
 | 1个 | 单源搜索 | 可用：约10-15来源 |
 | 0个 | 回退到内置WebSearch，仅提醒一次 | 基础：约5-10来源 |
+
+> **SerpApi 特别说明**：免费档仅 250 次/月。它默认参与多元搜索，但配额耗尽或密钥缺失时**静默降级**到其余源，研究报告照常生成，不受影响。
 
 **四个关键原则**：
 
@@ -68,7 +72,8 @@ cp -r /tmp/tri-research/skills/* ~/.claude/skills/
 用户: tri-research <问题>
   ↓
 主导代理自动检测（对用户透明）
-  ├─ 3个可用 → 三源全速（最佳效果）
+  ├─ 4个可用 → 多元全速（最佳效果）
+  ├─ 3个可用 → 其余源运行（静默跳过缺失）
   ├─ 2个可用 → 双源运行（静默跳过缺失）
   ├─ 1个可用 → 单源运行
   └─ 0个可用 → 提醒一次 + 内置WebSearch（不阻断）
@@ -87,7 +92,7 @@ tri-research 比较 AWS、Azure 和 Google Cloud 的计算实例定价
 - `tri-research <研究问题>`
 - `@tri-research <研究问题>`
 - "帮我做一个深度研究：..."
-- "用三源搜索研究一下..."
+- "用多元搜索研究一下..."
 
 ## 示例
 
