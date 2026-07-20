@@ -9,6 +9,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - 验收失败时会保持 `S3`，不再写入伪造的 `REPORT_VALIDATED` 事件。
 - 验收成功后记录报告路径、SHA-256、最小来源门槛和验收时间，形成可审计完成证据。
 - 状态机拒绝低于 10 的来源门槛，验收器按唯一 URL 计数，禁止重复链接冒充多个来源。
+- 主技能和内部子代理的 frontmatter 仅保留标准 `name` 与富 `description`，版本和依赖说明移入正文。
 
 ### Added
 - 增加缺报告、无效报告、低来源门槛和重复 URL 的反例测试，并校验验收证据哈希。

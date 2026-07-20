@@ -1,45 +1,9 @@
 ---
 name: tri-research
-version: 5.7.0
-description: "Conduct cited deep research using parallel subagents, four optional external search backends (AnySearch + Tavily + SciVerse + SerpApi), and a runtime WebSearch fallback."
-triggers:
-  - "tri-research"
-  - "多元研究"
-  - "多源研究"
-  - "深度研究"
-  - "deep research"
-  - "research"
-  - "研究报告"
-dependencies:
-  - name: anysearch
-    type: cli-skill
-    required: false
-    install: "npx skills add LearnPrompt/anysearch"
-    fallback: "Built-in WebSearch"
-  - name: tavily
-    type: mcp-server
-    required: false
-    config: "~/.claude/mcp.json"
-    fallback: "Built-in WebSearch"
-  - name: sciverse
-    type: cli-skill-or-mcp-server
-    required: false
-    install: "npx skills add https://sciverse.space"
-    config: "Set SCIVERSE_API_TOKEN; bundled Node.js scripts require Node 18+"
-    note: "Prefer host MCP when available; otherwise use the installed skill's scripts/semantic_search.mjs and scripts/read_content.mjs"
-    fallback: "Tavily academic search or WebSearch"
-  - name: serpapi
-    type: cli-skill
-    required: false
-    install: "Use the bundled serpapi skill (scripts/serpapi_cli.py); set SERPAPI_KEY env var"
-    note: "Lead Agent direct search (source 1/2). NOT dispatched to subagents to avoid proxy/env leaks. Free tier: 250 searches/month."
-    fallback: "Degrades silently to WebSearch + 3 other sources when key missing or quota exhausted"
-  - name: websearch
-    type: builtin
-    required: false
-    note: "Lead Agent direct search (source 2/2). Claude Code built-in WebSearch + WebFetch, no quota limit. Used in parallel with SerpApi to broaden coverage."
-    fallback: "Always available as last resort"
+description: "Conduct cited deep research with parallel subagents, bilingual evidence, four optional external search backends, runtime search fallback, failure isolation, and a validated completion gate. Use for multi-source deep research, literature reviews, comparative analysis, policy or industry reports, and requests needing 10+ cited sources, including prompts containing tri-research, deep research, 多元研究, 深度研究, 研究报告, or 文献综述. Do not use for simple facts, code debugging, or local codebase questions."
 ---
+
+Current version: `5.7.0`
 
 ## Trigger
 
@@ -493,7 +457,7 @@ MCP tool names follow the convention `mcp__<server>__<tool>` in Claude Code, but
 
 **Best practice**: Skill files reference tools by their MCP server name + tool name. The runtime adapter translates based on detected framework.
 
-**SciVerse portable fallback**: If the framework-specific tool is absent, run `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '<json>'`; use `read_content.mjs` with the returned `doc_id` and offset for source expansion. This fallback is part of the supported interface, not a degraded citation format.
+**SciVerse portable fallback**: If the framework-specific tool is absent, run `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '<json>'`; then use `${SCIVERSE_HOME}/scripts/read_content.mjs` with the returned `doc_id` and offset for source expansion. This fallback is part of the supported interface, not a degraded citation format.
 
 ### Subagent Type Resolution
 

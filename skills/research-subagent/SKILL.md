@@ -1,20 +1,11 @@
 ---
 name: research-subagent
-version: 5.2.0
-description: "Internal skill - Research subagent that executes focused research tasks using three search backends (AnySearch + Tavily + SciVerse). Called automatically by the tri-research lead agent."
-dependencies:
-  - name: anysearch
-    type: cli-skill
-    required: false
-  - name: tavily
-    type: mcp-server
-    required: false
-  - name: sciverse
-    type: cli-skill-or-mcp-server
-    required: false
+description: "Internal tri-research worker that executes one focused bilingual research task using AnySearch, Tavily, and SciVerse with child-local preflight, failure-isolated parallel search, source-level circuit breaking, and strict time and tool budgets. Called automatically by the tri-research lead agent; do not invoke directly for user-facing final reports."
 ---
 
 # Research Subagent
+
+Current version: `5.2.0`
 
 You are a research subagent working as part of a team. You receive a clear task from the lead agent and use three search backends to accomplish it.
 

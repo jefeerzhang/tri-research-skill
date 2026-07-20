@@ -17,14 +17,23 @@ class SkillContractTests(unittest.TestCase):
         cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
         cls.changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         cls.prompts = json.loads((ROOT / "test-prompts.json").read_text(encoding="utf-8"))
+        cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
 
     def test_versions_match(self) -> None:
-        match = re.search(r"^version:\s*([^\s]+)", self.skill, re.MULTILINE)
+        match = re.search(r"^Current version:\s*`([^`]+)`", self.skill, re.MULTILINE)
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), VERSION)
         self.assertEqual(self.prompts["version"], VERSION)
         self.assertIn(f"当前版本：`{VERSION}`", self.readme)
         self.assertIn(f"## [{VERSION}]", self.changelog)
+
+    def test_frontmatter_uses_portable_standard_fields(self) -> None:
+        for content in (self.skill, self.subagent):
+            frontmatter = content.split("---", 2)[1]
+            keys = set(re.findall(r"^([A-Za-z][A-Za-z0-9_-]*):", frontmatter, re.MULTILINE))
+            self.assertEqual(keys, {"name", "description"})
 
     def test_report_contract_requires_citations(self) -> None:
         self.assertNotIn("Do NOT include citations", self.skill)
