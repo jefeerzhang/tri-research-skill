@@ -2,6 +2,11 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- 子代理的 AnySearch 路由改为 CLI-only：直接运行 bundled `anysearch_cli.py` 的 `doc`、`batch_search` 和 `extract`，禁止宿主把 AnySearch 自动映射到 MCP 工具。
+
 ## [5.8.0] - 2026-07-20
 
 ### Added

@@ -97,6 +97,17 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("子代理启动后必须对允许的后端各执行一次本地预检", self.skill)
         self.assertIn("单源失败不得取消或丢弃其他源的成功结果", self.skill)
 
+    def test_subagent_anysearch_is_cli_only(self) -> None:
+        for content in (self.skill, self.subagent):
+            self.assertIn("AnySearch CLI-only", content)
+            self.assertIn("scripts/anysearch_cli.py", content)
+            self.assertNotIn("mcp__anysearch", content.lower())
+        for command in (" doc", " batch_search", " extract"):
+            self.assertIn(command, self.subagent)
+        self.assertIn(
+            "AnySearch CLI-only", self.prompts["prompts"][0]["expected_behavior"]
+        )
+
     def test_integrity_contract_is_documented(self) -> None:
         for command in ("record_dispatch", "record_result", "INTEGRITY:OK"):
             self.assertIn(command, self.skill)
