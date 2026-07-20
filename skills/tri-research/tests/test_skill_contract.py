@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-VERSION = "5.6.0"
+VERSION = "5.7.0"
 
 
 class SkillContractTests(unittest.TestCase):
@@ -17,19 +17,40 @@ class SkillContractTests(unittest.TestCase):
         cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
         cls.changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         cls.prompts = json.loads((ROOT / "test-prompts.json").read_text(encoding="utf-8"))
+        cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
 
     def test_versions_match(self) -> None:
-        match = re.search(r"^version:\s*([^\s]+)", self.skill, re.MULTILINE)
+        match = re.search(r"^Current version:\s*`([^`]+)`", self.skill, re.MULTILINE)
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), VERSION)
         self.assertEqual(self.prompts["version"], VERSION)
         self.assertIn(f"当前版本：`{VERSION}`", self.readme)
         self.assertIn(f"## [{VERSION}]", self.changelog)
 
+    def test_frontmatter_uses_portable_standard_fields(self) -> None:
+        for content in (self.skill, self.subagent):
+            frontmatter = content.split("---", 2)[1]
+            keys = set(re.findall(r"^([A-Za-z][A-Za-z0-9_-]*):", frontmatter, re.MULTILINE))
+            self.assertEqual(keys, {"name", "description"})
+
+    def test_public_docs_do_not_embed_private_or_retired_repo_paths(self) -> None:
+        documents = [self.readme, self.skill, self.subagent]
+        repo_readme = ROOT.parents[1] / "README.md"
+        if repo_readme.is_file():
+            documents.append(repo_readme.read_text(encoding="utf-8"))
+        public_text = "\n".join(documents)
+        self.assertNotIn("C:\\Users\\jefeer", public_text)
+        self.assertNotIn(".claude\\skills\\tri-research", public_text)
+        self.assertNotIn("& $python", self.readme)
+        self.assertIn("& $env:CONDA_PYTHON", self.readme)
+
     def test_report_contract_requires_citations(self) -> None:
         self.assertNotIn("Do NOT include citations", self.skill)
         self.assertIn("参考文献", self.skill)
         self.assertIn("Found by", self.skill)
+        self.assertIn("advance DONE --report", self.skill)
 
     def test_state_directory_is_separate_from_skill_home(self) -> None:
         self.assertIn("TRI_RESEARCH_STATE_DIR", self.skill)

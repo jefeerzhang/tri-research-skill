@@ -33,13 +33,30 @@ def validate(text: str, min_sources: int) -> list[str]:
         if actual != expected:
             errors.append(f"reference numbers are not consecutive: {actual}")
 
+    reference_urls: dict[int, str] = {}
     for number, entry in sorted(references.items()):
-        if not URL_RE.search(entry):
+        url_match = URL_RE.search(entry)
+        if not url_match:
             errors.append(f"reference [{number}] has no URL")
+        else:
+            reference_urls[number] = url_match.group(0).rstrip(".,;:)]}>").lower()
         if not re.search(r"\bTier:\s*[123]\b", entry):
             errors.append(f"reference [{number}] has no valid Tier")
         if not re.search(r"\bFound by:\s*[^—\n]+", entry):
             errors.append(f"reference [{number}] has no Found by metadata")
+
+    unique_urls = set(reference_urls.values())
+    if len(unique_urls) < len(reference_urls):
+        duplicate_numbers = sorted(
+            number
+            for number, url in reference_urls.items()
+            if list(reference_urls.values()).count(url) > 1
+        )
+        errors.append(f"reference URLs are not unique: {duplicate_numbers}")
+    if len(unique_urls) < min_sources:
+        errors.append(
+            f"expected at least {min_sources} unique reference URLs, found {len(unique_urls)}"
+        )
 
     body = text.split("## 参考文献", 1)[0]
     cited = {int(number) for number in INLINE_RE.findall(body)}

@@ -1,5 +1,5 @@
 {
-  "version": "5.6.0",
+  "version": "5.7.0",
   "description": "Tri Research 可执行回归场景。",
   "usage": "运行研究场景后，按 validation_checklist 验收 Markdown 报告。",
   "prompts": [

@@ -2,7 +2,7 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`5.6.0`
+当前版本：`5.7.0`
 
 ## 能力边界
 
@@ -67,18 +67,24 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 
 状态机实现位于 `scripts/state_machine.py`。它使用显式 `--session` 隔离并发研究，状态数据写入 `TRI_RESEARCH_STATE_DIR` 或系统临时目录，不写入技能安装目录。
 
-本仓库在 PowerShell 下使用 conda Python：
+PowerShell 下先激活获准的 conda 环境，并设置两个可移植路径变量：
 
 ```powershell
-$python = 'C:\Users\jefeer\an\python.exe'
-$state = '.claude\skills\tri-research\scripts\state_machine.py'
+$env:CONDA_PYTHON = (Get-Command python).Source
+$env:TRI_RESEARCH_HOME = (Resolve-Path '<tri-research-install-dir>').Path
+$state = Join-Path $env:TRI_RESEARCH_HOME 'scripts\state_machine.py'
 $session = 'ai-labor-allocation'
 
-& $python $state --session $session init
-& $python $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
-& $python $state --session $session advance S1
-& $python $state --session $session check
+& $env:CONDA_PYTHON $state --session $session init
+& $env:CONDA_PYTHON $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
+& $env:CONDA_PYTHON $state --session $session advance S1
+& $env:CONDA_PYTHON $state --session $session check
+& $env:CONDA_PYTHON $state --session $session advance S2
+& $env:CONDA_PYTHON $state --session $session advance S3
+& $env:CONDA_PYTHON $state --session $session advance DONE --report '<report.md>' --min-sources 12
 ```
+
+进入 `DONE` 时，状态机必须实际读取并验收报告；通过后在状态文件中记录报告路径、SHA-256、来源门槛和验收时间。缺报告或验收失败都会保持 `S3`。
 
 Unix 环境可调用 `scripts/state_machine.sh` 兼容包装器，也可直接运行 Python 实现。
 
@@ -114,7 +120,7 @@ npx skills add jefeerzhang/tri-research-skill
 ## 测试
 
 ```powershell
-& 'C:\Users\jefeer\an\python.exe' -m unittest discover -s '.claude\skills\tri-research\tests' -v
+& $env:CONDA_PYTHON -m unittest discover -s (Join-Path $env:TRI_RESEARCH_HOME 'tests') -v
 ```
 
 测试覆盖状态转换、非法跳转、重复初始化、并发会话隔离、参数 JSON、路径污染和技能契约一致性。
@@ -122,7 +128,7 @@ npx skills add jefeerzhang/tri-research-skill
 报告生成后必须运行验收器：
 
 ```powershell
-& 'C:\Users\jefeer\an\python.exe' '.claude\skills\tri-research\scripts\validate_report.py' '<report.md>' --min-sources 12
+& $env:CONDA_PYTHON (Join-Path $env:TRI_RESEARCH_HOME 'scripts\validate_report.py') '<report.md>' --min-sources 12
 ```
 
 ## 文件结构

@@ -1,45 +1,9 @@
 ---
 name: tri-research
-version: 5.6.0
-description: "Conduct cited deep research using parallel subagents, four optional external search backends (AnySearch + Tavily + SciVerse + SerpApi), and a runtime WebSearch fallback."
-triggers:
-  - "tri-research"
-  - "多元研究"
-  - "多源研究"
-  - "深度研究"
-  - "deep research"
-  - "research"
-  - "研究报告"
-dependencies:
-  - name: anysearch
-    type: cli-skill
-    required: false
-    install: "npx skills add LearnPrompt/anysearch"
-    fallback: "Built-in WebSearch"
-  - name: tavily
-    type: mcp-server
-    required: false
-    config: "~/.claude/mcp.json"
-    fallback: "Built-in WebSearch"
-  - name: sciverse
-    type: cli-skill-or-mcp-server
-    required: false
-    install: "npx skills add https://sciverse.space"
-    config: "Set SCIVERSE_API_TOKEN; bundled Node.js scripts require Node 18+"
-    note: "Prefer host MCP when available; otherwise use the installed skill's scripts/semantic_search.mjs and scripts/read_content.mjs"
-    fallback: "Tavily academic search or WebSearch"
-  - name: serpapi
-    type: cli-skill
-    required: false
-    install: "Use the bundled serpapi skill (scripts/serpapi_cli.py); set SERPAPI_KEY env var"
-    note: "Lead Agent direct search (source 1/2). NOT dispatched to subagents to avoid proxy/env leaks. Free tier: 250 searches/month."
-    fallback: "Degrades silently to WebSearch + 3 other sources when key missing or quota exhausted"
-  - name: websearch
-    type: builtin
-    required: false
-    note: "Lead Agent direct search (source 2/2). Claude Code built-in WebSearch + WebFetch, no quota limit. Used in parallel with SerpApi to broaden coverage."
-    fallback: "Always available as last resort"
+description: "Conduct cited deep research with parallel subagents, bilingual evidence, four optional external search backends, runtime search fallback, failure isolation, and a validated completion gate. Use for multi-source deep research, literature reviews, comparative analysis, policy or industry reports, and requests needing 10+ cited sources, including prompts containing tri-research, deep research, 多元研究, 深度研究, 研究报告, or 文献综述. Do not use for simple facts, code debugging, or local codebase questions."
 ---
+
+Current version: `5.7.0`
 
 ## Trigger
 
@@ -233,6 +197,7 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 ```powershell
 $state = "$env:TRI_RESEARCH_HOME\scripts\state_machine.py"
 $session = "ai-labor-allocation"
+$report = "DEEP_RESEARCH_ai-labor-allocation_2026-07-20.md"
 
 & $env:CONDA_PYTHON $state --session $session init
 & $env:CONDA_PYTHON $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
@@ -240,10 +205,10 @@ $session = "ai-labor-allocation"
 & $env:CONDA_PYTHON $state --session $session check
 & $env:CONDA_PYTHON $state --session $session advance S2
 & $env:CONDA_PYTHON $state --session $session advance S3
-& $env:CONDA_PYTHON $state --session $session advance DONE
+& $env:CONDA_PYTHON $state --session $session advance DONE --report $report --min-sources 12
 ```
 
-在本仓库中，`CONDA_PYTHON=C:\Users\jefeer\an\python.exe`。其他环境使用已激活 conda 环境或该环境批准的 Python 3.8+。
+在 Windows/PowerShell 中，先激活获准的 conda 环境，再设置 `$env:CONDA_PYTHON = (Get-Command python).Source`。其他环境使用已激活的 conda Python 3.8+。
 
 **硬性规则**：
 1. **每次操作前必须 `check`**：派发子代理前检查当前状态
@@ -251,9 +216,9 @@ $session = "ai-labor-allocation"
 3. **S2 状态下禁止重新派发子代理**
 4. **脚本报错时停止操作，不要绕过**
 5. **所有命令必须复用同一 `--session`**：禁止依赖“最近修改的状态文件”
-6. **只有报告文件已写入且验收通过后才能推进到 `DONE`**
+6. **推进到 `DONE` 必须传入 `--report`**：状态机调用验收器，失败时保持 `S3`；成功时记录报告路径、SHA-256、来源门槛和验收时间
 
-验收命令：`python ${TRI_RESEARCH_HOME}/scripts/validate_report.py <report.md> --min-sources <N>`。在本仓库必须使用 conda Python。
+可单独预检报告：`python ${TRI_RESEARCH_HOME}/scripts/validate_report.py <report.md> --min-sources <N>`。最终仍必须通过 `advance DONE --report <report.md> --min-sources <N>` 完成状态转换。
 
 ### Phase 0: CLARIFY — 确认研究范围（必须在检索前完成）
 
@@ -492,7 +457,7 @@ MCP tool names follow the convention `mcp__<server>__<tool>` in Claude Code, but
 
 **Best practice**: Skill files reference tools by their MCP server name + tool name. The runtime adapter translates based on detected framework.
 
-**SciVerse portable fallback**: If the framework-specific tool is absent, run `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '<json>'`; use `read_content.mjs` with the returned `doc_id` and offset for source expansion. This fallback is part of the supported interface, not a degraded citation format.
+**SciVerse portable fallback**: If the framework-specific tool is absent, run `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '<json>'`; then use `${SCIVERSE_HOME}/scripts/read_content.mjs` with the returned `doc_id` and offset for source expansion. This fallback is part of the supported interface, not a degraded citation format.
 
 ### Subagent Type Resolution
 
