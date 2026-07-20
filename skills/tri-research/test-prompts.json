@@ -1,17 +1,22 @@
 {
-  "version": "5.0.0",
-  "description": "Deep Research Skill 测试用例。用于验证安装后技能是否正常工作。",
-  "usage": "运行任意测试查询，检查是否生成带引用的Markdown报告。",
+  "version": "5.6.0",
+  "description": "Tri Research 可执行回归场景。",
+  "usage": "运行研究场景后，按 validation_checklist 验收 Markdown 报告。",
   "prompts": [
     {
-      "id": "simple-fact",
-      "type": "straightforward",
-      "prompt": "tri-research 东京当前的人口是多少？",
-      "expected_subagents": 1,
-      "expected_sources_min": 5,
-      "expected_sections": ["TL;DR", "参考文献"],
-      "timeout_seconds": 120,
-      "description": "简单事实查询，1个子代理，验证基本功能"
+      "id": "ai-labor-allocation",
+      "type": "depth-first",
+      "prompt": "tri-research 人工智能与劳动分配",
+      "topic": "人工智能与劳动分配",
+      "keywords_zh": ["人工智能", "劳动分配", "就业结构", "收入分配", "劳动收入份额"],
+      "keywords_en": ["artificial intelligence", "labor allocation", "employment structure", "income distribution", "labor share"],
+      "time_range": "all",
+      "expected_subagents": 3,
+      "expected_sources_min": 12,
+      "expected_tools": ["anysearch", "sciverse"],
+      "expected_sections": ["TL;DR", "核心机制", "中国证据", "政策含义", "参考文献"],
+      "expected_behavior": "子代理本地预检；并行源调用 failure-isolated/allSettled；中英双补；SciVerse MCP 缺失时使用 Node CLI 并保留 doc_id/title；来源级配置失败只记录一次且不重新派发；报告包含连续引用、Tier 和 Found by。",
+      "timeout_seconds": 480
     },
     {
       "id": "breadth-comparison",
@@ -20,73 +25,36 @@
       "expected_subagents": 3,
       "expected_sources_min": 15,
       "expected_sections": ["TL;DR", "Executive Summary", "参考文献"],
-      "timeout_seconds": 300,
-      "description": "广度优先查询，3个子代理分别研究一个云厂商"
+      "timeout_seconds": 480
     },
     {
-      "id": "depth-analysis",
+      "id": "single-source-degradation",
       "type": "depth-first",
-      "prompt": "tri-research 2008年金融危机的根本原因是什么？",
-      "expected_subagents": 4,
-      "expected_sources_min": 20,
-      "expected_sections": ["TL;DR", "Executive Summary", "1.", "2.", "参考文献"],
-      "timeout_seconds": 480,
-      "description": "深度优先查询，4个子代理从不同视角分析"
-    },
-    {
-      "id": "academic-research",
-      "type": "depth-first",
-      "prompt": "tri-research 大语言模型的幻觉问题有哪些最新的缓解方法？",
-      "expected_subagents": 3,
-      "expected_sources_min": 15,
-      "expected_sections": ["TL;DR", "参考文献"],
-      "expected_tools": ["sciverse", "tavily"],
-      "timeout_seconds": 480,
-      "description": "学术研究类查询，验证SciVerse学术搜索是否生效"
-    },
-    {
-      "id": "degradation-test",
-      "type": "straightforward",
-      "prompt": "tri-research 全球最大的10个城市",
-      "setup": "禁用AnySearch和SciVerse，仅保留Tavily",
-      "expected_subagents": 1,
-      "expected_sources_min": 5,
-      "expected_behavior": "降级到Tavily+WebSearch，仍能生成报告",
-      "timeout_seconds": 120,
-      "description": "降级测试：验证单工具可用时的降级策略"
-    },
-    {
-      "id": "serpapi-fourth-source",
-      "type": "depth-first",
-      "prompt": "tri-research 股价暴跌风险的成因与度量指标",
-      "setup": "多元全开（AnySearch + Tavily + SciVerse + SerpApi，SERPAPI_KEY 已配置）",
-      "expected_subagents": 3,
-      "expected_sources_min": 15,
-      "expected_tools": ["serpapi", "anysearch", "tavily", "sciverse"],
-      "expected_behavior": "主导代理合成前用 SerpApi 集中中英双补（中文+英文轮）Google / Google Scholar 精准结果，并并入综述；子代理不直接调 SerpApi，且三源检索同样中英双补",
-      "timeout_seconds": 480,
-      "description": "多元集成测试：验证 SerpApi 作为可扩展源由父代理集中调用、且子代理只跑其余三源；全部检索中英双补"
-    },
-    {
-      "id": "serpapi-quota-degrade",
-      "type": "straightforward",
       "prompt": "tri-research 中国煤电资产搁浅风险",
-      "setup": "清除 SERPAPI_KEY 或设为无效值，模拟配额耗尽/未配置",
-      "expected_subagents": 1,
-      "expected_sources_min": 5,
-      "expected_behavior": "SerpApi 返回 error 后静默降级到其余源，报告照常生成，末尾注明『SerpApi 因配额耗尽/未配置未参与』，不中断不报错",
-      "timeout_seconds": 240,
-      "description": "SerpApi 配额降级测试：验证多元整合后单源失效不影响整体"
+      "setup": "仅 AnySearch 真实可用，其他渠道不可用或配额耗尽",
+      "expected_subagents": 3,
+      "expected_sources_min": 10,
+      "expected_behavior": "只报告一次状态，使用 AnySearch 中英双补，仍生成带引用报告。",
+      "timeout_seconds": 480
+    },
+    {
+      "id": "state-session-isolation",
+      "type": "internal",
+      "setup": "同时初始化两个不同 --session",
+      "expected_behavior": "两个会话独立推进；重复初始化不覆盖；TRI_RESEARCH_HOME 内不产生状态文件。",
+      "timeout_seconds": 30
     }
   ],
   "validation_checklist": [
-    "报告文件 DEEP_RESEARCH_*.md 是否生成？",
-    "报告是否包含 TL;DR 章节？",
-    "报告是否包含 参考文献 章节？",
-    "参考文献中的 [N] 编号是否连续无跳号？",
-    "正文中的 [N] 引用是否都能在参考文献中找到对应条目？",
-    "每个来源是否标注了 Tier 和 Found by？",
-    "子代理是否在8分钟内完成（无超时）？",
-    "报告语言是否与用户查询语言一致？"
+    "报告文件 DEEP_RESEARCH_*.md 已生成且文件名带日期或唯一后缀",
+    "报告包含 TL;DR 和参考文献章节",
+    "正文引用 [N] 与参考文献一一对应且编号连续",
+    "每个来源包含可访问 URL、Tier 和 Found by",
+    "报告同时包含中文来源与英文来源",
+    "报告记录 available、unavailable 或 quota_exhausted 的渠道状态",
+    "子代理数量符合查询类型且没有重复派发",
+    "所有子代理在 8 分钟内完成",
+    "报告语言与用户查询语言一致",
+    "只有报告写入并通过验收后，状态才进入 DONE"
   ]
 }

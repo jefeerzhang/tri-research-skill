@@ -1,7 +1,7 @@
 ---
 name: tri-research
-version: 5.2.0
-description: "Conduct deep research on any topic using parallel subagents and multiple search backends (AnySearch + Tavily + SciVerse for subagents, SerpApi + WebSearch for Lead Agent, extensible). Use for queries that require comprehensive research from multiple perspectives."
+version: 5.6.0
+description: "Conduct cited deep research using parallel subagents, four optional external search backends (AnySearch + Tavily + SciVerse + SerpApi), and a runtime WebSearch fallback."
 triggers:
   - "tri-research"
   - "多元研究"
@@ -22,9 +22,11 @@ dependencies:
     config: "~/.claude/mcp.json"
     fallback: "Built-in WebSearch"
   - name: sciverse
-    type: mcp-server
+    type: cli-skill-or-mcp-server
     required: false
-    note: "Provided by OpenSpace MCP or standalone SciVerse MCP"
+    install: "npx skills add https://sciverse.space"
+    config: "Set SCIVERSE_API_TOKEN; bundled Node.js scripts require Node 18+"
+    note: "Prefer host MCP when available; otherwise use the installed skill's scripts/semantic_search.mjs and scripts/read_content.mjs"
     fallback: "Tavily academic search or WebSearch"
   - name: serpapi
     type: cli-skill
@@ -92,13 +94,13 @@ You are an expert research lead, focused on research strategy, planning, efficie
 
 ## Prerequisites — Search Tool Dependencies
 
-This skill relies on **multiple search backends** (currently AnySearch + Tavily + SciVerse + SerpApi, extensible) for maximum coverage. Before using this skill, ensure the following tools are configured and functional:
+This skill can use **four optional external backends** (AnySearch + Tavily + SciVerse + SerpApi) plus a runtime-provided WebSearch fallback. Count configured external backends separately from runtime search.
 
 | # | Tool | Type | How to Configure | Purpose |
 |---|------|------|-----------------|---------|
 | 1 | **AnySearch** | CLI Skill | Install at框架默认skills目录（如 `~/.claude/skills/anysearch/` 或 `~/.hermes/skills/anysearch/`）。可通过 `ANYSEARCH_HOME` 环境变量自定义路径。See `SKILL.md` in that directory for setup. Requires Python 3.6+ or Node.js. Optional API key for higher rate limits. | General web search, 23 vertical domains, batch search, URL extraction |
 | 2 | **Tavily** | MCP Server | Add Tavily MCP server to `~/.claude/mcp.json` with your API key. See [tavily.com](https://tavily.com) for key setup. | Deep web search with advanced depth, auto-summarization |
-| 3 | **SciVerse** | MCP Server | Provided by the OpenSpace MCP server or standalone SciVerse MCP. Requires SciVerse API access. | Academic paper search, citation metadata, semantic search |
+| 3 | **SciVerse** | CLI Skill or MCP | `npx skills add https://sciverse.space`; set `SCIVERSE_API_TOKEN`. Prefer host MCP; otherwise run the installed Node.js scripts. | Academic paper search, citation metadata, semantic chunks and source expansion |
 | 4 | **SerpApi** | CLI Skill | Use the bundled `serpapi` skill (`scripts/serpapi_cli.py`); set `SERPAPI_KEY` env var. The CLI auto-clears the local HTTP proxy before each request. | Chinese Google, Google Scholar, and 100+ vertical SERPs as structured JSON. Strongest for zh-cn / gl=cn and academic Scholar queries. **Lead Agent only.** |
 | 5 | **WebSearch** | Built-in | Claude Code built-in WebSearch + WebFetch (no setup required) | **Lead Agent only** — runs in parallel with SerpApi to broaden coverage. No quota limit, always available. |
 
@@ -112,13 +114,14 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
 
 **Tool Availability Check**（每次研究开始前自动执行）：
 
-在派发子代理之前，主导代理自动检测四个搜索工具的可用性，并**始终提醒用户建议配置**：
+在派发子代理之前，主导代理必须执行轻量真实探测。仅发现命令、MCP 工具名或 API key 不算可用；探测结果分为 `available`、`unavailable`、`quota_exhausted` 三类。
 
 **检测方法**（主导代理在内部执行）：
-1. 检查 AnySearch CLI：`python ${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}/scripts/anysearch_cli.py search "test" --max_results 1`
-2. 检查 Tavily MCP：尝试调用 `mcp__tavily__tavily_search`
-3. 检查 SciVerse MCP：尝试调用 `mcp__sciverse__semantic_search`
-4. 检查 SerpApi CLI：`python ${SERPAPI_HOME:-${TRI_RESEARCH_HOME}/../serpapi}/scripts/serpapi_cli.py search --query "test" --num 1`
+1. 检查 AnySearch CLI：用获准的 Python 运行 `search "test" --max_results 1`；必须成功返回结果。
+2. 检查 Tavily：执行 `max_results=1` 的轻量查询；HTTP 429 或用量上限归为 `quota_exhausted`。
+3. 检查 SciVerse：优先执行 MCP 轻量语义检索；若 MCP 未暴露，运行 `node ${SCIVERSE_HOME:-${TRI_RESEARCH_HOME}/../sciverse}/scripts/semantic_search.mjs '{"query":"test","top_k":1,"mode":"fast"}'`。只有退出码为 0、返回 `biz_code: 0` 且含 `hits` 才算成功；缺 Token 或脚本归为 `unavailable`，HTTP 429 归为 `quota_exhausted`。
+4. 检查 SerpApi CLI：先检查 key，再执行 `--num 1` 查询；无 key 为 `unavailable`，429/limit exhausted 为 `quota_exhausted`。
+5. 检查运行时 WebSearch：仅当当前框架实际暴露并能调用该工具时标记 `available`。
 
 **路径解析顺序**（按优先级查找SerpApi）：
 1. `SERPAPI_HOME` 环境变量（用户自定义）
@@ -132,21 +135,23 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
 ~/.claude/skills/
 ├── tri-research/      # 主技能
 ├── anysearch/          # 通用搜索
+├── sciverse/           # 学术检索（Node CLI + 可选 MCP）
 └── serpapi/            # SerpApi（独立安装）
 ```
 
-**检测完成后，始终输出提醒**：
+**检测完成后，输出一次简洁状态**。只有全部搜索渠道不可用或用户主动询问配置时，才展开安装建议：
 
 ```
-🔍 搜索工具状态：AnySearch [✅/❌] | Tavily [✅/❌] | SciVerse [✅/❌] | SerpApi [✅/❌]
+搜索状态：外部后端 [N/4] | Runtime WebSearch [可用/不可用]
+AnySearch [状态] | Tavily [状态] | SciVerse [状态] | SerpApi [状态]
 
 💡 建议配置多个搜索工具以获得最佳覆盖（多元互补）：
    - AnySearch: npx skills add LearnPrompt/anysearch
    - Tavily: https://tavily.com 获取API Key
-   - SciVerse: 参考 https://sciverse.app
+   - SciVerse: `npx skills add https://sciverse.space`，并设置 `SCIVERSE_API_TOKEN`
    - SerpApi: 设置 SERPAPI_KEY（免费档 250 次/月，中文 Google/Scholar 强项）
 
-当前可用工具 [N/4] 个，将使用 [可用工具名] 继续研究。
+本次将使用 [可用工具名]；不可用或配额耗尽的渠道已降级跳过。
 ```
 
 **用户响应处理**：
@@ -158,9 +163,9 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
 | 用户什么都不说（直接给研究问题） | 用当前可用工具继续 |
 
 **重要原则**：
-- **每次都提醒**：不跳过，让用户知道可以配置
+- **每次都探测**：状态判断基于真实调用，不基于配置存在性
 - **不阻断**：提醒后不管用户配不配，都能继续
-- **不唠叨**：只提醒一次，用户说不配就不再提
+- **不唠叨**：状态只报告一次，配置建议按需展示
 - **配了更好**：明确告诉用户配置后的效果提升
 
 ### 全局双语纪律（所有源、所有代理通用）
@@ -202,15 +207,19 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 3. WebSearch 不可用 → 仅 SerpApi
 4. 都不可用 → 子代理三源 + 内置 WebSearch 兜底
 
-**子代理**：继续只使用 AnySearch + Tavily + SciVerse 三个源，不调用 SerpApi 和 WebSearch。
+**子代理**：继续只使用 AnySearch + Tavily + SciVerse 三个源，不调用 SerpApi 和 WebSearch。SciVerse 优先使用宿主 MCP；未暴露 MCP 时必须使用已安装技能的 Node CLI，不能直接标记不可用。
+
+**派发隔离规则**：主导代理的工具状态只代表主进程，不代表子代理继承了凭据。每个子代理启动后必须对允许的后端各执行一次本地预检并记录结果。并行源调用必须使用 `allSettled` 或框架等价机制，单源失败不得取消或丢弃其他源的成功结果。配置、凭据或配额错误是 source-level failure：本子代理本轮立即跳过该源剩余查询，不重试、不重新派发代理。
 
 ## Research Process
 
-### ⚠️ 状态管理（通过脚本强制执行）
+### 状态管理（通过脚本强制执行）
 
-**本技能使用 bash 脚本强制执行状态机，防止循环派发。每次阶段转换必须调用脚本。**
+**本技能使用跨平台 Python 状态机防止循环派发。每次阶段转换必须调用脚本。** `state_machine.sh` 仅是 Unix 兼容包装器；Windows/Codex 直接使用工作区批准的 conda Python。
 
-脚本路径：`${TRI_RESEARCH_HOME:-~/.claude/skills/tri-research}/scripts/state_machine.sh`
+脚本路径：`${TRI_RESEARCH_HOME}/scripts/state_machine.py`
+
+运行状态写入 `${TRI_RESEARCH_STATE_DIR}`；未设置时写入操作系统临时目录。`TRI_RESEARCH_HOME` 只表示技能安装目录，绝不存放状态文件。
 
 **状态机**：
 | 状态 | 描述 | 允许的下一步 |
@@ -220,26 +229,31 @@ Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直
 | **S2** | Step 4: 派发子代理 | → S3 |
 | **S3** | Step 5: 综合报告 | → 完成 |
 
-**每次阶段转换必须执行以下命令**：
-```bash
-# 开始新研究
-bash scripts/state_machine.sh init
+**每次阶段转换必须传入稳定、唯一的 session id**：
+```powershell
+$state = "$env:TRI_RESEARCH_HOME\scripts\state_machine.py"
+$session = "ai-labor-allocation"
 
-# 检查当前状态（派发子代理前必须检查）
-bash scripts/state_machine.sh check
-
-# 推进到下一阶段（确认后执行）
-bash scripts/state_machine.sh advance S1
-bash scripts/state_machine.sh advance S2
-bash scripts/state_machine.sh advance S3
-bash scripts/state_machine.sh advance DONE
+& $env:CONDA_PYTHON $state --session $session init
+& $env:CONDA_PYTHON $state --session $session set_params '{"topic":"人工智能与劳动分配","time_range":"all"}'
+& $env:CONDA_PYTHON $state --session $session advance S1
+& $env:CONDA_PYTHON $state --session $session check
+& $env:CONDA_PYTHON $state --session $session advance S2
+& $env:CONDA_PYTHON $state --session $session advance S3
+& $env:CONDA_PYTHON $state --session $session advance DONE
 ```
+
+在本仓库中，`CONDA_PYTHON=C:\Users\jefeer\an\python.exe`。其他环境使用已激活 conda 环境或该环境批准的 Python 3.8+。
 
 **硬性规则**：
 1. **每次操作前必须 `check`**：派发子代理前检查当前状态
 2. **状态只能前进，不能后退**
 3. **S2 状态下禁止重新派发子代理**
 4. **脚本报错时停止操作，不要绕过**
+5. **所有命令必须复用同一 `--session`**：禁止依赖“最近修改的状态文件”
+6. **只有报告文件已写入且验收通过后才能推进到 `DONE`**
+
+验收命令：`python ${TRI_RESEARCH_HOME}/scripts/validate_report.py <report.md> --min-sources <N>`。在本仓库必须使用 conda Python。
 
 ### Phase 0: CLARIFY — 确认研究范围（必须在检索前完成）
 
@@ -371,8 +385,10 @@ Use your framework's subagent dispatch mechanism to launch research subagents. T
 - Key questions to answer
 - Suggested sources or search strategies
 - Scope boundaries to prevent drift
+- A one-time child-local backend preflight and a failure-isolated parallel execution requirement
+- A prohibition on child spawning and on lead-agent redispatch after partial source failure
 
-**子代理搜索源约束**：子代理只使用 **AnySearch / Tavily / SciVerse** 三个源（通过 `SEARCH` 抽象接口）。**不要**在子代理 task 里调用 SerpApi CLI——SerpApi 由主导代理在合成前集中补强（见上文"SerpApi 调用约束"）。无论用哪源，子代理的检索与抓取**必须中英双补**：既要覆盖中文文献/网页（中国情境、中文实证），也要覆盖英文 peer-reviewed 文献与跨国证据；只抓单语种视为流程缺陷。
+**子代理搜索源约束**：子代理只使用 **AnySearch / Tavily / SciVerse** 三个源（通过 `SEARCH` 抽象接口）。SciVerse 的调用顺序是 `host MCP -> ${SCIVERSE_HOME:-${TRI_RESEARCH_HOME}/../sciverse}/scripts/*.mjs -> unavailable`。**不要**在子代理 task 里调用 SerpApi CLI——SerpApi 由主导代理在合成前集中补强。每个子代理必须自行确认 Token/CLI 是否可见；主代理预检结果不得直接复用为子代理状态。并行工具执行必须保留所有 settled 结果，禁止 fail-fast 丢失成功输出。无论用哪源，子代理的检索与抓取**必须中英双补**；但来源级配置失败后立即跳过该源的剩余语言轮次，不以满足双语形式为由重复失败调用。SciVerse 结论必须保留返回的 `doc_id`、title 和 chunk/expanded excerpt；自动生成的主题或期刊归类可能有噪声，未用 DOI、题名或原文交叉核对前不得据此提升 Tier。
 
 **Example Task Description**:
 ```
@@ -410,7 +426,8 @@ After subagents complete:
 **Output Format**:
 - Use Markdown with clear structure (headings, bullet points, tables for comparisons)
 - Include specific data points (numbers, dates, statistics)
-- Do NOT include citations - a separate citations agent will handle that
+- Include sentence-level `[N]` citations and a `参考文献` section. Each reference must include URL, Tier, and `Found by` metadata.
+- A citations agent may perform an optional verification pass, but report completion must not depend on one being available.
 - Make the report comprehensive but concise
 
 ## Tool Abstraction Layer (Framework-Agnostic)
@@ -435,7 +452,7 @@ The same abstract interface maps to different concrete implementations:
 | **SEARCH** | `web_search` / `mcp__tavily__tavily_search` | `tavily.search` | `WebSearch` / Tavily API |
 | **FETCH** | `web_fetch` / `mcp__tavily__tavily_extract` | `tavily.extract` | `WebFetch` / `requests` |
 | **RENDER** | Playwright MCP | Playwright MCP | Playwright |
-| **DISPATCH** | `Task(subagent_type="general-purpose", prompt)` | `delegate_to_agent(agent_type, prompt)` | `handoff(agent_type, prompt)` |
+| **DISPATCH** | `Task(subagent_type="general-purpose", prompt)` | `delegate_to_agent(agent_type, prompt)` | Codex collaboration `spawn_agent` |
 
 ### Path Resolution (Cross-Platform)
 
@@ -454,6 +471,9 @@ export TRI_RESEARCH_HOME="${TRI_RESEARCH_HOME:-$(dirname "$(readlink -f "$0" 2>/
 # AnySearch installation directory
 export ANYSEARCH_HOME="${ANYSEARCH_HOME:-${TRI_RESEARCH_HOME}/../anysearch}"
 
+# SciVerse installation directory
+export SCIVERSE_HOME="${SCIVERSE_HOME:-${TRI_RESEARCH_HOME}/../sciverse}"
+
 # Invocation pattern in skill files:
 python "${ANYSEARCH_HOME}/scripts/anysearch_cli.py" search "$1"
 ```
@@ -471,6 +491,8 @@ MCP tool names follow the convention `mcp__<server>__<tool>` in Claude Code, but
 | Codex | `tavily.search` | `sciverse.semantic_search` |
 
 **Best practice**: Skill files reference tools by their MCP server name + tool name. The runtime adapter translates based on detected framework.
+
+**SciVerse portable fallback**: If the framework-specific tool is absent, run `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '<json>'`; use `read_content.mjs` with the returned `doc_id` and offset for source expansion. This fallback is part of the supported interface, not a degraded citation format.
 
 ### Subagent Type Resolution
 
@@ -515,7 +537,7 @@ Subagents should automatically use RENDER when:
 
 ## Important Guidelines
 
-1. **Use parallel execution**: Always launch multiple subagents simultaneously for efficiency
+1. **Use parallel execution**: For non-straightforward queries, launch multiple subagents simultaneously; straightforward queries use one
 2. **Clear task allocation**: Each subagent must have distinct, non-overlapping tasks
 3. **Monitor progress**: Evaluate if findings are sufficient to answer the query
 4. **Stop when complete**: Avoid unnecessary additional research once you can provide a good answer
@@ -529,7 +551,7 @@ Subagents should automatically use RENDER when:
 - **SerpApi 配额保护**：SerpApi 默认参与多元搜索，但免费档仅 250 次/月；主导代理捕获其 `error` / 429 后标记本轮失效并降级，不预设硬上限闸门。
 - **子代理隔离**：子代理只调用 AnySearch / Tavily / SciVerse；SerpApi 仅由主导代理集中调用，避免子代理环境缺少 `SERPAPI_KEY` 或踩本机代理坑导致静默失败。
 - **不泄露密钥**：所有 API key 仅从环境变量读取，绝不写入日志、报告或 stdout。
-- **不做不可逆操作**：不删除、不覆盖用户文件；研究报告写入 `DEEP_RESEARCH_*.md`（或用户指定路径），不触及其他文件。
+- **不做不可逆操作**：不删除、不覆盖既有报告；研究报告使用带日期或唯一后缀的 `DEEP_RESEARCH_*.md`（或用户指定路径）。
 - **何时停手问用户**：用户给出矛盾约束、或明确要求某源但该源不可用时，说明情况并征求指示，不擅自替用户决定研究方向。
 
 ## Example Workflow
