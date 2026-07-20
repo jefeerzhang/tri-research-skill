@@ -14,6 +14,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - S1 不再允许缺少参数；S2/S3 不再允许没有代理证据的空状态推进。
 - 移除 `--force` 会话覆盖入口，保留完成历史；`DONE` 后 `check` 会复核代理结果与报告哈希。
 - URL 唯一性按无 query/fragment 的规范形式计数；双语覆盖取自参考文献条目，渠道状态只检查对应章节。
+- 最终来源拒绝保留占位域名、localhost、私网/回环地址和 URL 内嵌凭据，防止结构测试数据冒充可核验来源。
 - Runtime WebSearch 不再宣称始终可用，登录墙和付费墙不再被视为渲染绕过目标。
 
 ### Changed

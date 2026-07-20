@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import re
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ TRACKING_QUERY_KEYS = {
     "ref",
     "ref_src",
 }
+RESERVED_HOSTS = {"example.com", "example.net", "example.org", "localhost"}
+RESERVED_SUFFIXES = (".example", ".invalid", ".localhost", ".test")
 
 
 def normalize_topic(value: str) -> str:
@@ -36,9 +39,28 @@ def canonicalize_url(value: str) -> str | None:
         port = parsed.port
     except ValueError:
         return None
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
         return None
     host = parsed.hostname.lower()
+    if host in RESERVED_HOSTS or host.endswith(RESERVED_SUFFIXES):
+        return None
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    if address and (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_unspecified
+    ):
+        return None
     if port and not (
         (parsed.scheme.lower() == "http" and port == 80)
         or (parsed.scheme.lower() == "https" and port == 443)

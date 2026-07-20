@@ -55,7 +55,7 @@ class StateMachineTests(unittest.TestCase):
             url_number = 1 if duplicate_urls else number
             references.append(
                 f"[{number}] Organization — {title} — "
-                f"https://example.com/source-{url_number} — 2025 — "
+                f"https://research-source-{url_number}.org/source-{url_number} — 2025 — "
                 "Tier: 1 — Found by: AnySearch"
             )
         report.write_text(

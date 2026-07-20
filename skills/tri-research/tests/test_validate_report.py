@@ -21,8 +21,8 @@ def valid_report() -> str:
 AnySearch: available; Tavily: quota_exhausted; SciVerse: unavailable.
 
 ## 参考文献
-[1] Organization — English source — https://example.com/one — 2025 — Tier: 1 — Found by: AnySearch
-[2] 作者 — 中文来源 — https://example.cn/two — 2024 — Tier: 2 — Found by: AnySearch
+[1] Organization — English source — https://publisher-one.org/one — 2025 — Tier: 1 — Found by: AnySearch
+[2] 作者 — 中文来源 — https://publisher-two.cn/two — 2024 — Tier: 2 — Found by: AnySearch
 """
 
 
@@ -37,7 +37,7 @@ class ReportValidatorTests(unittest.TestCase):
         report = (
             valid_report()
             .replace("[2] 作者", "[3] 作者")
-            .replace("https://example.com/one", "missing-url")
+            .replace("https://publisher-one.org/one", "missing-url")
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("not consecutive" in error for error in errors))
@@ -46,7 +46,7 @@ class ReportValidatorTests(unittest.TestCase):
 
     def test_rejects_duplicate_reference_urls(self) -> None:
         report = valid_report().replace(
-            "https://example.cn/two", "https://example.com/one"
+            "https://publisher-two.cn/two", "https://publisher-one.org/one"
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("URLs are not unique" in error for error in errors))
@@ -54,8 +54,8 @@ class ReportValidatorTests(unittest.TestCase):
 
     def test_rejects_query_and_fragment_url_variants(self) -> None:
         report = valid_report().replace(
-            "https://example.cn/two",
-            "https://example.com/one?utm_source=test#abstract",
+            "https://publisher-two.cn/two",
+            "https://publisher-one.org/one?utm_source=test#abstract",
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("URLs are not unique" in error for error in errors))
@@ -63,10 +63,32 @@ class ReportValidatorTests(unittest.TestCase):
     def test_preserves_meaningful_query_identifiers(self) -> None:
         report = (
             valid_report()
-            .replace("https://example.com/one", "https://example.com/article?id=one")
-            .replace("https://example.cn/two", "https://example.com/article?id=two")
+            .replace(
+                "https://publisher-one.org/one",
+                "https://journal-publisher.org/article?id=one",
+            )
+            .replace(
+                "https://publisher-two.cn/two",
+                "https://journal-publisher.org/article?id=two",
+            )
         )
         self.assertEqual(MODULE.validate(report, 2), [])
+
+    def test_rejects_placeholder_and_nonpublic_urls(self) -> None:
+        for invalid_url in (
+            "https://example.org/source",
+            "http://localhost/source",
+            "http://127.0.0.1/source",
+            "https://user:password@publisher-one.org/one",
+        ):
+            with self.subTest(url=invalid_url):
+                report = valid_report().replace(
+                    "https://publisher-one.org/one", invalid_url
+                )
+                errors = MODULE.validate(report, 2)
+                self.assertTrue(
+                    any("invalid http/https URL" in error for error in errors)
+                )
 
     def test_rejects_report_for_a_different_topic(self) -> None:
         errors = MODULE.validate(valid_report(), 2, expected_topic="量子芯片供应链")
