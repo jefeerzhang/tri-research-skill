@@ -119,5 +119,28 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("references/runtime-adapters.md", self.skill)
         self.assertTrue((ROOT / "references" / "runtime-adapters.md").is_file())
 
+    def test_repository_birth_certificate_basics(self) -> None:
+        repo_root = ROOT.parents[1]
+        repo_readme = (repo_root / "README.md").read_text(encoding="utf-8")
+        self.assertTrue((repo_root / "LICENSE").is_file())
+        self.assertIn(
+            "npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research",
+            repo_readme,
+        )
+        self.assertIn("https://skills.sh/b/jefeerzhang/tri-research-skill", repo_readme)
+        for screenshot in (
+            "01-skill-loaded-and-phase1.png",
+            "02-3-subagents-parallel.png",
+            "03-subagents-completed.png",
+            "04-final-report-summary.png",
+        ):
+            self.assertIn(f"assets/screenshots/{screenshot}", repo_readme)
+            self.assertTrue(
+                (repo_root / "assets" / "screenshots" / screenshot).is_file()
+            )
+        self.assertIn("## 数据与安全边界", repo_readme)
+        self.assertIn("## 致谢", repo_readme)
+
+
 if __name__ == "__main__":
     unittest.main()
