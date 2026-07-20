@@ -113,6 +113,21 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
 3. 检查 SciVerse MCP：尝试调用 `mcp__sciverse__semantic_search`
 4. 检查 SerpApi CLI：`python ${SERPAPI_HOME:-${TRI_RESEARCH_HOME}/../serpapi}/scripts/serpapi_cli.py search --query "test" --num 1`
 
+**路径解析顺序**（按优先级查找SerpApi）：
+1. `SERPAPI_HOME` 环境变量（用户自定义）
+2. `${TRI_RESEARCH_HOME}/../serpapi`（tri-research同级目录）
+3. 项目级 `~/.claude/skills/serpapi/`（如果存在）
+4. 用户级 `~/.claude/skills/serpapi/`（如果存在）
+5. **找不到则视为不可用**，静默降级到三源
+
+**建议的目录布局**：
+```
+~/.claude/skills/
+├── tri-research/      # 主技能
+├── anysearch/          # 通用搜索
+└── serpapi/            # SerpApi（独立安装）
+```
+
 **检测完成后，始终输出提醒**：
 
 ```
