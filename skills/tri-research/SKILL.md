@@ -1,7 +1,7 @@
 ---
 name: tri-research
 version: 5.2.0
-description: "Conduct deep research on any topic using parallel subagents and multiple search backends (AnySearch + Tavily + SciVerse + SerpApi, extensible). Use for queries that require comprehensive research from multiple perspectives."
+description: "Conduct deep research on any topic using parallel subagents and multiple search backends (AnySearch + Tavily + SciVerse for subagents, SerpApi + WebSearch for Lead Agent, extensible). Use for queries that require comprehensive research from multiple perspectives."
 triggers:
   - "tri-research"
   - "多元研究"
@@ -30,8 +30,13 @@ dependencies:
     type: cli-skill
     required: false
     install: "Use the bundled serpapi skill (scripts/serpapi_cli.py); set SERPAPI_KEY env var"
-    note: "Fourth source. Parent-agent-only invocation (NOT dispatched to subagents) to avoid proxy/env leaks. Free tier: 250 searches/month."
-    fallback: "Degrades silently to the other three sources when key missing or quota exhausted"
+    note: "Lead Agent direct search (source 1/2). NOT dispatched to subagents to avoid proxy/env leaks. Free tier: 250 searches/month."
+    fallback: "Degrades silently to WebSearch + 3 other sources when key missing or quota exhausted"
+  - name: websearch
+    type: builtin
+    required: false
+    note: "Lead Agent direct search (source 2/2). Claude Code built-in WebSearch + WebFetch, no quota limit. Used in parallel with SerpApi to broaden coverage."
+    fallback: "Always available as last resort"
 ---
 
 ## Trigger
@@ -94,14 +99,16 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
 | 1 | **AnySearch** | CLI Skill | Install at框架默认skills目录（如 `~/.claude/skills/anysearch/` 或 `~/.hermes/skills/anysearch/`）。可通过 `ANYSEARCH_HOME` 环境变量自定义路径。See `SKILL.md` in that directory for setup. Requires Python 3.6+ or Node.js. Optional API key for higher rate limits. | General web search, 23 vertical domains, batch search, URL extraction |
 | 2 | **Tavily** | MCP Server | Add Tavily MCP server to `~/.claude/mcp.json` with your API key. See [tavily.com](https://tavily.com) for key setup. | Deep web search with advanced depth, auto-summarization |
 | 3 | **SciVerse** | MCP Server | Provided by the OpenSpace MCP server or standalone SciVerse MCP. Requires SciVerse API access. | Academic paper search, citation metadata, semantic search |
-| 4 | **SerpApi** | CLI Skill | Use the bundled `serpapi` skill (`scripts/serpapi_cli.py`); set `SERPAPI_KEY` env var. The CLI auto-clears the local HTTP proxy before each request. | Chinese Google, Google Scholar, and 100+ vertical SERPs as structured JSON. Strongest for zh-cn / gl=cn and academic Scholar queries. |
+| 4 | **SerpApi** | CLI Skill | Use the bundled `serpapi` skill (`scripts/serpapi_cli.py`); set `SERPAPI_KEY` env var. The CLI auto-clears the local HTTP proxy before each request. | Chinese Google, Google Scholar, and 100+ vertical SERPs as structured JSON. Strongest for zh-cn / gl=cn and academic Scholar queries. **Lead Agent only.** |
+| 5 | **WebSearch** | Built-in | Claude Code built-in WebSearch + WebFetch (no setup required) | **Lead Agent only** — runs in parallel with SerpApi to broaden coverage. No quota limit, always available. |
 
 **Fallback behavior**: If any tool is unavailable, the skill degrades gracefully:
-- AnySearch unavailable → use Tavily + SciVerse + SerpApi
-- Tavily unavailable → use AnySearch + SciVerse + SerpApi
-- SciVerse unavailable → use AnySearch + Tavily + SerpApi
-- SerpApi unavailable (no key / quota exhausted) → **silently** use the other three; research still completes
-- All unavailable → inform user and fall back to built-in WebSearch/WebFetch
+- AnySearch unavailable → use Tavily + SciVerse + SerpApi + WebSearch
+- Tavily unavailable → use AnySearch + SciVerse + SerpApi + WebSearch
+- SciVerse unavailable → use AnySearch + Tavily + SerpApi + WebSearch
+- SerpApi unavailable (no key / quota exhausted) → **silently** use WebSearch + 3 other sources; research still completes
+- WebSearch unavailable → use SerpApi + 3 other sources
+- All unavailable → inform user and fall back to built-in WebFetch
 
 **Tool Availability Check**（每次研究开始前自动执行）：
 
@@ -167,22 +174,35 @@ This skill relies on **multiple search backends** (currently AnySearch + Tavily 
   - 主导代理用 SerpApi 补强时，必须中文轮 + 英文轮各至少一轮。
 - **报告标注**：最终综述里每个源的检索段都要显式标注"中英双补"，缺任一词种即视为未达标。
 
-### SerpApi 调用约束（主导代理专属源）
+### Lead Agent 双源直接检索
 
-SerpApi 与其他三个源不同，有两点硬性约束，主导代理必须遵守：
+Lead Agent 在派发子代理**之前**，用 **SerpApi + WebSearch 两个源直接检索**：
 
-1. **仅由主导代理调用，绝不派发给子代理。**
-    子代理并行运行时不一定继承 `SERPAPI_KEY` 环境变量，且本机 HTTP 代理会掐断对 `serpapi.com` 的 HTTPS 握手（CLI 已自动清代理，但子代理环境不可控）。因此：子代理只跑 AnySearch / Tavily / SciVerse 三个源；SerpApi 由主导代理在**合成报告前集中补强**——针对需要中文 Google / Google Scholar / 垂直 SERP 的子问题，用 `serpapi_cli.py` 精准抓取，再把结果并入最终综述。
+1. **SerpApi（结构化SERP）** —— 主导代理的核心源
+   - 仅由主导代理调用，绝不派发给子代理（子代理环境可能缺少 `SERPAPI_KEY` 或踩代理坑）
+   - 中文轮（`hl=zh-cn` + `gl=cn`）覆盖中国情境
+   - 英文轮（`hl=en` + `gl=us`）覆盖国际证据
+   - Google Scholar 学术轮（`--engine google_scholar`）覆盖顶刊
+   - 配额耗尽即静默降级（标记 SerpApi 失效，不影响其他源）
 
-2. **配额耗尽即静默降级，不影响其他源。**
-    SerpApi 免费档仅 250 次/月。主导代理每次调用后检查返回：
-    - 若返回含 `error` 且提示 `limit is exhausted` / `API key not valid`，或 HTTP 429，则标记 **SerpApi 本轮失效**。
-    - 标记后，本次研究剩余环节不再调用 SerpApi，并**不中断、不报错**，其余三个源结果照常生成报告。
-    - 在最终报告末尾注明：`SerpApi 因配额耗尽/未配置未参与，本次基于其余源（AnySearch + Tavily + SciVerse）。`
-     - 不预设"准入闸"或硬上限——SerpApi 默认参与，没钱了再退，确保多元搜索能力每次都真实生效。
+2. **WebSearch（通用补充）** —— 主导代理的补充源
+   - 与 SerpApi **并行运行**，覆盖更多搜索源
+   - 弥补 SerpApi 未覆盖的场景（新闻、博客、新闻网站等）
+   - 自动 fallback 到 WebFetch 抓取完整内容
+   - 无配额限制
 
-3. **补强中英双补（见"全局双语纪律"）。**
-     SerpApi 的核心价值是补强其余三个源覆盖不到的 Google / Google Scholar 精准结果，而国际学术与跨国证据多在英文文献中。主导代理用 `serpapi_cli.py` 补强时**必须同时发起中文轮（`hl=zh-cn`+`gl=cn`）与英文轮（`hl=en`+`gl=us`）**，两轮结果都并入综述并标注"中英双补"。具体参数与判定见上方「全局双语纪律」。
+**双源并行模式**：
+- Lead Agent 对每个关键子问题，**同时**调用 SerpApi 和 WebSearch
+- 两个源的结果**对比合并**，去重后并入最终综述
+- 标注"中英双补"和"SerpApi/WebSearch"来源
+
+**降级链**：
+1. SerpApi + WebSearch 都可用 → 双源补强
+2. SerpApi 不可用（无Key/配额耗尽）→ 仅 WebSearch
+3. WebSearch 不可用 → 仅 SerpApi
+4. 都不可用 → 子代理三源 + 内置 WebSearch 兜底
+
+**子代理**：继续只使用 AnySearch + Tavily + SciVerse 三个源，不调用 SerpApi 和 WebSearch。
 
 ## Research Process
 
