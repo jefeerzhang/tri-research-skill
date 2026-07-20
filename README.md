@@ -1,10 +1,10 @@
 # Tri Research Skill
 
-> **四源并行搜索，深度研究框架。** AnySearch（通用）+ Tavily（深度）+ SciVerse（学术）+ SerpApi（结构化SERP），可扩展。
+> **五源并行搜索，深度研究框架。** Lead Agent 双源（SerpApi+WebSearch）+ 子代理三源（AnySearch+Tavily+SciVerse）。
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![Framework-agnostic](https://img.shields.io/badge/Framework-agnostic-green)](skills/tri-research/SKILL.md)
-[![Search Sources](https://img.shields.io/badge/Search%20Sources-4-orange)](skills/tri-research/SKILL.md)
+[![Search Sources](https://img.shields.io/badge/Search%20Sources-5-orange)](skills/tri-research/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](skills/tri-research/LICENSE)
 
 ---
@@ -62,7 +62,7 @@ graph TB
 - **Lead Agent** 直接用 SerpApi + WebSearch 双源，覆盖最广
 - **子代理** 用 AnySearch + Tavily + SciVerse 三源，互补性强
 - **Lead + 子代理** 合计 **5源协同**（不是5选1）
-## 🔍 四源分工
+## 🔍 五源分工
 
 | 搜索源 | 强项 | 弱项 | 典型场景 | 调用层 |
 |--------|------|------|---------|--------|
@@ -94,7 +94,7 @@ graph TB
    ├─ Subagent 2：AnySearch + Tavily + SciVerse
    └─ Subagent 3：AnySearch + Tavily + SciVerse
    ↓
-5️⃣ Lead 综合4个数据源 + 写入最终报告
+5️⃣ Lead 综合5个数据源 + 写入最终报告
    ↓
 6️⃣ Citation Agent：添加引用（可选）
    ↓
@@ -152,7 +152,7 @@ npx skills add jefeerzhang/tri-research-skill
 🔍 搜索工具状态：AnySearch [✅] | Tavily [✅] | SciVerse [✅] | SerpApi [❌]
 
 💡 建议配置四个搜索工具以获得最佳效果
-当前可用工具 3/4 个，将使用 AnySearch + Tavily + SciVerse 继续研究。
+当前可用工具 3/5 个，将使用 AnySearch + Tavily + SciVerse 继续研究。
 ```
 
 ## 🌍 跨平台兼容
@@ -166,7 +166,7 @@ npx skills add jefeerzhang/tri-research-skill
 
 ## 📊 实测验证：五轮迭代
 
-| 指标 | v1 (web_search) | v2 (抽象接口) | v3 (Tavily) | v4 (三源) | v5 (四源+8min) |
+| 指标 | v1 (web_search) | v2 (抽象接口) | v3 (Tavily) | v4 (三源) | v5 (五源+8min) |
 |------|----------------|--------------|-------------|-----------|-----------------|
 | 搜索源数 | 1 | 1 | 2 | 3 | **4** |
 | 来源总数 | 24 | 27 | 34 | 23* | **39-50** |
@@ -176,7 +176,7 @@ npx skills add jefeerzhang/tri-research-skill
 
 *v4因无时间约束被中止
 
-**四源互补率**：约70%（来源来自单一工具独占）
+**五源互补率**：约70%（来源来自单一工具独占）
 
 ## 🔒 安全边界
 
