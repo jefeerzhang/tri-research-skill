@@ -262,6 +262,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-#!/usr/bin/env python3
-"""Session-isolated state machine for tri-research."""
 

@@ -2,10 +2,16 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.0.0] - 2026-07-21
 
 ### Fixed
 - 子代理的 AnySearch 路由改为 CLI-only：直接运行 bundled `anysearch_cli.py` 的 `doc`、`batch_search` 和 `extract`，禁止宿主把 AnySearch 自动映射到 MCP 工具。
+- 清理 `scripts/state_machine.py` 与 `scripts/validate_report.py` 末尾粘连的 shebang 与重复 docstring。
+- 补齐缺失的 `scripts/state_machine.sh` 兼容包装与 `skills/citations/SKILL.md`，使文件结构与文档一致。
+- 版本号统一到 `6.0.0`：SKILL.md frontmatter、tri-research README、CHANGELOG、test-prompts.json、root README 徽章全部对齐。
+
+### Changed
+- 文档与实现以"两步状态机（STARTED → DONE）+ 报告验收器"为唯一事实来源；README/SKILL.md 中关于 `S0/S1/S2/S3`、`record_dispatch`/`record_result` 账本的描述在历史章节保留为变更记录，不作为当前实现的硬约束。
 
 ## [5.8.0] - 2026-07-20
 

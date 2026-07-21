@@ -204,6 +204,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-#!/usr/bin/env python3
-"""Validate the structural contract of a tri-research Markdown report."""
 
