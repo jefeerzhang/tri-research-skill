@@ -63,11 +63,11 @@ flowchart TD
 
 ## 演示
 
-![主题确认与技能加载](assets/screenshots/01-skill-loaded-and-phase1.png)
+![主题确认与技能加载](assets/screenshots/01-skill-loaded-and-step1.png)
 
 ![三个子代理并行研究](assets/screenshots/02-3-subagents-parallel.png)
 
-![子代理完成并收敛](assets/screenshots/03-subagents-completed.png)
+![子代理完成并收敛](assets/screenshots/03-subagents-converged.png)
 
 ![最终报告摘要](assets/screenshots/04-final-report-summary.png)
 
@@ -80,6 +80,20 @@ flowchart TD
 ```bash
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
 ```
+
+装完对 Agent 说：
+
+```text
+深度研究：<一句话主题>，覆盖中英双语来源，至少 10 个可核验引用。
+```
+
+示例（`examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md` 是按这个 prompt 跑出来的真实报告骨架）：
+
+```text
+深度研究：人工智能如何影响劳动分配？覆盖中英双语来源，近五年证据，至少 12 个可核验来源。
+```
+
+触发词：`深度研究` / `多元研究` / `多源研究` / `研究报告` / `文献综述` 任一即进入。
 
 安装可选搜索后端：
 
