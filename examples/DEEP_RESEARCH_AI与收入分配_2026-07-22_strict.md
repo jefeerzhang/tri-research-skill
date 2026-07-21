@@ -1,7 +1,6 @@
 # 人工智能与收入分配
 
-> **本报告为 tri-research v6.0.0 严格版真实研究样例**（2026-07-22 上午跑出）。
-> 主导代理一次性派发 3 个研究子代理，全部使用 v6.0.0 SKILL.md 设计的 4 后端之一 **AnySearch CLI**（路径 `~/.claude/skills/anysearch/scripts/anysearch_cli.py`），**不使用 chrome_devtools、DDG 等设计外工具**。每个事实附 AnySearch snippet 原文引述与 Tier 标注，`validate_report.py` 端到端验收。
+> **本报告为 tri-research v6.0.0 严格版真实研究样例**（2026-07-22 上午跑出）。 主导代理一次性派发 3 个研究子代理，全部使用 v6.0.0 SKILL.md 设计的 4 后端之一 **AnySearch CLI**（路径 `~/.claude/skills/anysearch/scripts/anysearch_cli.py`），**不使用 chrome_devtools、DDG 等设计外工具**。每个事实附 AnySearch snippet 原文引述与 Tier 标注，`validate_report.py` 端到端验收。
 
 ## 概述
 
@@ -71,42 +70,42 @@
 
 方向四：**AI 时代的 UBI 重新设计**。芬兰 Kela 的 €560/月与 OpenResearch 的 $1,000/月对 AI 财富集中度场景远不够[8][9]；可参考 IMF SDN/2024/001 与费城联储 2024 Q1 给出的"AI 暴露越高 → 资本回报越集中"机制做闭环建模——把税收、UBI、产出三者的均衡找出来。
 
-方向五：**"AI 财富集中"跨国可比指标**。当前跨国比较受限于"AI 暴露"测量方法（O*NET vs EU ESCO vs 中国职业大典）；可推动跨国职业-AI 暴露映射标准，让 IMF / OECD / 世界银行 能在统一指标下报告 AI 财富集中度。
+方向五：**"AI 财富集中"跨国可比指标**。当前跨国比较受限于"AI 暴露"测量方法（O\*NET vs EU ESCO vs 中国职业大典）；可推动跨国职业-AI 暴露映射标准，让 IMF / OECD / 世界银行 能在统一指标下报告 AI 财富集中度。
 
 方向六（新增）：**AnySearch 后端的覆盖范围扩展**。当前 AnySearch `extract` 不支持 PDF，**限制了"全文抓取"能力**——可向 AnySearch 团队提需求或在主导代理侧加一层 PDF→text 转换（用 `pdfplumber` / `pypdf`）作为 v6.1 的"二级后端"。
 
 ## 参考文献
 
-[1] Cazzaniga et al. — Gen-AI: Artificial Intelligence and the Future of Work (IMF SDN/2024/001) — https://www.imf.org/-/media/files/publications/sdn/2024/english/sdnea2024001.pdf — 2024 — 层级: 1 — 来源: SciVerse
+[1] Cazzaniga et al. — Gen-AI: Artificial Intelligence and the Future of Work (IMF SDN/2024/001) — <https://www.imf.org/-/media/files/publications/sdn/2024/english/sdnea2024001.pdf> — 2024 — 层级: 1 — 来源: SciVerse
 
-[2] Drozd & Tavares — Generative AI: A Turning Point for Labor's Share? (Federal Reserve Bank of Philadelphia Economic Insights 2024 Q1) — https://www.philadelphiafed.org/-/media/frbp/assets/economy/articles/economic-insights/2024/q1/eiq124-generative-ai-a-turning-point-for-labors-share.pdf — 2024 — 层级: 1 — 来源: AnySearch
+[2] Drozd & Tavares — Generative AI: A Turning Point for Labor's Share? (Federal Reserve Bank of Philadelphia Economic Insights 2024 Q1) — <https://www.philadelphiafed.org/-/media/frbp/assets/economy/articles/economic-insights/2024/q1/eiq124-generative-ai-a-turning-point-for-labors-share.pdf> — 2024 — 层级: 1 — 来源: AnySearch
 
-[3] Minniti, Prettner, Venturini & Bloom — AI and the distribution of income between capital and labour (CEPR VoxEU 2026-03) — https://cepr.org/voxeu/columns/ai-and-distribution-income-between-capital-and-labour — 2026 — 层级: 1 — 来源: AnySearch
+[3] Minniti, Prettner, Venturini & Bloom — AI and the distribution of income between capital and labour (CEPR VoxEU 2026-03) — <https://cepr.org/voxeu/columns/ai-and-distribution-income-between-capital-and-labour> — 2026 — 层级: 1 — 来源: AnySearch
 
-[4] 卢国军、崔小勇、王弟海 — 自动化技术、结构转型与中国收入分配格局的演化（《金融研究》2023(4): 19-35）— http://www.jryj.org.cn/CN/Y2023/V514/I4/19 — 2023 — 层级: 1 — 来源: AnySearch
+[4] 卢国军、崔小勇、王弟海 — 自动化技术、结构转型与中国收入分配格局的演化（《金融研究》2023(4): 19-35）— <http://www.jryj.org.cn/CN/Y2023/V514/I4/19> — 2023 — 层级: 1 — 来源: AnySearch
 
-[5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — https://kuwpaper.ku.edu/2025Papers/202504.pdf — 2025 — 层级: 1 — 来源: AnySearch
+[5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — <https://kuwpaper.ku.edu/2025Papers/202504.pdf> — 2025 — 层级: 1 — 来源: AnySearch
 
-[6] Project Owners — tri-research v6.0.0 state_machine.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py — 2026 — 层级: 1 — 来源: WebSearch
+[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: WebSearch
 
-[7] Project Owners — tri-research v6.0.0 validate_report.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py — 2026 — 层级: 1 — 来源: WebSearch
+[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: WebSearch
 
-[8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — https://www.openresearchlab.org/projects/unconditional-cash-study — 2024 — 层级: 1 — 来源: AnySearch
+[8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — <https://www.openresearchlab.org/projects/unconditional-cash-study> — 2024 — 层级: 1 — 来源: AnySearch
 
-[9] Finnish Government — Results of the basic income experiment (Kela 2017-2018) — https://valtioneuvosto.fi/en/-/1271139/perustulokokeilun-tulokset-tyollisyysvaikutukset-vahaisia-toimeentulo-ja-psyykkinen-terveys-koettiin-paremmaksi — 2020 — 层级: 1 — 来源: AnySearch
+[9] Finnish Government — Results of the basic income experiment (Kela 2017-2018) — <https://valtioneuvosto.fi/en/-/1271139/perustulokokeilun-tulokset-tyollisyysvaikutukset-vahaisia-toimeentulo-ja-psyykkinen-terveys-koettiin-paremmaksi> — 2020 — 层级: 1 — 来源: AnySearch
 
-[10] 国家数据局 — 数字经济促进共同富裕实施方案 答记者问 — https://www.nda.gov.cn/sjj/zwgk/zcjd/0830/20240830194650852257290_pc.html — 2024 — 层级: 1 — 来源: AnySearch
+[10] 国家数据局 — 数字经济促进共同富裕实施方案 答记者问 — <https://www.nda.gov.cn/sjj/zwgk/zcjd/0830/20240830194650852257290_pc.html> — 2024 — 层级: 1 — 来源: AnySearch
 
-[11] Kang — Robot Tax Controversy and How to Legislate a Robot Tax (KCI) — https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART003084508 — 2024 — 层级: 1 — 来源: AnySearch
+[11] Kang — Robot Tax Controversy and How to Legislate a Robot Tax (KCI) — <https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART003084508> — 2024 — 层级: 1 — 来源: AnySearch
 
-[12] OECD — Income and wealth inequalities: Society at a Glance 2024 — https://www.oecd.org/ — 2024 — 层级: 1 — 来源: AnySearch
+[12] OECD — Income and wealth inequalities: Society at a Glance 2024 — <https://www.oecd.org/> — 2024 — 层级: 1 — 来源: AnySearch
 
-[13] World Inequality Lab — World Inequality Report 2022 (WIR2022) — https://wir2022.wid.world/ — 2022 — 层级: 1 — 来源: AnySearch
+[13] World Inequality Lab — World Inequality Report 2022 (WIR2022) — <https://wir2022.wid.world/> — 2022 — 层级: 1 — 来源: AnySearch
 
 ## 执行情况
 
 | 项目 | 说明 |
-|------|------|
+| --- | --- |
 | 执行流程 | 预检 → 派子代理（3 个，1 个熔断 + 主导补跑） → 综合 → 验收 |
 | 搜索后端 | **AnySearch CLI（v6.0.0 SKILL.md 必选源）**——未使用 chrome_devtools / DDG 等设计外工具 |
 | 子代理 1（AI 与劳动份额） | 4 个检索词，19 个真实 URL，5 条核心事实 |
@@ -115,8 +114,8 @@
 | 子代理 3（UBI / 自动化税） | 4 个检索词，20 个真实 URL，5 条核心事实 |
 | 真实抓回 URL 合计 | 79 个（去重前）；约 60 个去重后 |
 | Tier 1 源占比 | ≥70%（IMF/OECD/世行/费城联储/CEPR/NBER/WIR2022/中国 CSSCI/Kela/OpenResearch 等） |
-| 缺失全文 | 所有源仅 AnySearch snippet（~200-500 字摘要），未抓取 PDF 全文——AnySearch `extract` 不支持 PDF 的技术限制 |
-| 后端降级 | WebSearch (Tavily) 402 持续耗尽；SciVerse MCP 未配；SerpApi 无 key——按 SKILL.md 设计只用 AnySearch CLI |
+| 缺失全文 | 所有源仅 AnySearch snippet（\~200-500 字摘要），未抓取 PDF 全文——AnySearch `extract` 不支持 PDF 的技术限制 |
+| 后端降级 | **Runtime WebSearch 402 持续耗尽**（本会话宿主 Proma 的 WebSearch 实现是 Tavily 集成；不同宿主的 WebSearch 实现不同，可以是 Tavily/Bing/Google Custom Search 等任意搜索引擎）；SciVerse MCP 未配；SerpApi 无 key——按 SKILL.md 设计只用 AnySearch CLI |
 | 状态机门禁 | STARTED → DONE 跑通，REPORT_SHA256 + INTEGRITY:OK |
 | 报告位置 | `examples/DEEP_RESEARCH_AI与收入分配_2026-07-22_strict.md` |
 | 验收状态 | 通过 `validate_report.py` 全部条款 |
