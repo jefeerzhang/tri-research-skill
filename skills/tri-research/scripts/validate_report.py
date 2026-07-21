@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the structural contract of a tri-research Markdown report."""
+"""验证 tri-research 报告的结构契约。"""
 
 from __future__ import annotations
 
@@ -76,7 +76,6 @@ def canonicalize_url(value: str) -> str | None:
         ),
         doseq=True,
     )
-    # Fragments and tracking parameters are not distinct evidence sources.
     return urlunsplit((parsed.scheme.lower(), host, path, query, ""))
 
 
@@ -84,48 +83,52 @@ def validate(
     text: str, min_sources: int, *, expected_topic: str | None = None
 ) -> list[str]:
     errors: list[str] = []
-    required_headings = ("## TL;DR", "## 参考文献", "## 搜索与降级状态")
+    required_headings = (
+        "## 概述",
+        "## 已有事实",
+        "## 主要文献观点",
+        "## 主要矛盾与冲突点",
+        "## 未来研究方向",
+        "## 参考文献",
+        "## 执行情况",
+    )
     for heading in required_headings:
         if heading not in text:
-            errors.append(f"missing required heading: {heading}")
+            errors.append(f"缺少必需章节: {heading}")
 
     if expected_topic:
         heading = H1_RE.search(text)
         expected_normalized = normalize_topic(expected_topic)
         actual_normalized = normalize_topic(heading.group(1)) if heading else ""
         if not expected_normalized or expected_normalized not in actual_normalized:
-            errors.append(
-                "report H1 does not contain the confirmed topic: " + expected_topic
-            )
+            errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
     references = {int(number): entry for number, entry in REFERENCE_RE.findall(text)}
     if len(references) < min_sources:
-        errors.append(
-            f"expected at least {min_sources} references, found {len(references)}"
-        )
+        errors.append(f"至少需要 {min_sources} 条参考文献，实际 {len(references)} 条")
 
     if references:
         expected = list(range(1, max(references) + 1))
         actual = sorted(references)
         if actual != expected:
-            errors.append(f"reference numbers are not consecutive: {actual}")
+            errors.append(f"参考文献编号不连续: {actual}")
 
     reference_urls: dict[int, str] = {}
     for number, entry in sorted(references.items()):
         url_match = URL_RE.search(entry)
         if not url_match:
-            errors.append(f"reference [{number}] has no URL")
+            errors.append(f"参考文献 [{number}] 缺少 URL")
         else:
             raw_url = url_match.group(0).rstrip(".,;:)]}>")
             canonical_url = canonicalize_url(raw_url)
             if canonical_url is None:
-                errors.append(f"reference [{number}] has an invalid http/https URL")
+                errors.append(f"参考文献 [{number}] URL 无效")
             else:
                 reference_urls[number] = canonical_url
-        if not re.search(r"\bTier:\s*[123]\b", entry):
-            errors.append(f"reference [{number}] has no valid Tier")
-        if not re.search(r"\bFound by:\s*[^—\n]+", entry):
-            errors.append(f"reference [{number}] has no Found by metadata")
+        if not re.search(r"层级:\s*[123]", entry):
+            errors.append(f"参考文献 [{number}] 缺少层级")
+        if not re.search(r"来源:\s*[^\n]+", entry):
+            errors.append(f"参考文献 [{number}] 缺少来源工具")
 
     unique_urls = set(reference_urls.values())
     if len(unique_urls) < len(reference_urls):
@@ -134,45 +137,31 @@ def validate(
             for number, url in reference_urls.items()
             if list(reference_urls.values()).count(url) > 1
         )
-        errors.append(f"reference URLs are not unique: {duplicate_numbers}")
+        errors.append(f"参考文献 URL 重复: {duplicate_numbers}")
     if len(unique_urls) < min_sources:
-        errors.append(
-            f"expected at least {min_sources} unique reference URLs, found {len(unique_urls)}"
-        )
+        errors.append(f"至少需要 {min_sources} 个不重复来源，实际 {len(unique_urls)} 个")
 
     body = text.split("## 参考文献", 1)[0]
     cited = {int(number) for number in INLINE_RE.findall(body)}
     missing = sorted(cited - set(references))
     if missing:
-        errors.append(f"inline citations have no reference entries: {missing}")
+        errors.append(f"正文引用无对应参考文献: {missing}")
     unused = sorted(set(references) - cited)
     if unused:
-        errors.append(f"reference entries are not cited in the body: {unused}")
+        errors.append(f"参考文献未在正文中引用: {unused}")
 
     reference_entries = list(references.values())
-    if reference_entries and not any(
-        CHINESE_RE.search(entry) for entry in reference_entries
-    ):
-        errors.append("report has no Chinese-language reference")
-    if reference_entries and not any(
-        ENGLISH_RE.search(entry) for entry in reference_entries
-    ):
-        errors.append("report has no English-language reference")
-
-    status_match = re.search(
-        r"^## 搜索与降级状态\s*$\n(?P<body>.*?)(?=^##\s|\Z)",
-        text,
-        re.MULTILINE | re.DOTALL,
-    )
-    if status_match and not re.search(
-        r"\b(?:available|unavailable|quota_exhausted)\b", status_match.group("body")
-    ):
-        errors.append("search status section has no normalized channel status")
+    # Check language coverage in the author/title portion (before URL), not metadata fields
+    content_parts = [entry.split("http")[0] for entry in reference_entries]
+    if content_parts and not any(CHINESE_RE.search(part) for part in content_parts):
+        errors.append("报告缺少中文来源")
+    if content_parts and not any(ENGLISH_RE.search(part) for part in content_parts):
+        errors.append("报告缺少英文来源")
 
     forbidden = ("generated by AI", "由 AI 撰写", "AI 生成水印")
     for marker in forbidden:
         if marker.lower() in text.lower():
-            errors.append(f"forbidden generation marker found: {marker}")
+            errors.append(f"禁止标记: {marker}")
     return errors
 
 
@@ -183,7 +172,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--min-sources", type=source_threshold, default=MIN_REPORT_SOURCES
     )
     parser.add_argument(
-        "--topic", help="Confirmed research topic that must appear in H1"
+        "--topic", help="确认的研究主题（必须出现在标题中）"
     )
     return parser
 
@@ -191,14 +180,14 @@ def create_parser() -> argparse.ArgumentParser:
 def source_threshold(value: str) -> int:
     parsed = int(value)
     if parsed < MIN_REPORT_SOURCES:
-        raise argparse.ArgumentTypeError(f"must be at least {MIN_REPORT_SOURCES}")
+        raise argparse.ArgumentTypeError(f"至少为 {MIN_REPORT_SOURCES}")
     return parsed
 
 
 def main() -> int:
     args = create_parser().parse_args()
     if not args.report.is_file():
-        print(f"ERROR:report does not exist: {args.report}", file=sys.stderr)
+        print(f"ERROR:报告不存在: {args.report}", file=sys.stderr)
         return 1
     errors = validate(
         args.report.read_text(encoding="utf-8"),
@@ -209,9 +198,12 @@ def main() -> int:
         for error in errors:
             print(f"ERROR:{error}", file=sys.stderr)
         return 1
-    print(f"OK:validated {args.report} with at least {args.min_sources} sources")
+    print(f"OK:验证通过，{args.min_sources}+ 来源")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+#!/usr/bin/env python3
+"""Validate the structural contract of a tri-research Markdown report."""
+

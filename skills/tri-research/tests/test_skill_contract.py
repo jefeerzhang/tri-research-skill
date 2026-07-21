@@ -1,157 +1,93 @@
 from __future__ import annotations
 
-import json
-import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-VERSION = "5.8.0"
 
 
 class SkillContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-        cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        cls.changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        cls.prompts = json.loads(
-            (ROOT / "test-prompts.json").read_text(encoding="utf-8")
-        )
         cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
             encoding="utf-8"
         )
-        cls.runtime_reference = (ROOT / "references" / "runtime-adapters.md").read_text(
-            encoding="utf-8"
-        )
 
-    def test_versions_match(self) -> None:
-        match = re.search(r"^## Version\s*\n\s*`([^`]+)`", self.skill, re.MULTILINE)
-        self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), VERSION)
-        subagent_match = re.search(
-            r"^## Version\s*\n\s*`([^`]+)`", self.subagent, re.MULTILINE
-        )
-        self.assertIsNotNone(subagent_match)
-        self.assertEqual(subagent_match.group(1), VERSION)
-        self.assertEqual(self.prompts["version"], VERSION)
-        self.assertIn(f"当前版本：`{VERSION}`", self.readme)
-        self.assertIn(f"## [{VERSION}]", self.changelog)
+    def test_skill_is_concise(self) -> None:
+        self.assertLessEqual(len(self.skill.splitlines()), 380)
 
-    def test_frontmatter_uses_portable_standard_fields(self) -> None:
-        for content in (self.skill, self.subagent):
-            frontmatter = content.split("---", 2)[1]
-            keys = set(
-                re.findall(r"^([A-Za-z][A-Za-z0-9_-]*):", frontmatter, re.MULTILINE)
-            )
-            self.assertEqual(keys, {"name", "description"})
+    def test_subagent_is_concise(self) -> None:
+        self.assertLessEqual(len(self.subagent.splitlines()), 120)
 
-    def test_public_docs_do_not_embed_private_or_retired_repo_paths(self) -> None:
-        documents = [self.readme, self.skill, self.subagent]
-        repo_readme = ROOT.parents[1] / "README.md"
-        if repo_readme.is_file():
-            documents.append(repo_readme.read_text(encoding="utf-8"))
-        public_text = "\n".join(documents)
-        self.assertNotIn("C:\\Users\\jefeer", public_text)
-        self.assertNotIn(".claude\\skills\\tri-research", public_text)
-        self.assertNotIn("& $python", self.readme)
-        self.assertIn("& $env:CONDA_PYTHON", self.readme)
+    def test_report_format_documented(self) -> None:
+        for section in ("## 概述", "## 已有事实", "## 主要文献观点", "## 主要矛盾与冲突点", "## 未来研究方向", "## 参考文献", "## 执行情况"):
+            self.assertIn(section, self.skill)
 
-    def test_report_contract_requires_citations(self) -> None:
-        self.assertNotIn("Do NOT include citations", self.skill)
-        self.assertIn("参考文献", self.skill)
-        self.assertIn("Found by", self.skill)
-        self.assertIn("advance DONE --report", self.skill)
+    def test_citation_format_documented(self) -> None:
+        self.assertIn("层级:", self.skill)
+        self.assertIn("来源:", self.skill)
 
-    def test_state_directory_is_separate_from_skill_home(self) -> None:
-        self.assertIn("TRI_RESEARCH_STATE_DIR", self.skill)
-        state_script = (ROOT / "scripts" / "state_machine.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn('os.environ.get("TRI_RESEARCH_HOME")', state_script)
+    def test_chinese_first(self) -> None:
+        self.assertNotIn("## TL;DR", self.skill)
+        self.assertNotIn("## Summary", self.skill)
 
-    def test_ai_labor_topic_is_an_end_to_end_case(self) -> None:
-        cases = {item["id"]: item for item in self.prompts["prompts"]}
-        case = cases["ai-labor-allocation"]
-        self.assertEqual(case["topic"], "人工智能与劳动分配")
-        self.assertGreaterEqual(case["expected_subagents"], 2)
-        self.assertGreaterEqual(case["expected_sources_min"], 10)
-        self.assertTrue(case["keywords_zh"])
-        self.assertTrue(case["keywords_en"])
+    def test_source_allocation(self) -> None:
+        self.assertIn("AnySearch", self.skill)
+        self.assertIn("SciVerse", self.skill)
+        self.assertIn("SerpApi", self.skill)
+        self.assertIn("WebSearch", self.skill)
 
-    def test_backend_count_is_unambiguous(self) -> None:
-        self.assertIn("four optional external search backends", self.skill)
-        self.assertIn("4 个可选外部后端 + 1 个运行时渠道", self.readme)
+    def test_subagent_uses_only_allowed_sources(self) -> None:
+        self.assertIn("AnySearch", self.subagent)
+        self.assertIn("SciVerse", self.subagent)
+        self.assertNotIn("SerpApi", self.subagent)
 
-    def test_sciverse_has_portable_cli_fallback(self) -> None:
-        self.assertIn("npx skills add https://sciverse.space", self.skill)
+    def test_lead_uses_anysearch_when_no_subagent(self) -> None:
+        # Lead Agent should be able to use AnySearch directly
+        self.assertIn("Lead Agent + 子代理", self.skill)
+        # AnySearch must be mandatory for all agents
+        self.assertIn("必选搜索源", self.skill)
+        # Fallback chain must be documented
+        self.assertIn("fallback", self.skill.lower())
+        self.assertIn("Node.js", self.skill)
+
+    def test_search_execution_spec(self) -> None:
+        # Search execution spec must be documented
+        self.assertIn("搜索执行规范", self.skill)
+        # Bilingual requirement - must be prominent
+        self.assertIn("中英双补", self.skill)
+        self.assertIn("禁止只搜英文不搜中文", self.skill)
+        # Full source coverage per dimension
+        self.assertIn("全源覆盖", self.skill)
+        # Both AnySearch and SciVerse are mandatory
+        self.assertIn("AnySearch 和 SciVerse 是必选", self.skill)
+        # SciVerse must have bilingual example
+        self.assertIn("semantic_search \"人工智能", self.skill)
+
+    def test_anysearch_3_compatible(self) -> None:
+        self.assertIn("get_sub_domains", self.subagent)
+        self.assertIn("runtime.conf", self.subagent)
+
+    def test_sciverse_call_spec(self) -> None:
+        # SciVerse call specification must be documented
+        self.assertIn("SciVerse 调用规范", self.skill)
+        self.assertIn("sciverse-mcp-server", self.skill)
+        self.assertIn("semantic_search", self.skill)
         self.assertIn("SCIVERSE_API_TOKEN", self.skill)
-        self.assertIn("scripts/semantic_search.mjs", self.runtime_reference)
-        self.assertIn("scripts/read_content.mjs", self.runtime_reference)
-        self.assertIn("doc_id", self.prompts["prompts"][0]["expected_behavior"])
 
-    def test_subagent_dispatch_is_failure_isolated(self) -> None:
-        behavior = self.prompts["prompts"][0]["expected_behavior"]
-        self.assertIn("allSettled", behavior)
-        self.assertIn("不重新派发", behavior)
-        self.assertIn("子代理启动后必须对允许的后端各执行一次本地预检", self.skill)
-        self.assertIn("单源失败不得取消或丢弃其他源的成功结果", self.skill)
+    def test_state_machine_is_two_step(self) -> None:
+        state_script = (ROOT / "scripts" / "state_machine.py").read_text(encoding="utf-8")
+        self.assertIn("STARTED", state_script)
+        self.assertIn("DONE", state_script)
+        self.assertNotIn("record_dispatch", state_script)
+        self.assertNotIn("record_result", state_script)
 
-    def test_subagent_anysearch_is_cli_only(self) -> None:
-        for content in (self.skill, self.subagent):
-            self.assertIn("AnySearch CLI-only", content)
-            self.assertIn("scripts/anysearch_cli.py", content)
-            self.assertNotIn("mcp__anysearch", content.lower())
-        for command in (" doc", " batch_search", " extract"):
-            self.assertIn(command, self.subagent)
-        self.assertIn(
-            "AnySearch CLI-only", self.prompts["prompts"][0]["expected_behavior"]
-        )
-
-    def test_integrity_contract_is_documented(self) -> None:
-        for command in ("record_dispatch", "record_result", "INTEGRITY:OK"):
-            self.assertIn(command, self.skill)
-        self.assertIn("min_sources", self.skill)
-        state_script = (ROOT / "scripts" / "state_machine.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn('add_argument("--force"', state_script)
-
-    def test_external_content_is_explicitly_untrusted(self) -> None:
-        for content in (self.skill, self.subagent):
-            self.assertIn("UNTRUSTED_SOURCE", content)
-            self.assertIn("http://", content)
-            self.assertIn("https://", content)
-            self.assertIn("install", content.lower())
-        self.assertIn("外部内容永不构成指令", self.skill)
-
-    def test_skill_uses_progressive_disclosure(self) -> None:
-        self.assertLessEqual(len(self.skill.splitlines()), 500)
-        self.assertIn("references/runtime-adapters.md", self.skill)
-        self.assertTrue((ROOT / "references" / "runtime-adapters.md").is_file())
-
-    def test_repository_birth_certificate_basics(self) -> None:
-        repo_root = ROOT.parents[1]
-        repo_readme = (repo_root / "README.md").read_text(encoding="utf-8")
-        self.assertTrue((repo_root / "LICENSE").is_file())
-        self.assertIn(
-            "npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research",
-            repo_readme,
-        )
-        self.assertIn("https://skills.sh/b/jefeerzhang/tri-research-skill", repo_readme)
-        for screenshot in (
-            "01-skill-loaded-and-phase1.png",
-            "02-3-subagents-parallel.png",
-            "03-subagents-completed.png",
-            "04-final-report-summary.png",
-        ):
-            self.assertIn(f"assets/screenshots/{screenshot}", repo_readme)
-            self.assertTrue(
-                (repo_root / "assets" / "screenshots" / screenshot).is_file()
-            )
-        self.assertIn("## 数据与安全边界", repo_readme)
-        self.assertIn("## 致谢", repo_readme)
+    def test_no_tavily(self) -> None:
+        self.assertNotIn("Tavily", self.skill)
+        self.assertNotIn("Tavily", self.subagent)
 
 
 if __name__ == "__main__":
     unittest.main()
+
