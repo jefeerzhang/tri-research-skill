@@ -50,15 +50,14 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 ```text
 用户确认或直接给出研究问题
   -> 真实探测搜索渠道并报告一次状态
-  -> 初始化带 session id 的状态机
-  -> S0: 确认主题、双语关键词、时间范围
-  -> S1: 评估、分类、规划
+  -> state_machine.py start：初始化带 session id 的状态机
+  -> state_machine.py set_params：冻结 topic、双语关键词、min_sources（不可改）
   -> 主导代理执行 SerpApi/WebSearch 补强（可用时）
-  -> 实际并行派发后记录 record_dispatch 账本
-  -> S2: 等待既有子代理，禁止重新派发
-  -> 子代理终止后记录 record_result 与结果哈希
-  -> S3: 汇总、写报告、加引用、验收
-  -> DONE: 仅在主题、来源门槛、代理证据与报告哈希均通过后进入
+  -> 一次性并行派发 1-6 个子代理
+  -> 子代理各自预检后端（AnySearch / SciVerse），故障隔离、单源失败不重试
+  -> 主导代理综合 + 撰写最终报告
+  -> state_machine.py done：跑 validate_report.py 验收，全部通过才进入 DONE
+  -> state_machine.py check：复核报告 SHA-256 与 INTEGRITY
 ```
 
 非简单问题使用 2-6 个子代理；简单问题使用 1 个。每个子代理必须覆盖中文与英文查询，并在 8 分钟内返回。
@@ -67,33 +66,30 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 
 ## 状态机
 
-状态机实现位于 `scripts/state_machine.py`。它使用显式 `--session` 隔离并发研究，状态数据写入 `TRI_RESEARCH_STATE_DIR` 或系统临时目录，不写入技能安装目录。
+状态机实现位于 `scripts/state_machine.py`。它使用显式 `--session` 隔离并发研究，状态数据写入 `TRI_RESEARCH_STATE_DIR` 或系统临时目录，不写入技能安装目录。状态机只有**两步门禁**（`STARTED → DONE`），DONE 必须经 `validate_report.py` 全部条款通过。
 
-PowerShell 下先激活获准的 conda 环境，并设置两个可移植路径变量：
+```bash
+# 初始化会话
+python scripts/state_machine.py --session <session-id> start
 
-```powershell
-$env:CONDA_PYTHON = (Get-Command python).Source
-$env:TRI_RESEARCH_HOME = (Resolve-Path '<tri-research-install-dir>').Path
-$state = Join-Path $env:TRI_RESEARCH_HOME 'scripts\state_machine.py'
-$session = 'ai-labor-allocation'
+# 冻结主题、双语关键词、min_sources（不可重复 set_params）
+python scripts/state_machine.py --session <session-id> set_params '{
+  "topic": "人工智能与劳动分配",
+  "min_sources": 12,
+  "keywords_zh": ["人工智能", "劳动分配"],
+  "keywords_en": ["artificial intelligence", "labor allocation"]
+}'
 
-& $env:CONDA_PYTHON $state --session $session init
-& $env:CONDA_PYTHON $state --session $session set_params '{"topic":"人工智能与劳动分配","min_sources":12,"keywords_zh":["人工智能","劳动分配"],"keywords_en":["artificial intelligence","labor allocation"],"time_range":"all"}'
-& $env:CONDA_PYTHON $state --session $session advance S1
-& $env:CONDA_PYTHON $state --session $session check
-& $env:CONDA_PYTHON $state --session $session record_dispatch agent-1 --objective '研究就业结构机制' --dispatch-ref '<runtime-task-id-1>'
-& $env:CONDA_PYTHON $state --session $session record_dispatch agent-2 --objective '研究收入分配机制' --dispatch-ref '<runtime-task-id-2>'
-& $env:CONDA_PYTHON $state --session $session advance S2
-& $env:CONDA_PYTHON $state --session $session record_result agent-1 --result '<agent-1-result.md>'
-& $env:CONDA_PYTHON $state --session $session record_result agent-2 --result '<agent-2-result.md>'
-& $env:CONDA_PYTHON $state --session $session advance S3
-& $env:CONDA_PYTHON $state --session $session advance DONE --report '<report.md>'
-& $env:CONDA_PYTHON $state --session $session check
+# 主导代理完成报告后调用 done：内部跑 validate_report.py 验收
+python scripts/state_machine.py --session <session-id> done --report <report.md>
+
+# 检查当前状态与报告哈希
+python scripts/state_machine.py --session <session-id> check
 ```
 
-进入 S1 时，状态机冻结主题和来源门槛。S2/S3 分别要求完整派发账本和代理终态证据。进入 `DONE` 时必须实际读取并验收报告；通过后记录报告路径、SHA-256、冻结主题、来源门槛和验收时间。后续 `check` 会复核所有成功代理结果和最终报告的哈希。
+进入 DONE 时，状态机读取报告并调用 `validate_report.py` 全部条款；通过后记录报告路径、SHA-256、冻结主题、来源门槛和验收时间。后续 `check` 会复核成功验收的最终报告哈希，输出 `INTEGRITY:OK`。
 
-Unix 环境可调用 `scripts/state_machine.sh` 兼容包装器，也可直接运行 Python 实现。
+Unix / macOS 环境可调用 `scripts/state_machine.sh` 兼容包装器，内部转发到 Python 实现。PowerShell 用户可把上面命令里的 `python` 换成 `& $env:CONDA_PYTHON` 走已配置的环境。
 
 ## 搜索降级
 

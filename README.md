@@ -161,7 +161,7 @@ Unix 环境也可直接调用 `scripts/state_machine.sh`，内部转发到 Pytho
 | 派生与重派发 | 派生代理 0，重复派发 0 |
 | 循环安全 | 空循环 0，死循环 0 |
 | 状态机 | 一次 `init` + 一次 `set_params`，最终 `DONE` |
-| 自动化测试 | 41/41 通过 |
+| 自动化测试 | 35/35 通过（本地执行；CI 见 [.github/workflows/python-package.yml](.github/workflows/python-package.yml)） |
 
 本轮后端状态：
 

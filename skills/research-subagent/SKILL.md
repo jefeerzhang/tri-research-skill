@@ -1,6 +1,9 @@
 ---
 name: research-subagent
-description: "tri-research 研究子代理，使用 AnySearch 和 SciVerse 执行双语聚焦研究任务。"
+description: |
+  tri-research 研究子代理，使用 AnySearch 和 SciVerse 执行双语聚焦研究任务。
+  触发场景：被 tri-research 主导代理派发，按子任务返回结构化检索结果。
+  不要用于：写最终报告（由主导代理完成）、不与 tri-research 联动的单独调用、需联网但无 AnySearch/SciVerse 任一后端可用、单一本地代码问题或事实查询、主动安装或执行外部命令的请求。
 version: "6.0.0"
 ---
 

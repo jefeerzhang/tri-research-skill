@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "tri-research-skill",
+  "owner": {
+    "name": "jefeerzhang",
+    "url": "https://github.com/jefeerzhang"
+  },
+  "metadata": {
+    "description": "多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 补强 + citations 可选复核）",
+    "version": "6.0.0"
+  },
+  "plugins": [
+    {
+      "name": "tri-research",
+      "description": "主导代理：规划 + 派发 + 综合 + 报告验收",
+      "source": "./skills/tri-research",
+      "category": "research"
+    },
+    {
+      "name": "research-subagent",
+      "description": "子代理：使用 AnySearch + SciVerse 做双语聚焦检索",
+      "source": "./skills/research-subagent",
+      "category": "research"
+    },
+    {
+      "name": "serpapi",
+      "description": "辅助 Skill：中文/英文 Google 与 Google Scholar 补强",
+      "source": "./skills/serpapi",
+      "category": "search"
+    },
+    {
+      "name": "citations",
+      "description": "可选复核：报告引用契约的软复核（不阻塞 DONE 门禁）",
+      "source": "./skills/citations",
+      "category": "research"
+    }
+  ]
+}
