@@ -44,8 +44,14 @@ version: "6.0.0"
 
 ## 研究流程
 
+> ⚠️ **硬约束：每个研究角度 × 每个源 × 中文 + 英文 = 必须全部执行。**
+> 禁止只搜英文不搜中文，禁止只搜中文不搜英文。缺少任一语言视为流程缺陷。
+
 1. **预检**：对 AnySearch 和 SciVerse 各执行一次轻量查询确认可用性
-2. **并行搜索**：对 AnySearch 和 SciVerse 同时发起不同角度的查询（中英双补）
+2. **并行搜索**：对 AnySearch 和 SciVerse 同时发起不同角度的查询
+   - **中英双补（强制）**：每个研究角度必须有中文 query 和英文 query，在两个源上各执行一遍
+   - 示例：`AnySearch batch_search --queries '[{"query":"人工智能 就业替代"},{"query":"AI job displacement"}]'`
+   - 示例：`SciVerse semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation employment"`
 3. **获取全文**：对最有价值的 3-5 个结果用 `extract` 获取完整内容
 4. **去重汇报**：按 URL 去重，标注来源工具
 
