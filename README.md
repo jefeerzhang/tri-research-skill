@@ -102,7 +102,7 @@ npx skills add LearnPrompt/anysearch
 npx skills add https://sciverse.space
 ```
 
-Tavily 通过宿主 MCP 配置。SerpApi 使用仓库中的 `skills/serpapi`，从 `SERPAPI_KEY` 读取凭据。SciVerse 从 `SCIVERSE_API_TOKEN` 读取凭据，需要 Node.js 18 或更高版本来运行 CLI fallback。
+SerpApi 使用仓库中的 `skills/serpapi`，从 `SERPAPI_KEY` 读取凭据。SciVerse 从 `SCIVERSE_API_TOKEN` 读取凭据，需要 Node.js 18 或更高版本来运行 CLI fallback。
 
 所有密钥只从环境变量读取，不写入仓库、日志或研究报告。
 
@@ -166,26 +166,20 @@ Unix 环境也可直接调用 `scripts/state_machine.sh`，内部转发到 Pytho
 
 ## 真实回归测试
 
-2026-07-20 以“人工智能与劳动分配”为主题完成端到端回归：
+> house-style #6 "每个数字可点击查证"：本节不放没有证据的数字。唯一能持续查证的事实是 unittest 数与 CI 运行状态，具体实时数字以 [最近一次 CI 运行](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml) 为准。
 
-| 检查项 | 结果 |
-|---|---|
-| 子代理派发 | 3 个一次性并行派发，3/3 完成 |
-| 子代理收敛 | 每个 2 个 OODA 循环，约 2-5 分钟完成 |
-| 派生与重派发 | 派生代理 0，重复派发 0 |
-| 循环安全 | 空循环 0，死循环 0 |
-| 状态机 | 一次 `init` + 一次 `set_params`，最终 `DONE` |
-| 自动化测试 | 35/35 通过（本地执行；CI 见 [.github/workflows/python-package.yml](.github/workflows/python-package.yml)） |
+| 检查项 | 事实状态 | 证据链接 |
+|---|---|---|
+| 自动化测试 | 35/35 通过（本地执行） | [.github/workflows/python-package.yml](.github/workflows/python-package.yml) · [CI 运行](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml) |
+| 报告结构验收器 | `validate_report.py` 全部条款 | [scripts/validate_report.py](skills/tri-research/scripts/validate_report.py) |
+| 状态机门禁 | `STARTED → DONE` 两步，硬验收 | [scripts/state_machine.py](skills/tri-research/scripts/state_machine.py) |
+| Examples 报告 | 1 份样本报告可被验收器通过 | [examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md](examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md) |
 
-本轮后端状态：
+### 本会话内已验证的回归场景
 
-- AnySearch：可用。
-- SciVerse：主代理和 2/3 子代理可用；1 个子代理未继承凭据，按设计熔断并降级，未触发重派发。
-- Tavily：`quota_exhausted`，按设计跳过。
-- SerpApi：测试进程未检测到凭据，因此本轮未验证真实查询。
-- Runtime WebSearch：当前宿主未暴露。
+`examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md` 是本仓库自带的一份样本报告，已用 `validate_report.py --min-sources 12 --topic '人工智能与劳动分配'` 端到端验收通过：12 条参考文献、章节齐全、URL 唯一、中英双补、引用与参考一一对应。
 
-因此，本轮验证的是“核心调度、真实子代理工作、来源故障隔离和降级流程全部跑通”，不宣称所有外部来源均已成功调用。
+任何“派发数 / 收敛循环数 / 后端状态”之类的量化数字，本 README 都不写——这些数字取决于真实运行环境（搜索后端可用性、宿主配置、研究主题），无法跨环境复现。如要看到“某一次具体研究”的真实派发与收敛数字，请直接打开该次研究产出的 `~/tri-research-reports/DEEP_RESEARCH_*.md` 与对应的状态机 JSON（`REPORT_SHA256` 与 `MIN_SOURCES` 字段会记录最终验收证据）。
 
 ## 测试
 
