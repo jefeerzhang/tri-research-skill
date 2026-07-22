@@ -44,45 +44,19 @@ version: "6.0.0"
 
 ### 交互式引导流程
 
-当源检测发现有未就绪的必选源时，按以下流程**逐个源引导**（每次只问一个）：
+源检测发现未就绪必选源时，逐个询问（每次只问一个）：
 
-**第 1 步：AnySearch**（未就绪时）
-1. 说明：通用网页与垂直领域搜索，研究的主力源
-2. 询问用户：「要现在配置 AnySearch 吗？[配置] / [跳过]」
-3. 用户选**配置** → 输出以下步骤，等用户执行完再验证：
-   - 下载：`curl -L -o anysearch.zip https://github.com/anysearch-ai/anysearch-skill/archive/refs/tags/v3.0.1.zip`
-   - 解压并移到 agent 的 skill 目录（如 `~/.claude/skills/anysearch`）
-   - API Key（可选但推荐）：访问 https://anysearch.com/console/api-keys 注册邮箱即可获取
-   - 验证命令：`python <skill_dir>/scripts/anysearch_cli.py search "test" --max_results 1`
-4. 验证成功 → 标记 AnySearch 为 ✅，**并持久化运行时**：
-   - 探测 `python --version` 和 `python3 --version`，记录可用的运行时
-   - 写入 `<skill_dir>/runtime.conf`（后续启动直接读此文件，不再重复检测）
-5. 验证失败 → 降级为 ❌，匿名模式可用
-6. 用户选**跳过** → 标记为本轮不使用，继续下一个源
+**AnySearch** → 询问「要配置吗？[配置]/[跳过]」：
+- 配置：下载 zip → 解压到 skill 目录 → 可选 API Key → 运行验证命令
+- 验证成功 → 标记 ✅，记录运行时到 `runtime.conf`；失败 → ❌（匿名模式可用）
 
-**第 2 步：SciVerse**（未就绪时）
-1. 说明：学术论文语义检索与引用元数据
-2. 询问用户：「要现在配置 SciVerse 吗？[配置] / [跳过]」
-3. 用户选**配置** → 输出以下步骤：
-   - 安装：`pip install sciverse`（需 Python 3.11+）
-   - 获取 Token：访问 https://sciverse.space 注册
-   - 设置环境变量：`export SCIVERSE_API_TOKEN=<your-token>`
-   - 验证命令：`python -c "from sciverse import AgentToolsClient; print('ok')"`
-4. 验证成功 → 标记 SciVerse 为 ✅；失败 → 标记为 ❌
-5. 用户选**跳过** → 标记为本轮不使用
+**SciVerse** → 询问「要配置吗？[配置]/[跳过]」：
+- 配置：`pip install sciverse` → 获取 Token → `export SCIVERSE_API_TOKEN=<your-token>`
+- 验证：`python -c "from sciverse import AgentToolsClient; print('ok')"`
 
-**第 3 步：SerpApi**（可选，仅用户主动要求时引导）
-- 设置环境变量：`export SERPAPI_KEY=<your-key>`
-- 获取 Key：https://serpapi.com（免费档 250 次/月）
-- 验证：`python <serpapi_dir>/scripts/serpapi_cli.py search --query "test" --num 1`
+**SerpApi**（仅用户要求时）：设 `SERPAPI_KEY` 环境变量
 
-**汇总与确认**：引导完成后输出最终可用源状态，确认开始研究。
-
-**用户随时可以说**：
-- 「跳过」→ 当前源跳过，继续下一个
-- 「跳过全部」→ 剩余源全部跳过
-- 直接给研究问题 → 用已就绪源继续
-- 「重新检测」→ 回到源检测步骤
+用户可用「跳过」「跳过全部」「重新检测」控制流程。
 
 ### AnySearch 调用规范（所有 Agent 通用）
 
@@ -91,18 +65,6 @@ version: "6.0.0"
 **⚠️ 子 agent 重要提示**：子 agent 是独立进程，只能使用通过 Bash 工具调用的外部 CLI。AnySearch 必须通过 Bash 工具执行命令调用。
 
 **路径解析**：`${ANYSEARCH_HOME}` → `${TRI_RESEARCH_HOME}/../anysearch` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 时直接用配置的命令。
-
-**子 agent 快速参考**：
-```bash
-# AnySearch CLI 路径（固定路径，无需解析）
-ANYSEARCH_CLI=~/.claude/skills/anysearch/scripts/anysearch_cli.js
-
-# 调用示例
-node $ANYSEARCH_CLI search "要素错配 理论框架" --max_results 5
-node $ANYSEARCH_CLI batch_search --query "中文查询" --query "english query" --max_results 5
-node $ANYSEARCH_CLI extract "https://example.com/page"
-node $ANYSEARCH_CLI get_sub_domains --domain finance
-```
 
 **命令速查**：
 
@@ -136,39 +98,25 @@ node $ANYSEARCH_CLI get_sub_domains --domain finance
 
 **SciVerse 是必选搜索源**，与 AnySearch 同等优先级，用于学术论文检索。
 
-**唯一调用方式：Python SDK**。v6.0.0 起**严格禁止**使用 MCP / mcp__sciverse__* 工具调用 SciVerse——MCP 通道在 Proma 协作子会话中**实测不继承父会话工具**，是不可靠通道。**Python SDK 是唯一受支持的通道**。
+**唯一调用方式：Python SDK**。v6.0.0 起**严格禁止** MCP 通道（Proma 子会话实测不继承 MCP 工具）。
 
-**安装**：
-```bash
-pip install sciverse
-```
+**安装**：`pip install sciverse` + `SCIVERSE_API_TOKEN` 环境变量
 
-**调用模板**（异步）：
+**调用模板**：
 ```python
 import asyncio, os
 from sciverse import AgentToolsClient
-
 async def main():
-    async with AgentToolsClient(
-        base_url="https://api.sciverse.space",
-        token=os.environ["SCIVERSE_API_TOKEN"],
-    ) as c:
-        # 语义检索
+    async with AgentToolsClient(base_url="https://api.sciverse.space", token=os.environ["SCIVERSE_API_TOKEN"]) as c:
         r = await c.semantic_search(query="...", top_k=3)
         for hit in r.get("hits", []):
             print(hit["title"], hit["doc_id"], hit.get("score"))
-        # 读全文（拿完整元数据：标题/作者/期刊/DOI）
-        text = (await c.read_content(doc_id=hit["doc_id"]))["text"]
 asyncio.run(main())
 ```
 
 **预检规则**：派子代理前，主导代理应**先实测** `from sciverse import AgentToolsClient` 在子代理 Python 环境是否可用 + `os.environ["SCIVERSE_API_TOKEN"]` 是否设置。子代理 Python 环境可能与父会话不一致（如 v2 跑时子代理 1 requests 缺失），**不能用就立即熔断该子代理、不重试、不派生新子代理**。
 
-**禁止行为**：
-- 禁止使用 `mcp__sciverse__*` 工具（MCP 通道 v6.0.0 起已弃用）
-- 禁止用 `npx sciverse-mcp-server` 启动 stdio MCP server（已被 Python SDK 取代）
-- 禁止凭训练记忆编造论文 doc_id / title / DOI（必须从 SDK 真实返回拿）
-- 禁止把 `sciverse-mcp-server` 加入 `~/.claude/mcp.json`（SDK 路径不需要 MCP server）
+**禁止行为**：禁止使用 MCP 工具 / MCP server / 凭训练记忆编造论文 ID（必须从 SDK 真实返回拿）
 
 ### 搜索执行规范
 
