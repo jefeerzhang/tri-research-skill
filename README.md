@@ -4,6 +4,7 @@
 
 [![Version](https://img.shields.io/badge/version-6.0.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
+[![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
