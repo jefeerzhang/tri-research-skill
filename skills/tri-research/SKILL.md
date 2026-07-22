@@ -47,7 +47,7 @@ version: "6.0.0"
 源检测发现未就绪必选源时，逐个询问（每次只问一个）：
 
 **AnySearch** → 询问「要配置吗？[配置]/[跳过]」：
-- 配置：下载 zip → 解压到 skill 目录 → 可选 API Key → 运行验证命令
+- 配置：`npx skills add anysearch-ai/anysearch-skill` → 可选 API Key → 运行验证命令
 - 验证成功 → 标记 ✅，记录运行时到 `runtime.conf`；失败 → ❌（匿名模式可用）
 
 **SciVerse** → 询问「要配置吗？[配置]/[跳过]」：
