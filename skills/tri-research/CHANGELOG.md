@@ -2,7 +2,31 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [6.0.0] - 2026-07-21
+## [6.0.0] - 2026-07-22
+
+### Added
+- **交互式引导流程**：首次使用时逐个源检测 + 配置引导（AnySearch → SciVerse → SerpApi），用户可跳过任意源
+- **首次使用引导输出**：研究开始前输出 `搜索源状态：AnySearch ✅/❌ | SciVerse ✅/❌ | SerpApi ✅/❌ | WebSearch ✅`
+- **参考文献单行格式**：与 validate_report.py 正则对齐，必须含 `层级:` `来源:` `URL:` 三个关键字
+- **执行情况表格**：从 bullet list 改为 Markdown 表格（7 行标准字段：流程/子代理/源使用/覆盖质量/维度覆盖/耗时/报告位置）
+
+### Fixed
+- **SciVerse 改为 Python SDK 必选路径**（禁止 MCP 通道）：v6.0.0 起 SciVerse 只走 `pip install sciverse` + Python SDK，MCP 通道在 Proma 协作子会话中实测不继承父会话工具，是不可靠通道
+- **Tavily 重新列为独立第 5 后端**：与 Runtime WebSearch 严格区分，两者独立配置、独立降级
+- **报告范式修正**：从"列信息"（X 报告称…Y 报告称…）改为"凝练总结"（多源合起来说明什么洞察）
+- **子代理任务描述模板压缩**：去掉 MCP 引用，数据源改为 Python SDK，8 条 requirements 合并为单段
+- **脚本精简**：state_machine.py 从 374 行精简为两步门禁（STARTED → DONE），代码量减半
+- **测试精简**：从 434 行 state_machine 测试精简为 13 项合约测试 + 验收器测试
+
+### Changed
+- **SKILL.md 全中文重写**：从英文改为中文（frontmatter 除外），行数从 500+ 精简到 393 行
+- **README 重写**：新增 v5.8.0 → v6.0.0 变更对照表，精简文档结构
+- **引用规则精简**：从 8 条 requirements 精简为 5 条，明确"单行、三必须字段、写完跑验证"
+
+### Verified
+- 端到端测试完成：会话 `ai-creative-destruction-20260722`，主题"AI是创造性破坏吗"
+- 3 个子代理并行搜索，26 篇引用（中 10 / 英 16），validate_report.py 验收通过
+- 13 项合约测试全部通过（SKILL.md 393 行 ≤ 400 限制）
 
 ### Added
 - **Tavily 重新列为独立的第 5 后端**（与 Runtime WebSearch 严格区分）：Tavily 是独立的搜索服务（需 `TAVILY_API_KEY`，通过 `mcp__tavily__*` 或 `tavily-python` SDK 调用），Runtime WebSearch 是宿主内置抽象能力（实现不固定，可由 Tavily/Bing/Google/Brave 等任意引擎实现）。两者独立配置、独立降级、独立计费，**不能**把 Tavily 当作 Runtime WebSearch 的"实现"。
