@@ -109,7 +109,10 @@ class StateMachineTests(unittest.TestCase):
         )
         self.run_cli("--session", "params", "set_params", params)
         result = self.run_cli("--session", "params", "get_params")
-        loaded = json.loads(result.stdout)
+        # First line is the SESSION: marker; second line is the JSON payload.
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], "SESSION:params")
+        loaded = json.loads(lines[1])
         self.assertEqual(loaded["topic"], "测试")
 
     def test_set_params_rejects_invalid(self) -> None:
@@ -138,9 +141,10 @@ class StateMachineTests(unittest.TestCase):
         result = self.run_cli("--session", "full", "done", "--report", str(report))
         self.assertIn("STATE:DONE", result.stdout)
         self.assertIn("REPORT:", result.stdout)
-        self.assertEqual(
-            self.run_cli("--session", "full", "get_phase").stdout.strip(), "DONE"
-        )
+        # get_phase now emits "SESSION:<id>" + phase value on separate lines.
+        phase_output = self.run_cli("--session", "full", "get_phase").stdout
+        phase_value = [line for line in phase_output.splitlines() if not line.startswith("SESSION:")][0]
+        self.assertEqual(phase_value, "DONE")
 
     def test_done_validates_report(self) -> None:
         self.run_cli("--session", "validate", "start")
@@ -151,9 +155,9 @@ class StateMachineTests(unittest.TestCase):
             "--session", "validate", "done", "--report", str(bad_report), ok=False
         )
         self.assertIn("validation failed", result.stderr)
-        self.assertEqual(
-            self.run_cli("--session", "validate", "get_phase").stdout.strip(), "STARTED"
-        )
+        phase_output = self.run_cli("--session", "validate", "get_phase").stdout
+        phase_value = [line for line in phase_output.splitlines() if not line.startswith("SESSION:")][0]
+        self.assertEqual(phase_value, "STARTED")
 
     def test_done_requires_params(self) -> None:
         self.run_cli("--session", "no-params", "start")
@@ -186,12 +190,13 @@ class StateMachineTests(unittest.TestCase):
         self.run_cli("--session", "sess-a", "start")
         self.set_params("sess-a")
         self.run_cli("--session", "sess-b", "start")
-        self.assertEqual(
-            self.run_cli("--session", "sess-a", "get_phase").stdout.strip(), "STARTED"
-        )
-        self.assertEqual(
-            self.run_cli("--session", "sess-b", "get_phase").stdout.strip(), "STARTED"
-        )
+        # get_phase now emits "SESSION:<id>" + phase value; extract the
+        # phase value (the non-SESSION: line) for comparison.
+        def _phase_for(session: str) -> str:
+            out = self.run_cli("--session", session, "get_phase").stdout
+            return [line for line in out.splitlines() if not line.startswith("SESSION:")][0]
+        self.assertEqual(_phase_for("sess-a"), "STARTED")
+        self.assertEqual(_phase_for("sess-b"), "STARTED")
 
     def test_check_works(self) -> None:
         self.run_cli("--session", "checkme", "start")

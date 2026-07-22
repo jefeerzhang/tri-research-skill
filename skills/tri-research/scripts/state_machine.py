@@ -92,6 +92,19 @@ class StateStore:
     def set_active(self, session_id: str) -> None:
         self._atomic_write_text(self.active_file, session_id + "\n")
 
+    def clear_active(self) -> None:
+        """Remove the active-session pointer.
+
+        Called after a session transitions to DONE so that subsequent
+        callers who run a read command without --session get the
+        'no active session' error instead of silently receiving a
+        completed session's state.
+        """
+        try:
+            self.active_file.unlink()
+        except FileNotFoundError:
+            pass  # already gone — no-op
+
     def resolve_session(self, requested: str | None) -> str:
         if requested:
             return validate_session_id(requested)
@@ -125,7 +138,17 @@ def emit(data: dict[str, Any], store: StateStore) -> None:
     print(f"STATE:{phase}")
     print(f"SESSION:{data['session_id']}")
     print(f"FILE:{store.state_path(data['session_id'])}")
-    if phase == "DONE" and data.get("report_validation"):
+    if phase == "DONE":
+        # A DONE phase MUST carry report_validation — without it, the state
+        # file is corrupt (either someone edited it by hand, or a future
+        # code path advanced phase=DONE without populating the proof).
+        # Refuse to print a sanitized view; raise loudly so the corruption
+        # is visible instead of silently swallowed.
+        if "report_validation" not in data or not data["report_validation"]:
+            raise StateError(
+                f"phase=DONE but report_validation is missing for session "
+                f"{data['session_id']!r} — state file is corrupt"
+            )
         proof = data["report_validation"]
         print(f"REPORT:{proof['path']}")
         print(f"REPORT_SHA256:{proof['sha256']}")
@@ -187,12 +210,19 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "get_phase":
+        # Emit SESSION marker before the phase value so external consumers
+        # (CI scripts, dashboards) can attribute the phase to a specific
+        # session id when the command is run against the active-session
+        # fallback.
+        print(f"SESSION:{session_id}")
         print(data["phase"])
         return 0
 
     if args.command == "get_params":
         if data.get("params") is None:
             raise StateError("parameters not set")
+        # Same SESSION marker convention as get_phase, for parseable output.
+        print(f"SESSION:{session_id}")
         print(json.dumps(data["params"], ensure_ascii=False))
         return 0
 
@@ -246,6 +276,10 @@ def run(args: argparse.Namespace) -> int:
         }
         data["history"].append({"phase": "DONE", "at": timestamp})
         store.save(data)
+        # Clear the active-session pointer: this session is now completed
+        # and the pointer must not silently redirect subsequent no-arg
+        # read commands to it.
+        store.clear_active()
         print(f"OK:Session {session_id} completed")
         emit(data, store)
         return 0
