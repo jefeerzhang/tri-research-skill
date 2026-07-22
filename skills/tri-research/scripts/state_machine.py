@@ -14,9 +14,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from validate_report import validate as validate_report
+# Make sibling `validate_report` and `_common` importable regardless of how
+# this file is invoked. Direct script execution (python state_machine.py)
+# already prepends the script's directory to sys.path[0], but importlib-based
+# loaders (e.g. `importlib.util.spec_from_file_location` used by tests and
+# external tooling) do NOT. Without this injection, `from validate_report
+# import validate` fails with ModuleNotFoundError on those code paths.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
-MIN_REPORT_SOURCES = 10
+from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
+from validate_report import validate as validate_report  # noqa: E402
+
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
@@ -39,13 +49,6 @@ def validate_session_id(session_id: str) -> str:
     if not SESSION_RE.fullmatch(session_id):
         raise StateError("session id must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
     return session_id
-
-
-def source_threshold(value: str) -> int:
-    parsed = int(value)
-    if parsed < MIN_REPORT_SOURCES:
-        raise argparse.ArgumentTypeError(f"must be at least {MIN_REPORT_SOURCES}")
-    return parsed
 
 
 def sha256_bytes(content: bytes) -> str:

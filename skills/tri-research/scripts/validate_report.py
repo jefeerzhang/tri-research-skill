@@ -10,13 +10,20 @@ import sys
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+# Make sibling `_common` importable when this file is loaded via importlib
+# (state_machine.py does the same in its own bootstrap).
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
+
 REFERENCE_RE = re.compile(r"^\[(\d+)]\s+(.+)$", re.MULTILINE)
 INLINE_RE = re.compile(r"\[(\d+)]")
 URL_RE = re.compile(r"https?://\S+")
 H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_RE = re.compile(r"\b[A-Za-z]{4,}\b")
-MIN_REPORT_SOURCES = 10
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "gclid",
@@ -175,13 +182,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--topic", help="确认的研究主题（必须出现在标题中）"
     )
     return parser
-
-
-def source_threshold(value: str) -> int:
-    parsed = int(value)
-    if parsed < MIN_REPORT_SOURCES:
-        raise argparse.ArgumentTypeError(f"至少为 {MIN_REPORT_SOURCES}")
-    return parsed
 
 
 def main() -> int:
