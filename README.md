@@ -101,8 +101,13 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 安装可选搜索后端：
 
 ```bash
+# AnySearch (CLI 必选)
 npx skills add LearnPrompt/anysearch
-npx skills add https://sciverse.space
+
+# SciVerse (Python SDK 必选，v6.0.0 起**不**通过 npx skills add 安装)
+pip install sciverse
+# 设置环境变量
+export SCIVERSE_API_TOKEN=<your-token>
 ```
 
 SerpApi 使用仓库中的 `skills/serpapi`，从 `SERPAPI_KEY` 读取凭据。SciVerse 从 `SCIVERSE_API_TOKEN` 读取凭据，需要 Node.js 18 或更高版本来运行 CLI fallback。

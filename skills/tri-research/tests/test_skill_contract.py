@@ -69,12 +69,20 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("get_sub_domains", self.subagent)
         self.assertIn("runtime.conf", self.subagent)
 
-    def test_sciverse_call_spec(self) -> None:
-        # SciVerse call specification must be documented
+    def test_sciverse_python_sdk_not_mcp(self) -> None:
+        # v6.0.0 起 SciVerse 走 Python SDK 必选路径
         self.assertIn("SciVerse 调用规范", self.skill)
-        self.assertIn("sciverse-mcp-server", self.skill)
-        self.assertIn("semantic_search", self.skill)
+        self.assertIn("pip install sciverse", self.skill)
+        self.assertIn("AgentToolsClient", self.skill)
         self.assertIn("SCIVERSE_API_TOKEN", self.skill)
+        # 禁止项:不应包含 SciVerse 工具调用形式 (e.g. mcp__sciverse__semantic_search)
+        self.assertNotIn("mcp__sciverse__semantic_search", self.skill)
+        self.assertNotIn("mcp__sciverse__search_papers", self.skill)
+        self.assertNotIn("mcp__sciverse__read_content", self.skill)
+        # 必含 "Python SDK" 作为必选路径明示
+        self.assertIn("Python SDK", self.skill)
+        # 必含 "禁止" 的反例黑名单
+        self.assertIn("禁止", self.skill)
 
     def test_state_machine_is_two_step(self) -> None:
         state_script = (ROOT / "scripts" / "state_machine.py").read_text(encoding="utf-8")

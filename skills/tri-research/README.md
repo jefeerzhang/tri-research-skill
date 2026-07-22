@@ -12,7 +12,7 @@ Tri Research 可使用**五个可选外部搜索后端**（AnySearch / Tavily / 
 |---|---|---|---|
 | AnySearch CLI-only | 子代理 | bundled CLI 通用网页、批量搜索、正文抓取；禁止 AnySearch MCP | 跳过 |
 | **Tavily** | 子代理 | 独立 Tavily 深度网页搜索与提取（MCP / API），**与 Runtime WebSearch 区分** | 跳过 |
-| SciVerse | 子代理 | 学术论文、语义片段和引用元数据；MCP 缺失时使用 Node CLI | 跳过 |
+| **SciVerse** | 子代理 | 学术论文、语义片段、引用元数据（**Python SDK 必选**，v6.0.0 起禁止 MCP） | 跳过 |
 | SerpApi | 主导代理 | 中文/英文 Google 与 Scholar 补强 | 跳过 |
 | Runtime WebSearch | 主导代理 | 框架内置兜底（**抽象能力**，与 Tavily 独立） | 使用剩余渠道 |
 
@@ -54,7 +54,7 @@ DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
   -> state_machine.py set_params：冻结 topic、双语关键词、min_sources（不可改）
   -> 主导代理执行 SerpApi/WebSearch 补强（可用时）
   -> 一次性并行派发 1-6 个子代理
-  -> 子代理各自预检后端（AnySearch / SciVerse），故障隔离、单源失败不重试
+  -> 子代理各自预检后端（AnySearch / SciVerse Python SDK），故障隔离、单源失败不重试
   -> 主导代理综合 + 撰写最终报告
   -> state_machine.py done：跑 validate_report.py 验收，全部通过才进入 DONE
   -> state_machine.py check：复核报告 SHA-256 与 INTEGRITY
@@ -118,7 +118,7 @@ Unix / macOS 环境可调用 `scripts/state_machine.sh` 兼容包装器，内部
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
 ```
 
-可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`SERPAPI_KEY`。SciVerse 使用 `npx skills add https://sciverse.space` 安装，并从 `SCIVERSE_API_TOKEN` 读取凭据；宿主没有 SciVerse MCP 时自动调用技能自带的 Node.js 脚本。密钥只从环境读取，不写入日志或报告。
+可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`SERPAPI_KEY`、`SCIVERSE_API_TOKEN`。SciVerse v6.0.0 起**只走 Python SDK**（`pip install sciverse`），**不**通过 `npx skills add` / Node CLI / MCP 通道调用；密钥只从环境读取，不写入日志或报告。
 
 ## 外部内容安全边界
 

@@ -19,7 +19,7 @@ version: "6.0.0"
 |----|--------|------|--------|----------|
 | **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | 安装 CLI + 可选 API Key |
 | **Tavily** | Lead Agent + 子代理 | 深度网页搜索与提取（独立 Tavily MCP / Tavily API） | 可选 | TAVILY_API_KEY 环境变量 |
-| **SciVerse** | Lead Agent + 子代理 | 学术论文（MCP 或 CLI） | **必选** | MCP 配置 + API Token |
+| **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** | `pip install sciverse` + `SCIVERSE_API_TOKEN` 环境变量 |
 | **SerpApi** | Lead Agent | 中文 Google/Scholar | 可选 | SERPAPI_KEY 环境变量 |
 | **Runtime WebSearch** | Lead Agent | 通用补充（宿主内置抽象，**不**等于 Tavily） | 可选 | 无需配置，由宿主决定实现（Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种） |
 
@@ -39,24 +39,16 @@ version: "6.0.0"
 ❓ AnySearch — 未检测到。安装方法：
    npx skills add LearnPrompt/anysearch
    可选：配置 ANYSEARCH_API_KEY 获得更高限额（https://anysearch.com/console/api-keys）
-❓ SciVerse — 未检测到。配置方法：
-   在框架的 mcp.json 中添加：
-   {
-     "mcpServers": {
-       "sciverse": {
-         "command": "npx",
-         "args": ["-y", "sciverse-mcp-server"],
-         "env": { "SCIVERSE_API_TOKEN": "<your-token>" }
-       }
-     }
-   }
+❓ SciVerse — 未检测到。配置方法（**仅 Python SDK，不使用 MCP**）：
+   `pip install sciverse`（Python 3.11+）
+   设置环境变量 `SCIVERSE_API_TOKEN=<your-token>`
    获取 Token：https://sciverse.space
 ❓ SerpApi — 未检测到。配置方法：
    设置环境变量 SERPAPI_KEY
    获取 Key：https://serpapi.com（免费档 250次/月）
 
 💡 不配置也能跑：AnySearch 支持匿名访问，WebSearch 已内置。
-   配置后可获得：更多源、更高限额、学术论文检索、中文 Google/Scholar。
+   配置后可获得：更多源、更高限额、学术论文检索（**SciVerse 走 Python SDK**）、中文 Google/Scholar。
 
 本次将使用已就绪的源继续。[继续] / [我先去配置]
 ```
@@ -94,32 +86,39 @@ version: "6.0.0"
 
 **SciVerse 是必选搜索源**，与 AnySearch 同等优先级，用于学术论文检索。
 
-**调用方式**（按优先级尝试，第一个成功即停）：
+**唯一调用方式：Python SDK**。v6.0.0 起**严格禁止**使用 MCP / mcp__sciverse__* 工具调用 SciVerse——MCP 通道在 Proma 协作子会话中**实测不继承父会话工具**，是不可靠通道。**Python SDK 是唯一受支持的通道**。
 
-| 优先级 | 方式 | 说明 |
-|--------|------|------|
-| 1 | MCP | 宿主暴露 `mcp__sciverse__semantic_search` 等工具时直接调用 |
-| 2 | CLI | `npx sciverse-mcp-server` 启动后通过 MCP 协议调用 |
-
-**MCP 配置**（在框架的 mcp.json 中添加）：
-
-```json
-{
-  "mcpServers": {
-    "sciverse": {
-      "command": "npx",
-      "args": ["-y", "sciverse-mcp-server"],
-      "env": {
-        "SCIVERSE_API_TOKEN": "<your-token>"
-      }
-    }
-  }
-}
+**安装**：
+```bash
+pip install sciverse
 ```
 
-**预检规则**：启动时尝试一次轻量 `semantic_search`（`top_k: 1`）。MCP 未暴露则尝试 `npx sciverse-mcp-server`。全部失败才标记为 `unavailable` 并提示用户配置。
+**调用模板**（异步）：
+```python
+import asyncio, os
+from sciverse import AgentToolsClient
 
-**禁止行为**：MCP 未暴露后不能直接放弃，必须尝试 CLI 方式。单源失败不得丢弃其他源已成功获取的结果。
+async def main():
+    async with AgentToolsClient(
+        base_url="https://api.sciverse.space",
+        token=os.environ["SCIVERSE_API_TOKEN"],
+    ) as c:
+        # 语义检索
+        r = await c.semantic_search(query="...", top_k=3)
+        for hit in r.get("hits", []):
+            print(hit["title"], hit["doc_id"], hit.get("score"))
+        # 读全文（拿完整元数据：标题/作者/期刊/DOI）
+        text = (await c.read_content(doc_id=hit["doc_id"]))["text"]
+asyncio.run(main())
+```
+
+**预检规则**：派子代理前，主导代理应**先实测** `from sciverse import AgentToolsClient` 在子代理 Python 环境是否可用 + `os.environ["SCIVERSE_API_TOKEN"]` 是否设置。子代理 Python 环境可能与父会话不一致（如 v2 跑时子代理 1 requests 缺失），**不能用就立即熔断该子代理、不重试、不派生新子代理**。
+
+**禁止行为**：
+- 禁止使用 `mcp__sciverse__*` 工具（MCP 通道 v6.0.0 起已弃用）
+- 禁止用 `npx sciverse-mcp-server` 启动 stdio MCP server（已被 Python SDK 取代）
+- 禁止凭训练记忆编造论文 doc_id / title / DOI（必须从 SDK 真实返回拿）
+- 禁止把 `sciverse-mcp-server` 加入 `~/.claude/mcp.json`（SDK 路径不需要 MCP server）
 
 ### 搜索执行规范
 

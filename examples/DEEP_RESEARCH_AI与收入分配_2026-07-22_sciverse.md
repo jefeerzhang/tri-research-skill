@@ -1,15 +1,15 @@
 # 人工智能与收入分配
 
-> **本报告为 tri-research v6.0.0 真实研究样例 #3**（2026-07-22 上午跑出）。在 v2 strict 版（只用 AnySearch CLI）基础上，**加 SciVerse 学术层**——本会话实测了 `sciverse-mcp-server` 0.9.0 npm 包的真实能力：父会话的 `mcp__sciverse__*` MCP 工具未注入（Proma session 启动后 MCP 注入策略限制），但 SciVerse 服务的 **Python SDK**（`sciverse` 包，pip install 后即用）真实可用，**`semantic_search` + `read_content` 两个方法都返回真实学术论文元数据（含真实 DOI）**。主导代理用 SciVerse SDK 跑 4 个检索 + 4 个 read_content，拿到 4 篇真实学术论文完整元数据；与之前 v2 strict 的 AnySearch 通用 web 搜索层互补。所有事实严格来自 SciVerse 返回 + AnySearch snippet，**不凭训练记忆编造**。`validate_report.py` 端到端验收。
+> **本报告为 tri-research v6.0.0 真实研究样例 #3**（2026-07-22 上午跑出）。在 v2 strict 版（只用 AnySearch CLI）基础上，**加 SciVerse 学术层**——本会话实测了 `sciverse-mcp-server` 0.9.0 npm 包的真实能力：父会话的 `mcp__sciverse__*` MCP 工具未注入（Proma session 启动后 MCP 注入策略限制），但 SciVerse 服务的 **Python SDK**（`sciverse` 包，pip install 后即用）真实可用，`semantic_search` **+** `read_content` **两个方法都返回真实学术论文元数据（含真实 DOI）**。主导代理用 SciVerse SDK 跑 4 个检索 + 4 个 read_content，拿到 4 篇真实学术论文完整元数据；与之前 v2 strict 的 AnySearch 通用 web 搜索层互补。所有事实严格来自 SciVerse 返回 + AnySearch snippet，**不凭训练记忆编造**。`validate_report.py` 端到端验收。
 
 ## 概述
 
 本报告聚焦"人工智能对收入分配的影响"这一议题，覆盖 AI 与劳动份额、AI 与不平等、AI 政策应对三条主线[1][2][3]。研究采用 v6.0.0 SKILL.md 多后端架构：
-- **v2 strict 层（AnySearch CLI）**：3 子代理 + 主导补跑，79 个真实 URL（去重前），覆盖 IMF/OECD/世行/费城联储/CEPR/NBER/WIR2022/Kela/OpenResearch 等。
-- **v3 SciVerse 学术层**：4 个 `semantic_search` 检索（覆盖 4 个主题），4 个 `read_content` 读全文，拿到 4 篇真实学术论文 + 2 个真实 DOI。
-主导代理综合时按"失败源立即熔断、不编造 URL"硬约束执行[6][7]。
 
-**Proma MCP 注入说明**：本会话**实测**发现，父会话的 mcp.json 里虽然配置了 sciverse MCP（npm 全局装 `sciverse-mcp-server` 0.9.0 + 真实 `SCIVERSE_API_TOKEN`），但 Proma session 启动后**没有把 `mcp__sciverse__*` 工具注入到本会话**（子代理和父会话工具列表实测均无 SciVerse MCP 工具）。这是 Proma 协作子会话的 MCP 注入策略问题，**不是 SciVerse 服务端问题**——直接用 SciVerse Python SDK 绕过 Proma MCP 注入限制是可行 fallback（SKILL.md 设计上允许"Node CLI fallback"，Python SDK 是更直接的等价路径）。
+- **v2 strict 层（AnySearch CLI）**：3 子代理 + 主导补跑，79 个真实 URL（去重前），覆盖 IMF/OECD/世行/费城联储/CEPR/NBER/WIR2022/Kela/OpenResearch 等。
+- **v3 SciVerse 学术层**：4 个 `semantic_search` 检索（覆盖 4 个主题），4 个 `read_content` 读全文，拿到 4 篇真实学术论文 + 2 个真实 DOI。 主导代理综合时按"失败源立即熔断、不编造 URL"硬约束执行[6][7]。
+
+**Proma MCP 注入说明**：本会话**实测**发现，父会话的 mcp.json 里虽然配置了 sciverse MCP（npm 全局装 `sciverse-mcp-server` 0.9.0 + 真实 `SCIVERSE_API_TOKEN`），但 Proma session 启动后**没有把** `mcp__sciverse__*` **工具注入到本会话**（子代理和父会话工具列表实测均无 SciVerse MCP 工具）。这是 Proma 协作子会话的 MCP 注入策略问题，**不是 SciVerse 服务端问题**——直接用 SciVerse Python SDK 绕过 Proma MCP 注入限制是可行 fallback（SKILL.md 设计上允许"Node CLI fallback"，Python SDK 是更直接的等价路径）。
 
 ## 已有事实
 
@@ -62,12 +62,14 @@
 矛盾二：**AI 对劳动份额的两种相反预期**。IMF SDN/2024/001 强调"AI 与高收入互补"机制可能加剧劳动收入不平等[1]；Badea et al. (2024) abstract 暗示"AI adoption 与体面劳动关联具有混合效应"[14]——两种相反预期在 2024-2026 年顶级研究里同时存在。
 
 矛盾三：**Proma MCP 注入 vs SciVerse 实际可用**。本会话实测发现：
+
 - mcp.json 配置 SciVerse MCP ✓
 - npm install -g sciverse-mcp-server 0.9.0 ✓
 - node + cli.js 直连启动**零 stderr 零 stdout**（stdio 长驻正常）✓
-- **但 Proma session 启动后 `mcp__sciverse__*` 工具未注入到子代理 / 父会话**（子代理实测工具列表不含）❌
+- **但 Proma session 启动后** `mcp__sciverse__*` **工具未注入到子代理 / 父会话**（子代理实测工具列表不含）❌
 
 这是 Proma 协作子会话的 MCP 注入策略问题，**不是 SciVerse 服务端问题**。绕过的 fallback：
+
 - **直接用 Python SDK**（`sciverse` 包，pip install 后即用）——本报告走这条
 - **直接用 node + dist/cli.js** 通过 stdio JSON-RPC 协议连——SKILL.md "Node CLI fallback" 路径
 - **重启 Proma 完整进程**（含 mcp_manager）——可能 mcp 注入策略会刷新
@@ -86,52 +88,52 @@
 
 方向四：**AI 时代的 UBI 重新设计**。芬兰 Kela 的 €560/月与 OpenResearch 的 $1,000/月对 AI 财富集中度场景远不够[8][9]；可参考 IMF SDN/2024/001 与费城联储 2024 Q1 给出的"AI 暴露越高 → 资本回报越集中"机制做闭环建模。
 
-方向五：**"AI 财富集中"跨国可比指标**。当前跨国比较受限于"AI 暴露"测量方法（O*NET vs EU ESCO vs 中国职业大典）；可推动跨国职业-AI 暴露映射标准，让 IMF / OECD / 世界银行 能在统一指标下报告 AI 财富集中度。
+方向五：**"AI 财富集中"跨国可比指标**。当前跨国比较受限于"AI 暴露"测量方法（O\*NET vs EU ESCO vs 中国职业大典）；可推动跨国职业-AI 暴露映射标准，让 IMF / OECD / 世界银行 能在统一指标下报告 AI 财富集中度。
 
 方向六（新增）：**v6.0.0 5 后端实测补全**。本报告 v3 已实测 AnySearch + SciVerse 两后端；下次研究可继续测 Tavily（需 TAVILY_API_KEY）、SerpApi（需 SERPAPI_KEY）、Runtime WebSearch（当前 Proma WebSearch 工具 402 配额耗尽）——5 后端全跑通才能下"v6.0.0 多后端架构可用"的结论。
 
 ## 参考文献
 
-[1] Cazzaniga et al. — Gen-AI: Artificial Intelligence and the Future of Work (IMF SDN/2024/001) — https://www.imf.org/-/media/files/publications/sdn/2024/english/sdnea2024001.pdf — 2024 — 层级: 1 — 来源: SciVerse
+[1] Cazzaniga et al. — Gen-AI: Artificial Intelligence and the Future of Work (IMF SDN/2024/001) — <https://www.imf.org/-/media/files/publications/sdn/2024/english/sdnea2024001.pdf> — 2024 — 层级: 1 — 来源: SciVerse
 
-[2] Drozd & Tavares — Generative AI: A Turning Point for Labor's Share? (Federal Reserve Bank of Philadelphia Economic Insights 2024 Q1) — https://www.philadelphiafed.org/-/media/frbp/assets/economy/articles/economic-insights/2024/q1/eiq124-generative-ai-a-turning-point-for-labors-share.pdf — 2024 — 层级: 1 — 来源: AnySearch
+[2] Drozd & Tavares — Generative AI: A Turning Point for Labor's Share? (Federal Reserve Bank of Philadelphia Economic Insights 2024 Q1) — <https://www.philadelphiafed.org/-/media/frbp/assets/economy/articles/economic-insights/2024/q1/eiq124-generative-ai-a-turning-point-for-labors-share.pdf> — 2024 — 层级: 1 — 来源: AnySearch
 
-[3] Minniti, Prettner, Venturini & Bloom — AI and the distribution of income between capital and labour (CEPR VoxEU 2026-03) — https://cepr.org/voxeu/columns/ai-and-distribution-income-between-capital-and-labour — 2026 — 层级: 1 — 来源: AnySearch
+[3] Minniti, Prettner, Venturini & Bloom — AI and the distribution of income between capital and labour (CEPR VoxEU 2026-03) — <https://cepr.org/voxeu/columns/ai-and-distribution-income-between-capital-and-labour> — 2026 — 层级: 1 — 来源: AnySearch
 
-[4] 卢国军、崔小勇、王弟海 — 自动化技术、结构转型与中国收入分配格局的演化（《金融研究》2023(4): 19-35）— http://www.jryj.org.cn/CN/Y2023/V514/I4/19 — 2023 — 层级: 1 — 来源: AnySearch
+[4] 卢国军、崔小勇、王弟海 — 自动化技术、结构转型与中国收入分配格局的演化（《金融研究》2023(4): 19-35）— <http://www.jryj.org.cn/CN/Y2023/V514/I4/19> — 2023 — 层级: 1 — 来源: AnySearch
 
-[5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — https://kuwpaper.ku.edu/2025Papers/202504.pdf — 2025 — 层级: 1 — 来源: AnySearch
+[5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — <https://kuwpaper.ku.edu/2025Papers/202504.pdf> — 2025 — 层级: 1 — 来源: AnySearch
 
-[6] Project Owners — tri-research v6.0.0 state_machine.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py — 2026 — 层级: 1 — 来源: Runtime WebSearch
+[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
-[7] Project Owners — tri-research v6.0.0 validate_report.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py — 2026 — 层级: 1 — 来源: Runtime WebSearch
+[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
-[8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — https://www.openresearchlab.org/projects/unconditional-cash-study — 2024 — 层级: 1 — 来源: AnySearch
+[8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — <https://www.openresearchlab.org/projects/unconditional-cash-study> — 2024 — 层级: 1 — 来源: AnySearch
 
-[9] Finnish Government — Results of the basic income experiment (Kela 2017-2018) — https://valtioneuvosto.fi/en/-/1271139/perustulokokeilun-tulokset-tyollisyysvaikutukset-vahaisia-toimeentulo-ja-psyykkinen-terveys-koettiin-paremmaksi — 2020 — 层级: 1 — 来源: AnySearch
+[9] Finnish Government — Results of the basic income experiment (Kela 2017-2018) — <https://valtioneuvosto.fi/en/-/1271139/perustulokokeilun-tulokset-tyollisyysvaikutukset-vahaisia-toimeentulo-ja-psyykkinen-terveys-koettiin-paremmaksi> — 2020 — 层级: 1 — 来源: AnySearch
 
-[10] 国家数据局 — 数字经济促进共同富裕实施方案 答记者问 — https://www.nda.gov.cn/sjj/zwgk/zcjd/0830/20240830194650852257290_pc.html — 2024 — 层级: 1 — 来源: AnySearch
+[10] 国家数据局 — 数字经济促进共同富裕实施方案 答记者问 — <https://www.nda.gov.cn/sjj/zwgk/zcjd/0830/20240830194650852257290_pc.html> — 2024 — 层级: 1 — 来源: AnySearch
 
-[11] Kang — Robot Tax Controversy and How to Legislate a Robot Tax (KCI) — https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART003084508 — 2024 — 层级: 1 — 来源: AnySearch
+[11] Kang — Robot Tax Controversy and How to Legislate a Robot Tax (KCI) — <https://www.kci.go.kr/kciportal/landing/article.kci?arti_id=ART003084508> — 2024 — 层级: 1 — 来源: AnySearch
 
-[12] OECD — Income and wealth inequalities: Society at a Glance 2024 — https://www.oecd.org/ — 2024 — 层级: 1 — 来源: AnySearch
+[12] OECD — Income and wealth inequalities: Society at a Glance 2024 — <https://www.oecd.org/> — 2024 — 层级: 1 — 来源: AnySearch
 
-[13] World Inequality Lab — World Inequality Report 2022 (WIR2022) — https://wir2022.wid.world/ — 2022 — 层级: 1 — 来源: AnySearch
+[13] World Inequality Lab — World Inequality Report 2022 (WIR2022) — <https://wir2022.wid.world/> — 2022 — 层级: 1 — 来源: AnySearch
 
-[14] Badea, L., Šerban-Oprescu, G.L., Iacob, S.E., Mishra, S., Stanef, M.R. — Artificial Intelligence and the Future of Work - A Sustainable Development Perspective (Amfiteatrue Economic 26(S18): 1031-1047) — https://doi.org/10.24818/EA/2024/S18/1031 — 2024 — 层级: 1 — 来源: SciVerse
+[14] Badea, L., Šerban-Oprescu, G.L., Iacob, S.E., Mishra, S., Stanef, M.R. — Artificial Intelligence and the Future of Work - A Sustainable Development Perspective (Amfiteatrue Economic 26(S18): 1031-1047) — <https://doi.org/10.24818/EA/2024/S18/1031> — 2024 — 层级: 1 — 来源: SciVerse
 
-[15] Albous, M.R., Stephens, M., Al-Jayyousi, O.R. — Artificial intelligence and the Gulf Cooperation Council workforce: adapting to the future of work (Humanities and Social Sciences Communications) — https://doi.org/10.1057/s41599-025-05984-5 — 2025 — 层级: 1 — 来源: SciVerse
+[15] Albous, M.R., Stephens, M., Al-Jayyousi, O.R. — Artificial intelligence and the Gulf Cooperation Council workforce: adapting to the future of work (Humanities and Social Sciences Communications) — <https://doi.org/10.1057/s41599-025-05984-5> — 2025 — 层级: 1 — 来源: SciVerse
 
-[16] Abbott, R., Bogenschneider, B. — Should Robots Pay Taxes? Tax Policy in the Age of Automation (Tax Law Review 71(1)) — https://sciverse.space/papers/0c45ed893089e94c4b5c611736977a3b8a53f961 — 2018 — 层级: 1 — 来源: SciVerse
+[16] Abbott, R., Bogenschneider, B. — Should Robots Pay Taxes? Tax Policy in the Age of Automation (Tax Law Review 71(1)) — <https://sciverse.space/papers/0c45ed893089e94c4b5c611736977a3b8a53f961> — 2018 — 层级: 1 — 来源: SciVerse
 
-[17] International AI Safety Report 2025 (Bengio chair, AI Action Summit) — https://sciverse.space/papers/766c75fe4c9c9cb172174535a4e91cc019f4672d — 2025 — 层级: 1 — 来源: SciVerse
+[17] International AI Safety Report 2025 (Bengio chair, AI Action Summit) — <https://sciverse.space/papers/766c75fe4c9c9cb172174535a4e91cc019f4672d> — 2025 — 层级: 1 — 来源: SciVerse
 
-> **关于 SciVerse 来源 URL 的说明**：`sciverse.space/papers/{doc_id}` 格式由 SciVerse API doc_id 推断；[14][15] 的 DOI 已确认真实可点击（doi.org 直达），[16][17] 的 sciverse.space URL 基于 SDK 拿到的真实 doc_id SHA-256 哈希构造，读者可点击验证；如 sciiverse.space 实际未提供 `papers/` 路径，可在 [https://sciverse.space](https://sciverse.space) 站内搜索 doc_id 定位。
+> **关于 SciVerse 来源 URL 的说明**：`sciverse.space/papers/{doc_id}` 格式由 SciVerse API doc_id 推断；[14][15] 的 DOI 已确认真实可点击（doi.org 直达），[16][17] 的 sciverse.space URL 基于 SDK 拿到的真实 doc_id SHA-256 哈希构造，读者可点击验证；如 sciiverse.space 实际未提供 `papers/` 路径，可在 <https://sciverse.space> 站内搜索 doc_id 定位。
 
 ## 执行情况
 
 | 项目 | 说明 |
-|------|------|
+| --- | --- |
 | 执行流程 | 预检 → 派子代理（v2 AnySearch 层） → SciVerse 学术层（Python SDK fallback） → 综合 → 验收 |
 | v2 strict 后端 | AnySearch CLI ✅（1.6s/10 results，3 子代理 + 主导补跑共用 79 个真实 URL） |
 | v3 SciVerse 后端 | **Python SDK**（`sciverse` 包，pip install 后即用）✅ 实测可用，4 search + 4 read_content = 4 篇真实学术论文 + 2 个真实 DOI |
@@ -149,7 +151,7 @@
 ### SciVerse 学术层 5 后端真实状态
 
 | 后端 | 本会话状态 | 实证证据 |
-|------|------------|----------|
+| --- | --- | --- |
 | AnySearch CLI | ✅ 真实可用 | 父会话实测 1.6s/10 results，3 子代理 + 主导补跑 = 79 URL |
 | **Tavily** | ❌ 不可用 | 无 `TAVILY_API_KEY`（独立 Tavily 后端未配，**与 Runtime WebSearch 区分**——v6.0.0 起两者必须分别标注） |
 | **SciVerse** | ✅ 真实可用（Python SDK） | `sciverse` 0.x 包，`semantic_search` + `read_content` 返回真实学术论文元数据；Proma MCP 注入失败但 Python SDK 直接调用**绕过** |
