@@ -14,7 +14,7 @@ version: "6.0.0"
 | 工具 | 调用方式 | 用途 |
 |------|---------|------|
 | **AnySearch** | CLI-only（3.0 版） | 通用网页 + 垂直领域 |
-| **SciVerse** | 优先 MCP，回退 Node CLI | 学术论文 |
+| **SciVerse** | Python SDK 必选（禁止 MCP） | 学术论文 |
 
 **路径**：AnySearch: `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`。SciVerse: `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。
 
@@ -40,7 +40,18 @@ version: "6.0.0"
 
 ### SciVerse 用法
 
-优先宿主 MCP；未暴露时执行 `node ${SCIVERSE_HOME}/scripts/semantic_search.mjs '{"query":"...","top_k":3}'`。保留 `doc_id`、标题、摘录。
+**v6.0.0 起只走 Python SDK，禁止 MCP 通道**（Proma 子会话实测不继承父会话 MCP 工具）。保留 `doc_id`、`title`、摘录。
+
+```python
+import asyncio, os
+from sciverse import AgentToolsClient
+async def search():
+    async with AgentToolsClient(base_url="https://api.sciverse.space", token=os.environ["SCIVERSE_API_TOKEN"]) as c:
+        r = await c.semantic_search(query="...", top_k=3)
+        for hit in r.get("hits", []):
+            print(hit["title"], hit["doc_id"], hit.get("score"))
+asyncio.run(search())
+```
 
 ## 研究流程
 
