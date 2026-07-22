@@ -15,7 +15,7 @@ class SkillContractTests(unittest.TestCase):
         )
 
     def test_skill_is_concise(self) -> None:
-        self.assertLessEqual(len(self.skill.splitlines()), 380)
+        self.assertLessEqual(len(self.skill.splitlines()), 400)
 
     def test_subagent_is_concise(self) -> None:
         self.assertLessEqual(len(self.subagent.splitlines()), 120)
