@@ -36,11 +36,22 @@ jobs:
         run: |
           python skills/tri-research/scripts/validate_report.py --help
 
-      - name: Verify test count matches README claim
+      - name: Verify all tests pass (zero-failure gate)
         run: |
-          ACTUAL=$(python -m unittest discover -s skills/tri-research/tests 2>&1 | tail -3 | head -1 | awk '{print $2}')
-          if [ "$ACTUAL" != "35" ]; then
-            echo "::error::Expected 35 tests, unittest reported $ACTUAL"
+          RESULT=$(python -m unittest discover -s skills/tri-research/tests 2>&1)
+          # Pin to "Ran N tests" + zero "FAILED" markers — robust to tests
+          # that print to stdout (which would otherwise pollute the tail
+          # line and break a naive "tail -1 == OK" check).
+          COUNT_LINE=$(echo "$RESULT" | grep -E '^Ran [0-9]+ tests' | head -1 || true)
+          if [ -z "$COUNT_LINE" ]; then
+            echo "::error::unittest did not report a test count (discover failed?)"
+            echo "$RESULT" | tail -20
             exit 1
           fi
-          echo "OK: 35 tests confirmed"
+          if echo "$RESULT" | grep -E '^FAILED' > /dev/null; then
+            echo "::error::unittest reported failures or errors"
+            echo "$RESULT" | tail -20
+            exit 1
+          fi
+          COUNT=$(echo "$COUNT_LINE" | awk '{print $2}')
+          echo "OK: $COUNT tests passed, zero failures"

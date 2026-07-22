@@ -166,7 +166,7 @@ Unix 环境也可直接调用 `scripts/state_machine.sh`，内部转发到 Pytho
 
 | 检查项 | 事实状态 | 证据链接 |
 |---|---|---|
-| 自动化测试 | 35/35 通过（本地执行） | [.github/workflows/python-package.yml](.github/workflows/python-package.yml) · [CI 运行](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml) |
+| 自动化测试 | 39/39 通过（本地执行） | [.github/workflows/python-package.yml](.github/workflows/python-package.yml) · [CI 运行](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml) |
 | 报告结构验收器 | `validate_report.py` 全部条款 | [scripts/validate_report.py](skills/tri-research/scripts/validate_report.py) |
 | 状态机门禁 | `STARTED → DONE` 两步，硬验收 | [scripts/state_machine.py](skills/tri-research/scripts/state_machine.py) |
 | Examples 报告 | 1 份样本报告可被验收器通过 | [examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md](examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md) |
