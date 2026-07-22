@@ -2,10 +2,46 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.0.0] - 2026-07-22
+
+### Added
+- **交互式引导流程**：首次使用时逐个源检测 + 配置引导（AnySearch → SciVerse → SerpApi），用户可跳过任意源
+- **首次使用引导输出**：研究开始前输出 `搜索源状态：AnySearch ✅/❌ | SciVerse ✅/❌ | SerpApi ✅/❌ | WebSearch ✅`
+- **参考文献单行格式**：与 validate_report.py 正则对齐，必须含 `层级:` `来源:` `URL:` 三个关键字
+- **执行情况表格**：从 bullet list 改为 Markdown 表格（7 行标准字段：流程/子代理/源使用/覆盖质量/维度覆盖/耗时/报告位置）
+
+### Fixed
+- **SciVerse 改为 Python SDK 必选路径**（禁止 MCP 通道）：v6.0.0 起 SciVerse 只走 `pip install sciverse` + Python SDK，MCP 通道在 Proma 协作子会话中实测不继承父会话工具，是不可靠通道
+- **Tavily 重新列为独立第 5 后端**：与 Runtime WebSearch 严格区分，两者独立配置、独立降级
+- **报告范式修正**：从"列信息"（X 报告称…Y 报告称…）改为"凝练总结"（多源合起来说明什么洞察）
+- **子代理任务描述模板压缩**：去掉 MCP 引用，数据源改为 Python SDK，8 条 requirements 合并为单段
+- **脚本精简**：state_machine.py 从 374 行精简为两步门禁（STARTED → DONE），代码量减半
+- **测试精简**：从 434 行 state_machine 测试精简为 13 项合约测试 + 验收器测试
+
+### Changed
+- **SKILL.md 全中文重写**：从英文改为中文（frontmatter 除外），行数从 500+ 精简到 393 行
+- **README 重写**：新增 v5.8.0 → v6.0.0 变更对照表，精简文档结构
+- **引用规则精简**：从 8 条 requirements 精简为 5 条，明确"单行、三必须字段、写完跑验证"
+
+### Verified
+- 端到端测试完成：会话 `ai-creative-destruction-20260722`，主题"AI是创造性破坏吗"
+- 3 个子代理并行搜索，26 篇引用（中 10 / 英 16），validate_report.py 验收通过
+- 13 项合约测试全部通过（SKILL.md 393 行 ≤ 400 限制）
+
+### Added
+- **Tavily 重新列为独立的第 5 后端**（与 Runtime WebSearch 严格区分）：Tavily 是独立的搜索服务（需 `TAVILY_API_KEY`，通过 `mcp__tavily__*` 或 `tavily-python` SDK 调用），Runtime WebSearch 是宿主内置抽象能力（实现不固定，可由 Tavily/Bing/Google/Brave 等任意引擎实现）。两者独立配置、独立降级、独立计费，**不能**把 Tavily 当作 Runtime WebSearch 的"实现"。
+- **SciVerse 改为 Python SDK 必选路径**（**禁止 MCP 通道**）：v6.0.0 起 SciVerse **只走** `pip install sciverse` + `from sciverse import AgentToolsClient` + `SCIVERSE_API_TOKEN` 环境变量。**MCP 通道（`mcp__sciverse__semantic_search` 等）已弃用**——Proma 协作子会话实测不继承父会话 MCP 工具，是不可靠通道。`~/.claude/mcp.json` 里**不应**再包含 `sciverse` 段；`sciverse-mcp-server` npm 包**不再需要安装**。
 
 ### Fixed
 - 子代理的 AnySearch 路由改为 CLI-only：直接运行 bundled `anysearch_cli.py` 的 `doc`、`batch_search` 和 `extract`，禁止宿主把 AnySearch 自动映射到 MCP 工具。
+- 清理 `scripts/state_machine.py` 与 `scripts/validate_report.py` 末尾粘连的 shebang 与重复 docstring。
+- 补齐缺失的 `scripts/state_machine.sh` 兼容包装与 `skills/citations/SKILL.md`，使文件结构与文档一致。
+- 版本号统一到 `6.0.0`：SKILL.md frontmatter、tri-research README、CHANGELOG、test-prompts.json、root README 徽章全部对齐。
+
+### Changed
+- 文档与实现以"两步状态机（STARTED → DONE）+ 报告验收器"为唯一事实来源；README/SKILL.md 中关于 `S0/S1/S2/S3`、`record_dispatch`/`record_result` 账本的描述在历史章节保留为变更记录，不作为当前实现的硬约束。
+- 搜索源表从 4 后端扩展为 5 后端：AnySearch / **Tavily** / SciVerse / SerpApi / Runtime WebSearch；任何文档不得把 "WebSearch" 和 "Tavily" 画等号。
+- **SciVerse 调用方式变更**：从"MCP / Node CLI fallback"改为"Python SDK 必选"。v3 报告 `examples/DEEP_RESEARCH_AI与收入分配_2026-07-22_sciverse.md` 是 SDK 路径的实证——拿到 4 篇真实学术论文（2 个真实 DOI）。
 
 ## [5.8.0] - 2026-07-20
 

@@ -1,0 +1,46 @@
+name: python-package
+
+on:
+  push:
+    branches: [master, refactor/slim-down]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: unittest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run state-machine unit tests
+        run: |
+          python -m unittest discover -s skills/tri-research/tests -v
+
+      - name: Smoke: state_machine.sh wrapper
+        run: |
+          bash skills/tri-research/scripts/state_machine.sh --help
+
+      - name: Smoke: validate_report.py --help
+        run: |
+          python skills/tri-research/scripts/validate_report.py --help
+
+      - name: Verify test count matches README claim
+        run: |
+          ACTUAL=$(python -m unittest discover -s skills/tri-research/tests 2>&1 | tail -3 | head -1 | awk '{print $2}')
+          if [ "$ACTUAL" != "35" ]; then
+            echo "::error::Expected 35 tests, unittest reported $ACTUAL"
+            exit 1
+          fi
+          echo "OK: 35 tests confirmed"
