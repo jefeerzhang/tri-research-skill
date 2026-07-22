@@ -15,12 +15,12 @@ Read this reference only when concrete tool names, install paths, or rendering b
 
 | Abstract | Claude Code | Hermes Agent | Codex / OpenCode |
 |---|---|---|---|
-| `SEARCH` | `web_search` 工具（宿主内部可能包 Tavily MCP / Bing / Google Custom Search / Brave 等任意一种或多种后端） | `tavily.search` 等价宿主内置搜索 | 宿主提供的 `runtime WebSearch`（实现不固定） |
-| `FETCH` | `web_fetch` 工具（宿主内部可能用 Tavily extract / HTTP client） | `tavily.extract` | `runtime WebFetch` / HTTP client |
+| `SEARCH`（任意源） | 任意独立搜索后端（AnySearch CLI / Tavily MCP / SciVerse MCP / SerpApi CLI / `web_search` 工具） | 任意独立搜索后端 | 任意独立搜索后端 + 宿主内置 WebSearch |
+| `FETCH` | 任意独立 fetch 后端（AnySearch extract / Tavily extract / `web_fetch` 工具） | `tavily.extract` | 宿主内置 WebFetch / HTTP client |
 | `RENDER` | Playwright MCP | Playwright MCP | Playwright |
 | `DISPATCH` | `Task(...)` | `delegate_to_agent(...)` | collaboration subagent mechanism |
 
-**重要：Runtime WebSearch 与 Tavily 是两个独立概念。** SKILL.md 中的 "Runtime WebSearch" 是 v6.0.0 四后端之一（另三个是 AnySearch / SciVerse / SerpApi），它是一个**抽象的宿主能力**，不同宿主框架可以由不同搜索引擎实现（Proma 当前宿主默认使用 Tavily 集成，但其他宿主可能是 Bing / Google / Brave / DuckDuckGo 或其他）。**Tavily 在 v5.x 时代曾是独立的第五后端**，v6.0.0 已并入 Runtime WebSearch 实现层（在评审记录中保留为历史事实）。SKILL.md / README / 报告 / commit message 中**不应**把 "WebSearch" 和 "Tavily" 画等号。
+**重要：Runtime WebSearch 与 Tavily 是两个独立的源。** v6.0.0 SKILL.md 列出 5 个搜索后端：AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch。**Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `mcp__tavily__*` 工具或 `tavily-python` SDK 调用），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
 
 Subagent types commonly map to `general-purpose` in Claude Code and Codex, `general` in Hermes, and `worker` in OpenCode. Detect what the host actually exposes; do not assume a listed tool exists.
 

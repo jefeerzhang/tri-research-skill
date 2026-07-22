@@ -83,8 +83,11 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("record_dispatch", state_script)
         self.assertNotIn("record_result", state_script)
 
-    def test_no_tavily(self) -> None:
-        self.assertNotIn("Tavily", self.skill)
+    def test_tavily_listed_in_main_skill(self) -> None:
+        # v6.0.0 起 Tavily 重新列为独立的第 5 后端（与 Runtime WebSearch 区分），
+        # tri-research SKILL.md 必须提到 Tavily（用于子代理独立使用）；
+        # 但 research-subagent SKILL.md 仍不应提 Tavily（subagent 用 AnySearch+SciVerse）
+        self.assertIn("Tavily", self.skill)
         self.assertNotIn("Tavily", self.subagent)
 
 

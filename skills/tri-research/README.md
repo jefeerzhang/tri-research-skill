@@ -6,16 +6,17 @@
 
 ## 能力边界
 
-Tri Research 可使用四个可选外部搜索后端，并在运行时支持时使用内置 WebSearch 兜底：
+Tri Research 可使用**五个可选外部搜索后端**（AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch）：
 
 | 渠道 | 调用者 | 作用 | 缺失时 |
 |---|---|---|---|
 | AnySearch CLI-only | 子代理 | bundled CLI 通用网页、批量搜索、正文抓取；禁止 AnySearch MCP | 跳过 |
+| **Tavily** | 子代理 | 独立 Tavily 深度网页搜索与提取（MCP / API），**与 Runtime WebSearch 区分** | 跳过 |
 | SciVerse | 子代理 | 学术论文、语义片段和引用元数据；MCP 缺失时使用 Node CLI | 跳过 |
 | SerpApi | 主导代理 | 中文/英文 Google 与 Scholar 补强 | 跳过 |
-| Runtime WebSearch | 主导代理 | 框架内置兜底 | 使用剩余渠道 |
+| Runtime WebSearch | 主导代理 | 框架内置兜底（**抽象能力**，与 Tavily 独立） | 使用剩余渠道 |
 
-这里的计数规则是：`4 个可选外部后端 + 1 个运行时渠道`。不能把“配置了 key”或“发现了命令”当成可用；轻量真实调用成功才算 `available`。
+这里的计数规则是：**5 个源都是独立后端**（AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch）。不能把"配置了 key"或"发现了命令"当成可用；轻量真实调用成功才算 `available`。**Tavily 与 Runtime WebSearch 是两个独立的源**——Tavily 是独立搜索服务（需 `TAVILY_API_KEY`），Runtime WebSearch 是宿主内置抽象能力（实现不固定）。
 
 ## 适用场景
 

@@ -4,6 +4,9 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ## [6.0.0] - 2026-07-21
 
+### Added
+- **Tavily 重新列为独立的第 5 后端**（与 Runtime WebSearch 严格区分）：Tavily 是独立的搜索服务（需 `TAVILY_API_KEY`，通过 `mcp__tavily__*` 或 `tavily-python` SDK 调用），Runtime WebSearch 是宿主内置抽象能力（实现不固定，可由 Tavily/Bing/Google/Brave 等任意引擎实现）。两者独立配置、独立降级、独立计费，**不能**把 Tavily 当作 Runtime WebSearch 的"实现"。
+
 ### Fixed
 - 子代理的 AnySearch 路由改为 CLI-only：直接运行 bundled `anysearch_cli.py` 的 `doc`、`batch_search` 和 `extract`，禁止宿主把 AnySearch 自动映射到 MCP 工具。
 - 清理 `scripts/state_machine.py` 与 `scripts/validate_report.py` 末尾粘连的 shebang 与重复 docstring。
@@ -12,6 +15,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ### Changed
 - 文档与实现以"两步状态机（STARTED → DONE）+ 报告验收器"为唯一事实来源；README/SKILL.md 中关于 `S0/S1/S2/S3`、`record_dispatch`/`record_result` 账本的描述在历史章节保留为变更记录，不作为当前实现的硬约束。
+- 搜索源表从 4 后端扩展为 5 后端：AnySearch / **Tavily** / SciVerse / SerpApi / Runtime WebSearch；任何文档不得把 "WebSearch" 和 "Tavily" 画等号。
 
 ## [5.8.0] - 2026-07-20
 

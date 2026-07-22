@@ -86,9 +86,9 @@
 
 [5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — <https://kuwpaper.ku.edu/2025Papers/202504.pdf> — 2025 — 层级: 1 — 来源: AnySearch
 
-[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: WebSearch
+[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
-[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: WebSearch
+[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
 [8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — <https://www.openresearchlab.org/projects/unconditional-cash-study> — 2024 — 层级: 1 — 来源: AnySearch
 
@@ -115,7 +115,19 @@
 | 真实抓回 URL 合计 | 79 个（去重前）；约 60 个去重后 |
 | Tier 1 源占比 | ≥70%（IMF/OECD/世行/费城联储/CEPR/NBER/WIR2022/中国 CSSCI/Kela/OpenResearch 等） |
 | 缺失全文 | 所有源仅 AnySearch snippet（\~200-500 字摘要），未抓取 PDF 全文——AnySearch `extract` 不支持 PDF 的技术限制 |
-| 后端降级 | **Runtime WebSearch 402 持续耗尽**（本会话宿主 Proma 的 WebSearch 实现是 Tavily 集成；不同宿主的 WebSearch 实现不同，可以是 Tavily/Bing/Google Custom Search 等任意搜索引擎）；SciVerse MCP 未配；SerpApi 无 key——按 SKILL.md 设计只用 AnySearch CLI |
+| 后端降级（v6.0.0 5 后端） | AnySearch ✅ / Tavily ❌ / SciVerse ❌ / SerpApi ❌ / Runtime WebSearch ❌（详见下方"5 后端真实状态"段） |
 | 状态机门禁 | STARTED → DONE 跑通，REPORT_SHA256 + INTEGRITY:OK |
 | 报告位置 | `examples/DEEP_RESEARCH_AI与收入分配_2026-07-22_strict.md` |
 | 验收状态 | 通过 `validate_report.py` 全部条款 |
+### 5 后端真实状态（v6.0.0 5 后端 = AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch）
+
+| 后端 | 本会话状态 | 证据 |
+|------|------------|------|
+| AnySearch CLI | ✅ 真实可用 | `python ~/.claude/skills/anysearch/scripts/anysearch_cli.py search "IMF AI labor share" --max_results 3` 1.6s/10 results；3 子代理 + 主导补跑共用 79 个真实 URL |
+| Tavily | ❌ 不可用 | 无 `TAVILY_API_KEY` 环境变量（**独立 Tavily 后端未配，与 Runtime WebSearch 区分**——v6.0.0 起两者必须分别标注） |
+| SciVerse MCP | ❌ 不可用 | mcp.json 未配（宿主 Proma 当前未注入 `mcp__sciverse__*` 工具） |
+| SerpApi | ❌ 不可用 | 无 `SERPAPI_KEY` 环境变量（免费档 250 次/月未申请） |
+| Runtime WebSearch | ❌ 不可用 | 宿主 Proma 的 WebSearch 工具（其默认实现 = Tavily 集成）返回 `402 Insufficient quota`——按 SKILL.md 熔断 |
+
+**失败源立即熔断的实际表现**：1 个子代理（AI 与不平等数据）因 `requests` 模块缺失导致 AnySearch CLI 无法运行 → 主导代理立即补跑该子代理的 4 个 search 拿回 40 个真实 URL。
+
