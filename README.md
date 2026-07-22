@@ -64,18 +64,6 @@ flowchart TD
 
 简单问题使用 1 个子代理，非简单问题使用 2–6 个。主导代理负责最终综合与写作，不把最终报告再次委派出去。
 
-## 演示
-
-![主题确认与技能加载](assets/screenshots/01-skill-loaded-and-step1.png)
-
-![三个子代理并行研究](assets/screenshots/02-3-subagents-parallel.png)
-
-![子代理完成并收敛](assets/screenshots/03-subagents-converged.png)
-
-![最终报告摘要](assets/screenshots/04-final-report-summary.png)
-
-以上截图来自真实研究回放，展示从范围确认、一次性派发到结果收敛和最终报告的完整路径。
-
 ## 安装
 
 安装主技能：
@@ -238,7 +226,6 @@ tri-research-skill/
 |   |   `-- scripts/serpapi_cli.py
 |   `-- citations/
 |       `-- SKILL.md
-`-- assets/screenshots/
 ```
 
 四个 Skill 各自职责：
