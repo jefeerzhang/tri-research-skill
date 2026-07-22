@@ -27,9 +27,7 @@ if [ -n "${WINDIR:-}" ] || uname -s 2>/dev/null | grep -qi "mingw\|msys\|cygwin"
         "/c/Python311/python.exe" \
         "/c/Python310/python.exe" \
         "/c/Program Files/Python313/python.exe" \
-        "/c/Program Files/Python312/python.exe" \
-        "/c/Users/jefeer/AppData/Local/Programs/Python/Python313/python.exe" \
-        "/c/Users/jefeer/AppData/Local/Programs/Python/Python312/python.exe"
+        "/c/Program Files/Python312/python.exe"
     do
         if [ -x "${candidate}" ]; then
             exec "${candidate}" "${SCRIPT_DIR}/state_machine.py" "$@"
