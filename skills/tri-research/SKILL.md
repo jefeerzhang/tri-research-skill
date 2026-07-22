@@ -50,7 +50,7 @@ version: "6.0.0"
 1. 说明：通用网页与垂直领域搜索，研究的主力源
 2. 询问用户：「要现在配置 AnySearch 吗？[配置] / [跳过]」
 3. 用户选**配置** → 输出以下步骤，等用户执行完再验证：
-   - 下载：`curl -L -o anysearch.zip https://github.com/anysearch-ai/anysearch-skill/archive/refs/tags/v3.0.0.zip`
+   - 下载：`curl -L -o anysearch.zip https://github.com/anysearch-ai/anysearch-skill/archive/refs/tags/v3.0.1.zip`
    - 解压并移到 agent 的 skill 目录（如 `~/.claude/skills/anysearch`）
    - API Key（可选但推荐）：访问 https://anysearch.com/console/api-keys 注册邮箱即可获取
    - 验证命令：`python <skill_dir>/scripts/anysearch_cli.py search "test" --max_results 1`
@@ -95,7 +95,7 @@ version: "6.0.0"
 | 命令 | 用途 | 用法 |
 |------|------|------|
 | `search` | 单条搜索 | `<cmd> search "query" --max_results 5` |
-| `batch_search` | 多条并行搜索 | `<cmd> batch_search --queries '[{"query":"q1"},{"query":"q2"}]'` |
+| `batch_search` | 多条并行搜索（v3.0.1+ 支持 shared `--max_results`） | `<cmd> batch_search --query "q1" --query "q2" --max_results 5` |
 | `extract` | 提取 URL 全文（**输出已是 Markdown，禁止加 `--format`**） | `<cmd> extract "https://example.com/page"` |
 | `get_sub_domains` | 发现垂直领域子域（**金融/学术等领域搜索前必须调用**） | `<cmd> get_sub_domains --domain finance` |
 
@@ -176,7 +176,7 @@ asyncio.run(main())
 
 ```
 维度: AI替代就业
-  AnySearch: batch_search --queries '[{"query":"AI替代就业岗位消失"},{"query":"AI job displacement automation"}]'
+  AnySearch: batch_search --query "AI替代就业岗位消失" --query "AI job displacement automation" --max_results 5
   AnySearch: extract "https://example.com/report.pdf"  （提取高价值URL全文）
   SciVerse:  semantic_search "人工智能 自动化 就业替代" + semantic_search "AI automation labor displacement"
   WebSearch: "AI替代就业 自动化失业 2026" + "AI job displacement automation unemployment 2026"

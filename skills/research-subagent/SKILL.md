@@ -30,8 +30,8 @@ version: "6.0.0"
 <cmd> get_sub_domains --domain finance
 <cmd> search "AAPL" --domain finance --sub_domain finance.quote --sdp type=stock,symbol=AAPL
 
-# 批量搜索（支持混合领域）
-<cmd> batch_search --query "中文查询" --query "English query"
+# 批量搜索（支持混合领域，v3.0.1+ 支持 shared --max_results）
+<cmd> batch_search --query "中文查询" --query "English query" --max_results 5
 <cmd> batch_search --queries '[{"query":"通用"},{"query":"AAPL","domain":"finance","sub_domain":"finance.quote"}]'
 
 # 提取全文（输出已是 Markdown，无 --format 选项）

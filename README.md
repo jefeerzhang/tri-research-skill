@@ -89,8 +89,8 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 安装可选搜索后端：
 
 ```bash
-# AnySearch (CLI 必选)
-npx skills add LearnPrompt/anysearch
+# AnySearch (CLI 必选, v3.0.1+)
+npx skills add anysearch-ai/anysearch-skill
 
 # SciVerse (Python SDK 必选，v6.0.0 起**不**通过 npx skills add 安装)
 pip install sciverse
