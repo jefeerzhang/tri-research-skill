@@ -80,6 +80,21 @@ def validate_params(params: Any) -> dict[str, Any]:
     return normalized
 
 
+def validate_extension(extension: Any) -> dict[str, Any]:
+    if not isinstance(extension, dict):
+        raise StateError("extension must be a JSON object")
+    validated: dict[str, Any] = {}
+    for field in ("keywords_zh", "keywords_en", "dimensions"):
+        values = extension.get(field)
+        if values is not None:
+            if not isinstance(values, list) or not values:
+                raise StateError(f"{field} must be a non-empty list when provided")
+            validated[field] = [require_text(value, field) for value in values]
+    if not validated:
+        raise StateError("extension must include at least one of: keywords_zh, keywords_en, dimensions")
+    return validated
+
+
 class StateStore:
     def __init__(self, state_dir: Path) -> None:
         self.state_dir = state_dir.resolve()
@@ -172,6 +187,9 @@ def create_parser() -> argparse.ArgumentParser:
 
     params_parser = subparsers.add_parser("set_params")
     params_parser.add_argument("params_json")
+
+    ext_parser = subparsers.add_parser("add_dimensions")
+    ext_parser.add_argument("extension_json")
     return parser
 
 
@@ -240,6 +258,38 @@ def run(args: argparse.Namespace) -> int:
         data["updated_at"] = now_iso()
         store.save(data)
         print("OK:Parameters saved")
+        return 0
+
+    if args.command == "add_dimensions":
+        params = data.get("params")
+        if params is None:
+            raise StateError("parameters not set; run set_params first")
+        try:
+            extension = json.loads(args.extension_json)
+        except json.JSONDecodeError as exc:
+            raise StateError(f"invalid JSON: {exc.msg}") from exc
+        extension = validate_extension(extension)
+        was_done = data["phase"] == "DONE"
+        for field in ("keywords_zh", "keywords_en", "dimensions"):
+            added = extension.get(field)
+            if added:
+                existing = params.setdefault(field, [])
+                for item in added:
+                    if item not in existing:
+                        existing.append(item)
+        data["updated_at"] = now_iso()
+        extend_phase = "EXTENDED" if was_done else data["phase"]
+        data["history"].append({"phase": extend_phase, "at": now_iso(), "extension": extension})
+        if was_done:
+            # Stale report_validation is no longer valid after extension
+            data.pop("report_validation", None)
+            # Reset phase so the workflow can continue
+            data["phase"] = "EXTENDED"
+            # Re-set active session pointer since done cleared it
+            store.set_active(session_id)
+        store.save(data)
+        print(f"OK:Session {session_id} extended")
+        emit(data, store)
         return 0
 
     if args.command == "done":

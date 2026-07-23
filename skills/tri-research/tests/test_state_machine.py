@@ -203,6 +203,66 @@ class StateMachineTests(unittest.TestCase):
         result = self.run_cli("--session", "checkme", "check")
         self.assertIn("INTEGRITY:OK", result.stdout)
 
+    def add_dimensions(self, session: str, extension: str, ok: bool = True) -> subprocess.CompletedProcess:
+        return self.run_cli("--session", session, "add_dimensions", extension, ok=ok)
+
+    def test_add_dimensions_extends_keywords(self) -> None:
+        self.run_cli("--session", "extend-me", "start")
+        self.set_params("extend-me")
+        ext = json.dumps({"keywords_zh": ["小米汽车", "蔚来"], "keywords_en": ["Xiaomi Auto", "NIO"]}, ensure_ascii=False)
+        self.add_dimensions("extend-me", ext)
+        result = self.run_cli("--session", "extend-me", "get_params")
+        lines = result.stdout.splitlines()
+        loaded = json.loads(lines[1])
+        self.assertIn("小米汽车", loaded["keywords_zh"])
+        self.assertIn("蔚来", loaded["keywords_zh"])
+        self.assertIn("Xiaomi Auto", loaded["keywords_en"])
+
+    def test_add_dimensions_rejects_empty(self) -> None:
+        self.run_cli("--session", "empty-ext", "start")
+        self.set_params("empty-ext")
+        result = self.add_dimensions("empty-ext", json.dumps({}, ensure_ascii=False), ok=False)
+        self.assertIn("ERROR", result.stderr)
+
+    def test_add_dimensions_rejects_invalid_json(self) -> None:
+        self.run_cli("--session", "bad-ext", "start")
+        self.set_params("bad-ext")
+        result = self.add_dimensions("bad-ext", "not json", ok=False)
+        self.assertIn("ERROR", result.stderr)
+
+    def test_add_dimensions_requires_params(self) -> None:
+        self.run_cli("--session", "no-params-ext", "start")
+        result = self.add_dimensions("no-params-ext", '{"keywords_zh":["x"]}', ok=False)
+        self.assertIn("ERROR", result.stderr)
+
+    def test_add_dimensions_after_done(self) -> None:
+        self.run_cli("--session", "ext-after-done", "start")
+        self.set_params("ext-after-done")
+        report = self.write_valid_report("ext-after-done.md")
+        self.run_cli("--session", "ext-after-done", "done", "--report", str(report))
+        # Now extend
+        ext = json.dumps({"keywords_zh": ["追加维度"]}, ensure_ascii=False)
+        result = self.add_dimensions("ext-after-done", ext)
+        self.assertIn("EXTENDED", result.stdout)
+        # Verify params extended
+        params_out = self.run_cli("--session", "ext-after-done", "get_params")
+        lines = params_out.stdout.splitlines()
+        loaded = json.loads(lines[1])
+        self.assertIn("追加维度", loaded["keywords_zh"])
+        # Verify old keyword still present (append not replace)
+        self.assertIn("人工智能", loaded["keywords_zh"])
+
+    def test_add_dimensions_dedup(self) -> None:
+        """Adding an already-existing keyword should not duplicate it."""
+        self.run_cli("--session", "dedup-ext", "start")
+        self.set_params("dedup-ext")
+        ext = json.dumps({"keywords_zh": ["人工智能"]}, ensure_ascii=False)
+        self.add_dimensions("dedup-ext", ext)
+        params_out = self.run_cli("--session", "dedup-ext", "get_params")
+        lines = params_out.stdout.splitlines()
+        loaded = json.loads(lines[1])
+        self.assertEqual(loaded["keywords_zh"].count("人工智能"), 1)
+
     def test_rejects_path_traversal_session(self) -> None:
         result = self.run_cli("--session", "../escape", "start", ok=False)
         self.assertIn("session id must match", result.stderr)
