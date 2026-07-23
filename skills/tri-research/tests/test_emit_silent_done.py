@@ -61,6 +61,35 @@ class EmitSilentDoneTests(unittest.TestCase):
             self.assertIn("DONE", msg)
             self.assertIn("report_validation", msg)
 
+    def test_emit_done_with_incomplete_report_validation_raises_state_error(self) -> None:
+        """Partial report_validation (e.g. only path) must not KeyError —
+        raise StateError so CLI prints ERROR: instead of a traceback."""
+        sm = _load_state_machine()
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            store = sm.StateStore(Path(tmp) / "state")
+            data = {
+                "session_id": "partial-proof",
+                "schema_version": 3,
+                "phase": "DONE",
+                "params": None,
+                "created_at": "2026-07-22T00:00:00+00:00",
+                "updated_at": "2026-07-22T00:00:00+00:00",
+                "history": [{"phase": "DONE", "at": "2026-07-22T00:00:00+00:00"}],
+                "report_validation": {"path": "/tmp/report.md"},  # missing sha256/min_sources
+            }
+            store.save(data)
+
+            with self.assertRaises(sm.StateError) as ctx:
+                sm.emit(data, store)
+            msg = str(ctx.exception)
+            self.assertIn("DONE", msg)
+            self.assertIn("report_validation", msg)
+            self.assertTrue(
+                "sha256" in msg or "min_sources" in msg or "incomplete" in msg.lower()
+                or "missing" in msg.lower(),
+                msg=f"error should name the incomplete proof: {msg!r}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

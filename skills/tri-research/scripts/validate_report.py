@@ -41,7 +41,9 @@ def normalize_topic(value: str) -> str:
 
 
 def _strip_url_punctuation(url: str) -> str:
-    url = url.rstrip(".,;:。，；：）》")
+    # ASCII + common CJK trailing punctuation that URL_RE (\S+) may swallow
+    # from surrounding prose (period, comma, Chinese quotes/brackets, etc.).
+    url = url.rstrip(".,;:。，；：）》」』”’\"'")
     pairs = {")": "(", "]": "[", "}": "{", ">": "<"}
     while url and url[-1] in pairs and url.count(url[-1]) > url.count(pairs[url[-1]]):
         url = url[:-1]
@@ -175,9 +177,9 @@ def validate(
                 errors.append(f"参考文献 [{number}] URL 无效")
             else:
                 reference_urls[number] = canonical_url
-        if not re.search(r"层级:\s*[123]", entry):
+        if not re.search(r"层级[:：]\s*[123]", entry):
             errors.append(f"参考文献 [{number}] 缺少层级")
-        if not re.search(r"来源:\s*[^\n]+", entry):
+        if not re.search(r"来源[:：]\s*[^\n]+", entry):
             errors.append(f"参考文献 [{number}] 缺少来源工具")
 
     unique_urls = set(reference_urls.values())

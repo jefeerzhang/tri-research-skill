@@ -169,7 +169,7 @@ tri-research-skill/
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 包装
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/
-|   |   |-- tests/                 # 61 项合约+验收测试
+|   |   |-- tests/                 # 64 项合约+验收测试
 |   |-- research-subagent/         # 子代理 skill
 |   |   `-- SKILL.md
 |   |-- serpapi/                   # SerpApi 辅助 skill

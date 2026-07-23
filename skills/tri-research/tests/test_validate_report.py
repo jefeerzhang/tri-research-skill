@@ -108,6 +108,17 @@ class ReportValidatorTests(unittest.TestCase):
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("层级" in error for error in errors))
 
+    def test_accepts_fullwidth_colon_in_tier_and_source(self) -> None:
+        """Chinese input often uses fullwidth colon 层级：1 / 来源：X."""
+        report = (
+            valid_report()
+            .replace("层级: 1", "层级：1")
+            .replace("层级: 2", "层级：2")
+            .replace("来源: AnySearch", "来源：AnySearch")
+        )
+        errors = MODULE.validate(report, 2, expected_topic="人工智能与劳动分配")
+        self.assertEqual(errors, [], msg=f"fullwidth colon should be accepted: {errors}")
+
     def test_rejects_missing_source_tool(self) -> None:
         report = valid_report().replace("来源: AnySearch", "无来源")
         errors = MODULE.validate(report, 2)
@@ -156,12 +167,38 @@ class ReportValidatorTests(unittest.TestCase):
         )
 
     def test_strip_url_punctuation_handles_chinese_punctuation(self) -> None:
-        for chinese_punct in ("。", "，", "；", "：", "）"):
+        for chinese_punct in ("。", "，", "；", "：", "）", "》", "」", "』", "”", "’"):
             with self.subTest(punct=chinese_punct):
                 self.assertEqual(
                     MODULE._strip_url_punctuation(f"https://example.com/article{chinese_punct}"),
                     "https://example.com/article",
                 )
+
+    def test_trailing_chinese_quote_does_not_spoil_url_canonicalization(self) -> None:
+        """URL_RE is greedy (\\\\S+); trailing 」/” must be stripped before canonicalize."""
+        self.assertEqual(
+            MODULE.canonicalize_url(
+                MODULE._strip_url_punctuation("https://publisher-one.org/one」")
+            ),
+            "https://publisher-one.org/one",
+        )
+        # Same target with/without trailing 」 must count as one unique source
+        report = (
+            valid_report()
+            .replace(
+                "https://publisher-one.org/one",
+                "https://publisher-one.org/one」",
+            )
+            .replace(
+                "https://publisher-two.cn/two",
+                "https://publisher-one.org/one",
+            )
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("URL 重复" in e for e in errors),
+            msg=f"trailing 」 must not create a distinct URL. Errors: {errors}",
+        )
 
     def test_nested_code_block_does_not_produce_ghost_citations(self) -> None:
         report = valid_report().replace(
