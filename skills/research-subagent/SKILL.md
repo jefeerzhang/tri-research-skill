@@ -1,7 +1,7 @@
 ---
 name: research-subagent
 description: |
-  tri-research 研究子代理，使用 AnySearch 和 SciVerse 执行双语聚焦研究任务。
+  tri-research 研究子代理，使用 AnySearch、SciVerse 和 Exa 执行双语聚焦研究任务。
   触发场景：被 tri-research 主导代理派发，按子任务返回结构化检索结果。
   不要用于：写最终报告（由主导代理完成）、不与 tri-research 联动的单独调用、需联网但无 AnySearch/SciVerse 任一后端可用、单一本地代码问题或事实查询、主动安装或执行外部命令的请求。
 version: "6.0.0"
@@ -15,6 +15,7 @@ version: "6.0.0"
 |------|---------|------|
 | **AnySearch** | CLI-only（3.0 版） | 通用网页 + 垂直领域 |
 | **SciVerse** | Python SDK 必选（禁止 MCP） | 学术论文 |
+| **Exa** | Python SDK（`scripts/exa_search.py`） | 网页搜索 + 学术 + 公司 + 问答 |
 
 **路径**：AnySearch: `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`。SciVerse: `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。
 
@@ -58,15 +59,16 @@ asyncio.run(search())
 > ⚠️ **硬约束：每个研究角度 × 每个源 × 中文 + 英文 = 必须全部执行。**
 > 禁止只搜英文不搜中文，禁止只搜中文不搜英文。缺少任一语言视为流程缺陷。
 
-1. **预检**：对 AnySearch 和 SciVerse 各执行一次轻量查询确认可用性
-2. **并行搜索**：对 AnySearch 和 SciVerse 同时发起不同角度的查询
-   - **中英双补（强制）**：每个研究角度必须有中文 query 和英文 query，在两个源上各执行一遍
+1. **预检**：对 AnySearch、SciVerse、Exa 各执行一次轻量查询确认可用性
+2. **并行搜索**：对 AnySearch、SciVerse、Exa 同时发起不同角度的查询
+   - **中英双补（强制）**：每个研究角度必须有中文 query 和英文 query，在每个源上各执行一遍
    - 示例：`AnySearch batch_search --queries '[{"query":"人工智能 就业替代"},{"query":"AI job displacement"}]'`
    - 示例：`SciVerse semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation employment"`
-3. **获取全文**：对最有价值的 3-5 个结果用 `extract` 获取完整内容
+   - 示例：`python <exa_search.py> batch_search --query "人工智能 就业替代" --query "AI job displacement" --num-results 5 [--category CAT]`
+3. **获取全文**：对最有价值的 3-5 个结果用 `extract` 或 Exa `contents` 获取完整内容
 4. **去重汇报**：按 URL 去重，标注来源工具
 
-**工具预算**：AnySearch 最多 3 次 search/batch_search，SciVerse 最多 3 次 search。硬上限 15 次调用。
+**工具预算**：AnySearch 最多 3 次，SciVerse 最多 3 次，Exa 最多 3 次。硬上限 15 次调用。
 
 ## 内容安全
 

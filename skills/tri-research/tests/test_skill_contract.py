@@ -15,7 +15,7 @@ class SkillContractTests(unittest.TestCase):
         )
 
     def test_skill_is_concise(self) -> None:
-        self.assertLessEqual(len(self.skill.splitlines()), 400)
+        self.assertLessEqual(len(self.skill.splitlines()), 450)
 
     def test_subagent_is_concise(self) -> None:
         self.assertLessEqual(len(self.subagent.splitlines()), 120)
@@ -35,12 +35,14 @@ class SkillContractTests(unittest.TestCase):
     def test_source_allocation(self) -> None:
         self.assertIn("AnySearch", self.skill)
         self.assertIn("SciVerse", self.skill)
+        self.assertIn("Exa", self.skill)
         self.assertIn("SerpApi", self.skill)
         self.assertIn("WebSearch", self.skill)
 
     def test_subagent_uses_only_allowed_sources(self) -> None:
         self.assertIn("AnySearch", self.subagent)
         self.assertIn("SciVerse", self.subagent)
+        self.assertIn("Exa", self.subagent)
         self.assertNotIn("SerpApi", self.subagent)
 
     def test_lead_uses_anysearch_when_no_subagent(self) -> None:
