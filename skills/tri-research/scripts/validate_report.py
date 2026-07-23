@@ -110,7 +110,10 @@ def validate(
         if not expected_normalized or expected_normalized not in actual_normalized:
             errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
-    references = {int(number): entry for number, entry in REFERENCE_RE.findall(text)}
+    ref_matches = REFERENCE_RE.findall(text)
+    references = {int(number): entry for number, entry in ref_matches}
+    if len(ref_matches) != len(references):
+        errors.append("参考文献编号重复")
     if len(references) < min_sources:
         errors.append(f"至少需要 {min_sources} 条参考文献，实际 {len(references)} 条")
 

@@ -113,6 +113,14 @@ class ReportValidatorTests(unittest.TestCase):
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("来源工具" in error for error in errors))
 
+    def test_rejects_duplicate_reference_numbers(self) -> None:
+        report = valid_report().replace(
+            "[2] 作者 — 中文来源 — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
+            "[1] Dup — duplicate number — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(any("重复" in e and "编号" in e for e in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

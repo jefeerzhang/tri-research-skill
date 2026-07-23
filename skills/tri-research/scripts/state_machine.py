@@ -313,7 +313,7 @@ def run(args: argparse.Namespace) -> int:
         errors = validate_report(report_text, min_sources, expected_topic=params["topic"])
         if errors:
             raise StateError("validation failed: " + "; ".join(errors))
-        report_bytes = report_path.read_bytes()
+        report_bytes = report_text.encode("utf-8")
         timestamp = now_iso()
         data["phase"] = "DONE"
         data["updated_at"] = timestamp
