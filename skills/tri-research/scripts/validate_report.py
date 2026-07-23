@@ -141,7 +141,9 @@ def validate(
         "## 执行情况",
     )
     for heading in required_headings:
-        if heading not in text:
+        # 锚定行首的二级标题，避免把 "### 概述" 这类三级标题（"## 概述"
+        # 的子串）误判为存在，也避免把正文中出现的 "## 概述" 片段当章节。
+        if not re.search(r"(?m)^" + re.escape(heading) + r"(?:\s|$)", text):
             errors.append(f"缺少必需章节: {heading}")
 
     if expected_topic:
@@ -152,6 +154,11 @@ def validate(
             errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
     references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
+    # 截止到下一个二级标题：## 参考文献 之后的章节（执行情况、附录等）
+    # 里的 "[n] ..." 行不是参考文献条目，不能被 REFERENCE_RE 扫到。
+    next_section = re.search(r"(?m)^## ", references_text)
+    if next_section:
+        references_text = references_text[: next_section.start()]
     ref_matches = REFERENCE_RE.findall(references_text)
     references = {int(number): entry for number, entry in ref_matches}
     if len(ref_matches) != len(references):
@@ -195,6 +202,9 @@ def validate(
 
     body = text.split("## 参考文献", 1)[0]
     body = _strip_code_blocks(body)
+    # 行内代码（单反引号）里的 [n] 不是引用，移除后再扫描。
+    # 围栏代码块已被 _strip_code_blocks 剥离，这里只剩行内代码。
+    body = re.sub(r"`[^`\n]+`", "", body)
     cited = {int(number) for number in INLINE_RE.findall(body)}
     missing = sorted(cited - set(references))
     if missing:

@@ -249,5 +249,57 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+    def test_reference_parsing_stops_at_next_section(self) -> None:
+        """## 参考文献 之后的章节（执行情况等）里的 [n] 行不是参考文献条目。
+
+        references_text 必须截止到下一个二级标题，否则执行情况/附录里
+        形如 "[9] 注：..." 的备注行会被 REFERENCE_RE 误解析为参考文献，
+        引发编号不连续、缺 URL/层级/来源、未引用等一连串误报。
+        """
+        report = valid_report().replace(
+            "| 报告位置 | ~/tri-research-reports/report.md |",
+            "| 报告位置 | ~/tri-research-reports/report.md |\n\n"
+            "[9] 注：执行情况后的备注行，不是参考文献条目。",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertFalse(
+            any("[9]" in e for e in errors),
+            f"执行情况章节里的 [9] 不应被当成参考文献: {errors}",
+        )
+        self.assertFalse(any("不连续" in e for e in errors), f"{errors}")
+
+
+    def test_inline_code_is_not_a_citation(self) -> None:
+        """行内代码 `arr[0]` 里的 [0] 不是正文引用。
+
+        _strip_code_blocks 只剥离 3+ 反引号的围栏代码块，不处理单反引号
+        行内代码；INLINE_RE 会把 `arr[0]` 里的 [0] 当成对参考文献 [0] 的
+        引用，导致合规报告误报"正文引用无对应参考文献: [0]"。
+        """
+        report = valid_report().replace(
+            "事实一[1]。事实二[2]。",
+            "事实一[1]。事实二[2]。\n注意数组 `arr[0]` 的索引从 0 开始。",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertFalse(
+            any("[0]" in e for e in errors),
+            f"行内代码里的 [0] 不应被当成引用: {errors}",
+        )
+
+
+    def test_h3_heading_is_not_accepted_as_h2_section(self) -> None:
+        """### 概述 是三级标题，不满足 ## 概述 必需章节要求。
+
+        章节存在性用 `in text` 子串判断时，"## 概述" 是 "### 概述" 的子串，
+        会把三级标题误判为存在二级章节。必须锚定行首的二级标题。
+        """
+        report = valid_report().replace("## 概述", "### 概述")
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("缺少必需章节: ## 概述" in e for e in errors),
+            f"### 概述 不应被当成 ## 概述 章节存在: {errors}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
