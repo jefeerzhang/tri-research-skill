@@ -41,7 +41,7 @@ def normalize_topic(value: str) -> str:
 
 
 def _strip_url_punctuation(url: str) -> str:
-    url = url.rstrip(".,;:")
+    url = url.rstrip(".,;:。，；：）》")
     pairs = {")": "(", "]": "[", "}": "{", ">": "<"}
     while url and url[-1] in pairs and url.count(url[-1]) > url.count(pairs[url[-1]]):
         url = url[:-1]
@@ -92,6 +92,36 @@ def canonicalize_url(value: str) -> str | None:
         doseq=True,
     )
     return urlunsplit((parsed.scheme.lower(), host, path, query, ""))
+
+
+def _strip_code_blocks(text: str) -> str:
+    """Remove fenced code blocks, correctly handling nested fences.
+
+    A code fence of N backticks is only closed by another run of exactly N
+    backticks — inner fences with fewer backticks are part of the block
+    content, not closing delimiters (CommonMark spec).
+    """
+    fence_re = re.compile(r"`{3,}")
+    result: list[str] = []
+    stack: list[tuple[int, int]] = []
+    pos = 0
+    for match in fence_re.finditer(text):
+        start = match.start()
+        end = match.end()
+        length = end - start
+        if not stack:
+            stack.append((length, start))
+        elif stack[-1][0] == length:
+            open_start, fence_start = stack.pop()
+            if not stack:
+                result.append(text[pos:open_start])
+                pos = end
+        else:
+            stack.append((length, start))
+    if pos == 0:
+        return text
+    result.append(text[pos:])
+    return "".join(result)
 
 
 def validate(
@@ -162,7 +192,7 @@ def validate(
         errors.append(f"至少需要 {min_sources} 个不重复来源，实际 {len(unique_urls)} 个")
 
     body = text.split("## 参考文献", 1)[0]
-    body = re.sub(r"```.*?```", "", body, flags=re.DOTALL)
+    body = _strip_code_blocks(body)
     cited = {int(number) for number in INLINE_RE.findall(body)}
     missing = sorted(cited - set(references))
     if missing:

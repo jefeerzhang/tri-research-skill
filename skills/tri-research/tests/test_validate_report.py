@@ -155,6 +155,25 @@ class ReportValidatorTests(unittest.TestCase):
             "https://example.com/page",
         )
 
+    def test_strip_url_punctuation_handles_chinese_punctuation(self) -> None:
+        for chinese_punct in ("。", "，", "；", "：", "）"):
+            with self.subTest(punct=chinese_punct):
+                self.assertEqual(
+                    MODULE._strip_url_punctuation(f"https://example.com/article{chinese_punct}"),
+                    "https://example.com/article",
+                )
+
+    def test_nested_code_block_does_not_produce_ghost_citations(self) -> None:
+        report = valid_report().replace(
+            "矛盾一。",
+            "矛盾一。\n\n````markdown\nExample code block:\n```\nfirst = arr[5]\n```\nEnd of example.\n````\n",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertFalse(
+            any("[5]" in e and "无对应参考文献" in e for e in errors),
+            f"Code inside nested code block should not be scanned for citations. Errors: {errors}",
+        )
+
     def test_report_with_utf8_bom_validates(self) -> None:
         errors = MODULE.validate(
             "\ufeff" + valid_report(), 2, expected_topic="人工智能与劳动分配"
