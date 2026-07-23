@@ -27,6 +27,7 @@ jobs:
       - name: Run state-machine unit tests
         run: |
           python -m unittest discover -s skills/tri-research/tests -v
+          python -m unittest discover -s skills/serpapi/tests -v
 
       - name: Smoke: state_machine.sh wrapper
         run: |
@@ -38,7 +39,7 @@ jobs:
 
       - name: Verify all tests pass (zero-failure gate)
         run: |
-          RESULT=$(python -m unittest discover -s skills/tri-research/tests 2>&1)
+          RESULT=$(python -m unittest discover -s skills/tri-research/tests 2>&1; python -m unittest discover -s skills/serpapi/tests 2>&1)
           # Pin to "Ran N tests" + zero "FAILED" markers — robust to tests
           # that print to stdout (which would otherwise pollute the tail
           # line and break a naive "tail -1 == OK" check).

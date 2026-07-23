@@ -40,6 +40,14 @@ def normalize_topic(value: str) -> str:
     return "".join(character.casefold() for character in value if character.isalnum())
 
 
+def _strip_url_punctuation(url: str) -> str:
+    url = url.rstrip(".,;:")
+    pairs = {")": "(", "]": "[", "}": "{", ">": "<"}
+    while url and url[-1] in pairs and url.count(url[-1]) > url.count(pairs[url[-1]]):
+        url = url[:-1]
+    return url
+
+
 def canonicalize_url(value: str) -> str | None:
     try:
         parsed = urlsplit(value)
@@ -89,6 +97,7 @@ def canonicalize_url(value: str) -> str | None:
 def validate(
     text: str, min_sources: int, *, expected_topic: str | None = None
 ) -> list[str]:
+    text = text.lstrip("\ufeff")
     errors: list[str] = []
     required_headings = (
         "## 概述",
@@ -110,7 +119,8 @@ def validate(
         if not expected_normalized or expected_normalized not in actual_normalized:
             errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
-    ref_matches = REFERENCE_RE.findall(text)
+    references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
+    ref_matches = REFERENCE_RE.findall(references_text)
     references = {int(number): entry for number, entry in ref_matches}
     if len(ref_matches) != len(references):
         errors.append("参考文献编号重复")
@@ -129,7 +139,7 @@ def validate(
         if not url_match:
             errors.append(f"参考文献 [{number}] 缺少 URL")
         else:
-            raw_url = url_match.group(0).rstrip(".,;:)]}>")
+            raw_url = _strip_url_punctuation(url_match.group(0))
             canonical_url = canonicalize_url(raw_url)
             if canonical_url is None:
                 errors.append(f"参考文献 [{number}] URL 无效")
@@ -152,6 +162,7 @@ def validate(
         errors.append(f"至少需要 {min_sources} 个不重复来源，实际 {len(unique_urls)} 个")
 
     body = text.split("## 参考文献", 1)[0]
+    body = re.sub(r"```.*?```", "", body, flags=re.DOTALL)
     cited = {int(number) for number in INLINE_RE.findall(body)}
     missing = sorted(cited - set(references))
     if missing:

@@ -27,6 +27,22 @@ for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     os.environ.pop(_p, None)
 
 
+def _key_from_env_file(env_path):
+    """Read SERPAPI_KEY from a .env file. Returns None if absent or malformed."""
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                key, sep, value = line.partition("=")
+                if sep and key.strip() == "SERPAPI_KEY":
+                    return value.strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+    return None
+
+
 def load_key(cli_key=None):
     if cli_key:
         return cli_key
@@ -35,15 +51,7 @@ def load_key(cli_key=None):
         return env
     # Try .env in skill dir
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
-    try:
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("SERPAPI_KEY"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except FileNotFoundError:
-        pass
-    return None
+    return _key_from_env_file(env_path)
 
 
 ENGINES = {

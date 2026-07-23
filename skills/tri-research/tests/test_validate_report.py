@@ -121,6 +121,46 @@ class ReportValidatorTests(unittest.TestCase):
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("重复" in e and "编号" in e for e in errors))
 
+    def test_body_line_starting_with_bracket_number_is_not_a_reference(self) -> None:
+        report = valid_report().replace(
+            "事实一[1]。事实二[2]。",
+            "事实一[1]。事实二[2]。\n[9] 注：这是正文里的编号行，不是参考文献条目。",
+        )
+        errors = MODULE.validate(report, 2)
+        # 正文行不能变成幽灵参考文献条目（缺 URL/层级/来源、编号不连续）
+        self.assertFalse(any("参考文献 [9]" in e for e in errors))
+        self.assertFalse(any("不连续" in e for e in errors))
+        # 但 [9] 仍按引用契约算行内引用，无对应条目必须报错
+        self.assertTrue(any("无对应参考文献" in e and "[9]" in e for e in errors))
+
+    def test_code_block_indexing_is_not_a_citation(self) -> None:
+        report = valid_report().replace(
+            "矛盾一。",
+            "矛盾一。\n\n```python\nfirst = arr[0]\nsecond = arr[1]\n```\n",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertFalse(any("[0]" in e for e in errors))
+
+    def test_strip_url_punctuation_keeps_balanced_parens(self) -> None:
+        self.assertEqual(
+            MODULE._strip_url_punctuation("https://en.wikipedia.org/wiki/AI_(disambiguation)"),
+            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
+        )
+        self.assertEqual(
+            MODULE._strip_url_punctuation("https://en.wikipedia.org/wiki/AI_(disambiguation)."),
+            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
+        )
+        self.assertEqual(
+            MODULE._strip_url_punctuation("https://example.com/page)."),
+            "https://example.com/page",
+        )
+
+    def test_report_with_utf8_bom_validates(self) -> None:
+        errors = MODULE.validate(
+            "\ufeff" + valid_report(), 2, expected_topic="人工智能与劳动分配"
+        )
+        self.assertEqual(errors, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,10 +17,16 @@ import json
 import os
 import sys
 
-import exa_py
+try:
+    import exa_py
+except ImportError:
+    exa_py = None
 
 
-def _client() -> exa_py.Exa:
+def _client() -> "exa_py.Exa":
+    if exa_py is None:
+        print(json.dumps({"error": "exa-py not installed", "available": False}))
+        sys.exit(1)
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
         print(json.dumps({"error": "EXA_API_KEY not set", "available": False}))
@@ -29,6 +35,9 @@ def _client() -> exa_py.Exa:
 
 
 def cmd_check() -> None:
+    if exa_py is None:
+        print(json.dumps({"available": False, "error": "exa-py not installed"}))
+        return
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
         print(json.dumps({"available": False, "error": "EXA_API_KEY not set"}))
