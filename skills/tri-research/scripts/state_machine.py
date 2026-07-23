@@ -107,14 +107,27 @@ class StateStore:
     def set_active(self, session_id: str) -> None:
         self._atomic_write_text(self.active_file, session_id + "\n")
 
-    def clear_active(self) -> None:
-        """Remove the active-session pointer.
+    def clear_active(self, session_id: str | None = None) -> None:
+        """Remove the active-session pointer when it refers to `session_id`.
 
         Called after a session transitions to DONE so that subsequent
         callers who run a read command without --session get the
         'no active session' error instead of silently receiving a
         completed session's state.
+
+        If `session_id` is given, only clear when the pointer currently
+        points at that session — completing B must not wipe an active
+        pointer that still refers to A.
         """
+        if not self.active_file.exists():
+            return
+        if session_id is not None:
+            try:
+                current = self.active_file.read_text(encoding="utf-8").strip()
+            except OSError:
+                return
+            if current != session_id:
+                return
         try:
             self.active_file.unlink()
         except FileNotFoundError:
@@ -326,10 +339,9 @@ def run(args: argparse.Namespace) -> int:
         }
         data["history"].append({"phase": "DONE", "at": timestamp})
         store.save(data)
-        # Clear the active-session pointer: this session is now completed
-        # and the pointer must not silently redirect subsequent no-arg
-        # read commands to it.
-        store.clear_active()
+        # Clear the active-session pointer only if it still points at this
+        # session. Completing B must not wipe an active pointer for A.
+        store.clear_active(session_id)
         print(f"OK:Session {session_id} completed")
         emit(data, store)
         return 0

@@ -174,6 +174,37 @@ class ReportValidatorTests(unittest.TestCase):
             f"Code inside nested code block should not be scanned for citations. Errors: {errors}",
         )
 
+    def test_strip_code_blocks_preserves_text_before_fence(self) -> None:
+        """Fence length must not be used as a slice end (unpack order bug)."""
+        self.assertEqual(
+            MODULE._strip_code_blocks("before\n```\ncode\n```\nafter"),
+            "before\n\nafter",
+        )
+        self.assertEqual(
+            MODULE._strip_code_blocks("prefix text\n```python\narr[0]\n```\nsuffix [1]"),
+            "prefix text\n\nsuffix [1]",
+        )
+        self.assertEqual(
+            MODULE._strip_code_blocks("a\n````\nb\n```\nc\n```\nd\n````\ne"),
+            "a\n\ne",
+        )
+        self.assertEqual(MODULE._strip_code_blocks("```\nonly block\n```"), "")
+        self.assertEqual(
+            MODULE._strip_code_blocks("no fences here [1]"),
+            "no fences here [1]",
+        )
+        # Regression: old unpack used fence length as slice end → "before" became "bef"
+        self.assertIn("before", MODULE._strip_code_blocks("before\n```\nx\n```\ny"))
+        self.assertNotIn("arr[0]", MODULE._strip_code_blocks("see [1]\n```\narr[0]\n```\n"))
+
+    def test_citations_immediately_before_code_block_are_kept(self) -> None:
+        report = valid_report().replace(
+            "矛盾一。",
+            "矛盾一见[1]与[2]。\n\n```python\nfirst = arr[0]\n```\n",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertEqual(errors, [])
+
     def test_report_with_utf8_bom_validates(self) -> None:
         errors = MODULE.validate(
             "\ufeff" + valid_report(), 2, expected_topic="人工智能与劳动分配"

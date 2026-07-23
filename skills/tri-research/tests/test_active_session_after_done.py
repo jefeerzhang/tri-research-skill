@@ -73,6 +73,49 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
                     ),
                 )
 
+    def test_done_does_not_clear_unrelated_active_session(self) -> None:
+        """Completing session B must not wipe active-session when it points at A."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            state_dir = Path(tmp) / "state"
+            sample = REPO / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+
+            def run(*args: str, ok: bool = True):
+                import subprocess
+                proc = subprocess.run(
+                    [sys.executable, str(SCRIPT),
+                     "--state-dir", str(state_dir), *args],
+                    capture_output=True, text=True,
+                )
+                if ok and proc.returncode != 0:
+                    self.fail(f"command failed: {args}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+                if not ok and proc.returncode == 0:
+                    self.fail(f"command unexpectedly succeeded: {args}\nstdout={proc.stdout}")
+                return proc
+
+            import json
+            params = json.dumps({
+                "topic": "人工智能与劳动分配", "min_sources": 10,
+                "keywords_zh": ["人工智能"], "keywords_en": ["ai"],
+            }, ensure_ascii=False)
+
+            run("--session", "sess-A", "start")
+            run("--session", "sess-A", "set_params", params)
+            run("--session", "sess-B", "start")
+            run("--session", "sess-B", "set_params", params)
+
+            # Restore A as the active session while completing B explicitly.
+            (state_dir / "active-session").write_text("sess-A\n", encoding="utf-8")
+            run("--session", "sess-B", "done", "--report", str(sample))
+
+            active_file = state_dir / "active-session"
+            self.assertTrue(active_file.exists(), "active pointer for A must remain")
+            self.assertEqual(active_file.read_text(encoding="utf-8").strip(), "sess-A")
+
+            # no --session still resolves to A
+            phase = run("get_phase")
+            self.assertIn("SESSION:sess-A", phase.stdout)
+            self.assertIn("STARTED", phase.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

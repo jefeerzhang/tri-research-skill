@@ -112,7 +112,7 @@ def _strip_code_blocks(text: str) -> str:
         if not stack:
             stack.append((length, start))
         elif stack[-1][0] == length:
-            open_start, fence_start = stack.pop()
+            _open_length, open_start = stack.pop()
             if not stack:
                 result.append(text[pos:open_start])
                 pos = end
