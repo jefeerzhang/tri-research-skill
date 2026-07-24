@@ -18,7 +18,7 @@ version: "6.1.0"
 | 源 | 使用者 | 用途 | 必要性 | 配置方式 |
 |----|--------|------|--------|----------|
 | **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | 安装 CLI + 可选 API Key |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（独立 Tavily MCP / Tavily API） | 可选 | TAVILY_API_KEY 环境变量 |
+| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 | `pip install tavily-python` + `TAVILY_API_KEY` 环境变量 |
 | **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** | `pip install sciverse` + `SCIVERSE_API_TOKEN` 环境变量 |
 | **Exa** | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK） | 可选 | `pip install exa-py` + `EXA_API_KEY` 环境变量 |
 | **SerpApi** | Lead Agent | 中文 Google/Scholar | 可选 | SERPAPI_KEY 环境变量 |
@@ -92,6 +92,23 @@ version: "6.1.0"
 **预检规则**：有 `runtime.conf` 直接用，不重复检测。没有的话启动时探一次（`--max_results 1`），Python → Node.js → PowerShell → Bash 挨个试。全挂才算降级。
 
 **禁止行为**：Python CLI 报错后要试下一个运行时。单源失败不能扔其他源结果。`extract` **禁止**加 `--format`（输出默认已是 Markdown）。
+
+### Tavily 调用规范（Lead Agent）
+
+Tavily 是可选的深度网页搜索源，仅 Lead Agent 使用。**唯一调用方式：Python SDK**，通过 `scripts/tavily_search.py` CLI 包装。
+
+**安装**：`pip install tavily-python` + `TAVILY_API_KEY` 环境变量
+
+| 命令 | 用途 | 用法 |
+|------|------|------|
+| `search` | 单次深度网页搜索 | `python <skill_dir>/scripts/tavily_search.py search "query" --max-results 5 --depth advanced` |
+| `batch_search` | 批量搜索 | `python <skill_dir>/scripts/tavily_search.py batch_search --query "q1" --query "q2"` |
+| `extract` | 提取 URL 全文 | `python <skill_dir>/scripts/tavily_search.py extract "https://..."` |
+| `check` | 检测可用性 | `python <skill_dir>/scripts/tavily_search.py check` |
+
+**参数**：`--max-results`（默认 5）、`--depth`（basic/advanced）、`--time-range`（day/week/month/year）。
+
+**区分与降级**：Tavily 是独立第 5 后端，**不等于** Runtime WebSearch。Tavily 不可用 → 静默跳过，依赖其他源。
 
 ### Exa 调用规范（所有 Agent 通用）
 
