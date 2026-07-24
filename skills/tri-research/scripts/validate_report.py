@@ -202,8 +202,10 @@ def validate(
 
     body = text.split("## 参考文献", 1)[0]
     body = _strip_code_blocks(body)
-    # 行内代码（单反引号）里的 [n] 不是引用，移除后再扫描。
+    # 行内代码里的 [n] 不是引用，移除后再扫描。
     # 围栏代码块已被 _strip_code_blocks 剥离，这里只剩行内代码。
+    # 先处理双反引号（可含内嵌单反引号），再处理单反引号。
+    body = re.sub(r"``.+?``", "", body, flags=re.DOTALL)
     body = re.sub(r"`[^`\n]+`", "", body)
     cited = {int(number) for number in INLINE_RE.findall(body)}
     missing = sorted(cited - set(references))

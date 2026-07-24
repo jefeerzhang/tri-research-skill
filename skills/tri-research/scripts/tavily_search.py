@@ -35,15 +35,12 @@ def _client() -> "TavilyClient":
 
 
 def cmd_check() -> None:
-    if TavilyClient is None:
-        print(json.dumps({"available": False, "error": "tavily-python not installed"}))
-        return
-    api_key = os.environ.get("TAVILY_API_KEY")
-    if not api_key:
-        print(json.dumps({"available": False, "error": "TAVILY_API_KEY not set"}))
-        return
     try:
         c = _client()
+    except SystemExit:
+        # _client() already printed the JSON error
+        return
+    try:
         c.search(query="test", max_results=1, search_depth="basic")
         print(json.dumps({"available": True}))
     except Exception as e:

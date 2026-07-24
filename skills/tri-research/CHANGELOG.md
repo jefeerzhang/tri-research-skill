@@ -2,6 +2,11 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.1.0] - 2026-07-23
+
+### Changed
+- **Tavily 调用方式从 MCP 改为 Python SDK**：主代理统一通过 `scripts/tavily_search.py` 调用 `tavily-python` SDK，与子代理的 `exa_search.py` 风格对齐；不再依赖 `mcp__tavily__*` 工具。
+
 ## [6.0.0] - 2026-07-22
 
 ### Added
@@ -29,7 +34,6 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - 文档与实现以"两步状态机（STARTED → DONE）+ 报告验收器"为唯一事实来源；README/SKILL.md 中关于 `S0/S1/S2/S3`、`record_dispatch`/`record_result` 账本的描述在历史章节保留为变更记录，不作为当前实现的硬约束。
 - 搜索源表从 4 后端扩展为 5 后端：AnySearch / **Tavily** / SciVerse / SerpApi / Runtime WebSearch；任何文档不得把 "WebSearch" 和 "Tavily" 画等号。
 - **SciVerse 调用方式变更**：从"MCP / Node CLI fallback"改为"Python SDK 必选"。v3 报告 `examples/DEEP_RESEARCH_AI与收入分配_2026-07-22_sciverse.md` 是 SDK 路径的实证——拿到 4 篇真实学术论文（2 个真实 DOI）。
-- **Tavily 调用方式从 MCP 改为 Python SDK**：主代理统一通过 `scripts/tavily_search.py` 调用 `tavily-python` SDK，与子代理的 `exa_search.py` 风格对齐；不再依赖 `mcp__tavily__*` 工具。
 
 ### Verified
 - 端到端测试完成：会话 `ai-creative-destruction-20260722`，主题"AI是创造性破坏吗"

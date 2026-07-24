@@ -113,15 +113,25 @@ tri-research/
 ├── CHANGELOG.md              # 版本记录
 ├── test-prompts.json         # 测试 prompt
 ├── scripts/
+│   ├── _common.py            # 共享工具函数
 │   ├── state_machine.py      # 两步状态机（STARTED → DONE）
 │   ├── state_machine.sh      # Unix 兼容包装
-│   └── validate_report.py    # 报告验收器
+│   ├── validate_report.py    # 报告验收器
+│   ├── tavily_search.py      # Tavily Python SDK 封装（CLI 入口）
+│   └── exa_search.py         # Exa 搜索封装
 ├── references/
 │   └── runtime-adapters.md   # 运行时适配细节
 └── tests/
     ├── test_state_machine.py
     ├── test_skill_contract.py
-    └── test_validate_report.py
+    ├── test_validate_report.py
+    ├── test_tavily_search.py  # Tavily 脚本测试
+    ├── test_exa_search.py     # Exa 脚本测试
+    ├── test_active_session_after_done.py
+    ├── test_changelog.py
+    ├── test_emit_silent_done.py
+    ├── test_get_commands_consistency.py
+    └── test_module_import.py
 ```
 
 ## 安全边界
