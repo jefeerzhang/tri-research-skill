@@ -15,12 +15,12 @@ Read this reference only when concrete tool names, install paths, or rendering b
 
 | Abstract | Claude Code | Hermes Agent | Codex / OpenCode |
 |---|---|---|---|
-| `SEARCH`（任意源） | 任意独立搜索后端（AnySearch CLI / Tavily MCP / **SciVerse Python SDK** / SerpApi CLI / `web_search` 工具） | 任意独立搜索后端 | 任意独立搜索后端 + 宿主内置 WebSearch |
-| `FETCH` | 任意独立 fetch 后端（AnySearch extract / Tavily extract / `web_fetch` 工具） | `tavily.extract` | 宿主内置 WebFetch / HTTP client |
+| `SEARCH`（任意源） | 任意独立搜索后端（AnySearch CLI / **Tavily Python SDK** / **SciVerse Python SDK** / SerpApi CLI / `web_search` 工具） | 任意独立搜索后端 | 任意独立搜索后端 + 宿主内置 WebSearch |
+| `FETCH` | 任意独立 fetch 后端（AnySearch extract / **Tavily extract（Python SDK）** / `web_fetch` 工具） | `tavily.extract` | 宿主内置 WebFetch / HTTP client |
 | `RENDER` | Playwright MCP | Playwright MCP | Playwright |
 | `DISPATCH` | `Task(...)` | `delegate_to_agent(...)` | collaboration subagent mechanism |
 
-**重要：Runtime WebSearch 与 Tavily 是两个独立的源。** v6.0.0 SKILL.md 列出 5 个搜索后端：AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch。**Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `mcp__tavily__*` 工具或 `tavily-python` SDK 调用），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
+**重要：Runtime WebSearch 与 Tavily 是两个独立的源。** v6.0.0 SKILL.md 列出 5 个搜索后端：AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch。**Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `tavily-python` SDK 调用，CLI 封装见 `tri-research/scripts/tavily_search.py`），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
 
 **重要：SciVerse v6.0.0 起只走 Python SDK，不走 MCP。** `mcp__sciverse__*` 工具在 Proma 协作子会话中**实测不继承父会话工具**，是不可靠通道；MCP 服务端进程（`sciverse-mcp-server` npm 包）v6.0.0 起**已弃用**。**唯一受支持的通道是 Python SDK**：`pip install sciverse` + `from sciverse import AgentToolsClient` + `SCIVERSE_API_TOKEN` 环境变量。`~/.claude/mcp.json` 里**不应**包含 `sciverse` 段。
 
