@@ -25,7 +25,7 @@
 | 渠道 | 调用者 | 作用 | 必要性 |
 |------|--------|------|--------|
 | **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** |
-| **Tavily** | Lead + 子代理 | 深度网页搜索与提取（独立服务，与 Runtime WebSearch 区分） | 可选 |
+| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 |
 | **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** |
 | **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 |
 | **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定） | 可选 |
@@ -83,6 +83,12 @@ SciVerse 安装：
 ```bash
 pip install sciverse
 export SCIVERSE_API_TOKEN=<your-token>
+```
+
+Tavily 安装：
+```bash
+pip install tavily-python
+export TAVILY_API_KEY=<your-key>
 ```
 
 ## 测试
