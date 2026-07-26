@@ -107,6 +107,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 执行流程 | 预检 → 派子代理（3 个，1 个熔断 + 主导补跑） → 综合 → 验收 |
+| 搜索源使用 | AnySearch: 13条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 2条 |
 | 搜索后端 | **AnySearch CLI（v6.0.0 SKILL.md 必选源）**——未使用 chrome_devtools / DDG 等设计外工具 |
 | 子代理 1（AI 与劳动份额） | 4 个检索词，19 个真实 URL，5 条核心事实 |
 | 子代理 2（AI 与不平等数据） | 因 `requests` 模块缺失失败熔断（0 抓回） |

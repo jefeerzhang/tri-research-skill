@@ -86,7 +86,7 @@
 |------|------|
 | 执行流程 | 预检 → 搜索 → 综合 → 验证 |
 | 子代理派发 | 否（样本报告） |
-| 搜索源使用 | AnySearch: 1条 / SciVerse: 4条 / SerpApi: 1条 / WebSearch: 6条 |
+| 搜索源使用 | AnySearch: 1条 / SciVerse: 4条 / Exa: 0条 / SerpApi: 1条 / WebSearch: 6条 |
 | 耗时 | —（样本） |
 | 报告位置 | `examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md` |
 | 验收状态 | 通过 `validate_report.py` 全部条款 |

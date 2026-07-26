@@ -135,6 +135,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 执行流程 | 预检 → 派子代理（v2 AnySearch 层） → SciVerse 学术层（Python SDK fallback） → 综合 → 验收 |
+| 搜索源使用 | AnySearch: 11条 / SciVerse: 4条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 2条 |
 | v2 strict 后端 | AnySearch CLI ✅（1.6s/10 results，3 子代理 + 主导补跑共用 79 个真实 URL） |
 | v3 SciVerse 后端 | **Python SDK**（`sciverse` 包，pip install 后即用）✅ 实测可用，4 search + 4 read_content = 4 篇真实学术论文 + 2 个真实 DOI |
 | SciVerse MCP 注入 | ❌ Proma session 启动后 `mcp__sciverse__*` 工具未注入（子代理实测 + 父会话实测都无），改走 Python SDK fallback 绕过 |

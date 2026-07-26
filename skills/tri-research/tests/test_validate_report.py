@@ -39,7 +39,7 @@ def valid_report() -> str:
 |------|------|
 | 执行流程 | 预检 → 搜索 → 综合 → 验证 |
 | 子代理派发 | 否 |
-| 搜索源使用 | AnySearch: 2条 |
+| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |
 | 耗时 | 3.0 分钟 |
 | 报告位置 | ~/tri-research-reports/report.md |
 """
@@ -50,6 +50,33 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertEqual(
             MODULE.validate(valid_report(), 2, expected_topic="人工智能与劳动分配"),
             [],
+        )
+
+    def test_rejects_execution_summary_missing_exa(self) -> None:
+        """## 执行情况 必须报告 Exa 检索过程（可写 0 条 / 跳过，不可省略）。
+
+        SKILL 契约：搜索源使用行含 AnySearch / SciVerse / Exa / SerpApi / WebSearch。
+        Agent 常漏写 Exa，导致最终报告无法审阅 Exa 是否被调用。
+        """
+        report = valid_report().replace(
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("Exa" in e for e in errors),
+            f"缺少 Exa 的执行情况应被拒: {errors}",
+        )
+
+    def test_rejects_execution_summary_missing_source_usage_row(self) -> None:
+        report = valid_report().replace(
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |\n",
+            "",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("搜索源使用" in e for e in errors),
+            f"缺少搜索源使用行应被拒: {errors}",
         )
 
     def test_rejects_missing_sections(self) -> None:

@@ -24,6 +24,17 @@ URL_RE = re.compile(r"https?://\S+")
 H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_RE = re.compile(r"\b[A-Za-z]{4,}\b")
+# 执行情况「搜索源使用」行必须点名的后端（含可选源 Exa：未用也要写 0/跳过）
+REQUIRED_SOURCE_BACKENDS = (
+    "AnySearch",
+    "SciVerse",
+    "Exa",
+    "SerpApi",
+    "WebSearch",
+)
+SOURCE_USAGE_ROW_RE = re.compile(
+    r"(?m)^\|?\s*搜索源使用\s*\|?\s*(.+?)\s*\|?\s*$"
+)
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "gclid",
@@ -152,6 +163,24 @@ def validate(
         actual_normalized = normalize_topic(heading.group(1)) if heading else ""
         if not expected_normalized or expected_normalized not in actual_normalized:
             errors.append(f"报告标题未包含确认主题: {expected_topic}")
+
+    execution_text = text.split("## 执行情况", 1)[1] if "## 执行情况" in text else ""
+    if execution_text:
+        next_section = re.search(r"(?m)^## ", execution_text)
+        if next_section:
+            execution_text = execution_text[: next_section.start()]
+        usage_match = SOURCE_USAGE_ROW_RE.search(execution_text)
+        if not usage_match:
+            errors.append("执行情况缺少搜索源使用行")
+        else:
+            usage_cell = usage_match.group(1)
+            missing_backends = [
+                name for name in REQUIRED_SOURCE_BACKENDS if name not in usage_cell
+            ]
+            if missing_backends:
+                errors.append(
+                    "执行情况搜索源使用未报告: " + " / ".join(missing_backends)
+                )
 
     references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
     # 截止到下一个二级标题：## 参考文献 之后的章节（执行情况、附录等）
