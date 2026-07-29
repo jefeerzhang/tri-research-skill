@@ -85,7 +85,7 @@ version: "6.2.0"
 
 | 命令 | 用法 |
 |------|------|
-| `search` | `python scripts/exa_search.py search "query" --category research_paper --num-results 5` |
+| `search` | `python scripts/exa_search.py search "query" --category "research paper" --num-results 5` |
 | `batch_search` | `python scripts/exa_search.py batch_search --query "q1" --query "q2" --num-results 5` |
 | `answer` | `python scripts/exa_search.py answer "question?"` |
 | `contents` | `python scripts/exa_search.py contents "https://..."` |

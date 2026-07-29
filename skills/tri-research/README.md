@@ -2,7 +2,7 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.0.0`
+当前版本：`6.2.0`
 
 ## 从 v5.8.0 到 v6.0.0 的核心变化
 
@@ -108,7 +108,7 @@ python -m pytest skills/tri-research/tests/test_state_machine.py -v
 
 ```text
 tri-research/
-├── SKILL.md                  # 技能定义（中文，393 行）
+├── SKILL.md                  # 技能定义（中文，378 行）
 ├── README.md                 # 本文件
 ├── CHANGELOG.md              # 版本记录
 ├── test-prompts.json         # 测试 prompt

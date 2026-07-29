@@ -76,6 +76,7 @@ def cmd_search(args: argparse.Namespace) -> None:
         }, ensure_ascii=False))
     except Exception as e:
         print(json.dumps({"error": str(e), "query": args.query}))
+        sys.exit(1)
 
 
 def cmd_batch_search(args: argparse.Namespace) -> None:
@@ -120,6 +121,7 @@ def cmd_answer(args: argparse.Namespace) -> None:
         }, ensure_ascii=False))
     except Exception as e:
         print(json.dumps({"error": str(e), "query": args.query}))
+        sys.exit(1)
 
 
 def cmd_contents(args: argparse.Namespace) -> None:
@@ -136,6 +138,7 @@ def cmd_contents(args: argparse.Namespace) -> None:
         print(json.dumps(pages, ensure_ascii=False))
     except Exception as e:
         print(json.dumps({"error": str(e), "url": args.url}))
+        sys.exit(1)
 
 
 def build_parser() -> argparse.ArgumentParser:
