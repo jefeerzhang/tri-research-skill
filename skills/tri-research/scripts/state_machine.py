@@ -35,7 +35,7 @@ class StateError(RuntimeError):
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="minutes")
 
 
 def default_state_dir() -> Path:
@@ -219,7 +219,7 @@ def run(args: argparse.Namespace) -> int:
 
     if args.command == "start":
         session_id = validate_session_id(
-            args.session or datetime.now().strftime("research-%Y%m%d-%H%M%S")
+            args.session or datetime.now().strftime("research-%Y%m%d-%H%M")
         )
         path = store.state_path(session_id)
         if path.exists():
