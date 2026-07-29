@@ -2,7 +2,7 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.1.0-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.2.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -75,6 +75,8 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 
 也支持增量追加维度（研究跑完后加实体或新角度，不必重头跑）。
 
+研究开始前会自动加载 `RESEARCH_CONTEXT.md`（如有），预填受众、深度等偏好，减少重复澄清。
+
 ## 搜索源
 
 | 源 | 调用者 | 用途 | 免费额度 |
@@ -91,7 +93,9 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 
 ```mermaid
 flowchart TD
-    U["用户确认或直接给出研究问题"] --> P["真实探测搜索渠道<br/>报告渠道状态"]
+    U["用户给出研究问题"] --> CT["研究上下文预加载<br/>加载 RESEARCH_CONTEXT.md"]
+    CT --> CL["研究意图澄清<br/>目标/受众/深度/时间/语言"]
+    CL --> P["源检测 + 研究拆解<br/>报告渠道状态"]
     P --> SM0["state_machine.py start"]
     SM0 --> SM1["set_params 冻结主题、关键词、min_sources"]
     SM1 --> D["派发 1-6 个子代理并行搜索<br/>AnySearch · SciVerse · Exa"]
@@ -100,13 +104,18 @@ flowchart TD
     F -- "是" --> CB["来源级熔断<br/>不重试不重新派发"]
     F -- "否" --> R["保留结果"]
     CB --> R
-    R --> C["用户闸门: 结果确认"]
-    C -- "继续" --> S["主导综合 + 撰写报告"]
-    C -- "补搜" --> D
-    S --> V{"报告验收?<br/>validate_report.py"}
-    V -- "否" --> FIX["只修正报告/引用<br/>禁止返回搜索"]
-    FIX --> V
-    V -- "是" --> SM2["state_machine.py done<br/>记录 SHA-256"]
+    R --> C["结果确认 + 质量门<br/>5项自动检查，标红薄弱维度"]
+    C -- "继续" --> V["来源内容核验<br/>SciVerse SDK 按 DOI 验证"]
+    C -- "补搜" --> GF["Gap-Fill 精准补漏子代理"]
+    GF --> V
+    V --> VX{"核验剔除后<br/>来源够？"}
+    VX -- "否" --> GF
+    VX -- "是" --> CR["红队自批判<br/>内部审查，不写入正文"]
+    CR --> S["主导综合 + 撰写报告<br/>矛盾保留 + 置信标签"]
+    S --> VT{"报告验收?<br/>validate_report.py"}
+    VT -- "否" --> FIX["只修正报告/引用<br/>禁止返回搜索"]
+    FIX --> VT
+    VT -- "是" --> SM2["state_machine.py done<br/>记录 SHA-256"]
 ```
 
 ## 状态机
@@ -138,9 +147,12 @@ python scripts/state_machine.py --session <id> add_dimensions '{"keywords_zh":["
 | **门禁体系** | Agent 自行宣称"已完成" | 两步状态机 + validate_report.py 硬验收 |
 | **双语覆盖** | 只搜英文或随缘 | 每个维度、每个源强制中英双补 |
 | **来源可核验** | 参考文献格式不统一 | 单行格式含层级+来源+URL，验证器检查 |
+| **来源真实性** | 格式合法即通过 | SciVerse SDK 按 DOI/标题逐条核验，拦截编造文献 |
+| **置信标注** | 结论不标可信度 | 每条结论标 `[高]/[中]/[低]`，与来源层级联动 |
+| **质量门** | 无自动检查 | 5 项自动检查（来源数/维度覆盖/反面视角/语言/层级占比），不通过标红 |
 | **增量研究** | 重头跑一遍 | `add_dimensions` 追加，旧结果保留 |
 | **跨运行时** | 绑特定 runtime | CLI + Python SDK，兼容 Claude Code/Codex/OpenCode/OpenClaw |
-| **结果确认闸门** | Agent 直接写报告 | 搜索完经用户确认再综合 |
+| **结果确认闸门** | Agent 直接写报告 | 搜索完经用户确认 + 质量门检查再综合 |
 | **搜索后端** | 单一后端 | 5 搜索源并行，必选+可选分级 |
 
 ## 安全边界
@@ -178,7 +190,7 @@ tri-research-skill/
 
 ## 致谢
 
-工作流设计参考了 [GPT Researcher](https://github.com/assafelovic/gpt-researcher)、[deep-research](https://github.com/dzhng/deep-research)、[Open Deep Research](https://github.com/langchain-ai/open_deep_research) 与 [Anthropic Skills](https://github.com/anthropics/skills) 的公开实践。Tri Research 在此基础上聚焦状态机门禁、双语强制与可复核完成验收。
+工作流设计参考了 [GPT Researcher](https://github.com/assafelovic/gpt-researcher)、[deep-research](https://github.com/dzhng/deep-research)、[Open Deep Research](https://github.com/langchain-ai/open_deep_research) 与 [Anthropic Skills](https://github.com/anthropics/skills) 的公开实践。v6.2.0 的引用核验、置信标签、质量门、红队批判等机制借鉴自 deep-research 的验证纪律。Tri Research 在此基础上聚焦状态机门禁、双语强制与可复核完成验收。
 
 ## License
 
