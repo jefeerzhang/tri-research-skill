@@ -64,7 +64,7 @@ version: "6.2.0"
 
 > ⚠️ 子 agent 是独立进程，只能通过 Bash 调外部 CLI，不能直接用内部工具。
 
-**AnySearch**（必选，所有 Agent）：路径解析 `${ANYSEARCH_HOME}` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 直接用，否则启动时按 Python→Node.js→PowerShell→Bash 顺序探测。
+**AnySearch**（必选，所有 Agent）：路径解析 `${ANYSEARCH_HOME}` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 直接用，否则启动时按 Python→Node.js→PowerShell→Bash 顺序 fallback 探测。
 
 | 命令 | 用途 | 用法 |
 |------|------|------|
@@ -94,10 +94,10 @@ Exa 类别：`research paper`（学术）/ `company`（公司）/ `news`（新�
 
 **SerpApi**（可选，仅 Lead Agent）：路径 `${SERPAPI_HOME}` → `${TRI_RESEARCH_HOME}/../serpapi` → 项目/用户级 `skills/serpapi/`。不可用→静默跳过。
 
-**SciVerse**（必选，所有 Agent）：**唯一调用方式：Python SDK**，v6.0.0 起**严格禁止 MCP**。
+**SciVerse 调用规范**（必选，所有 Agent）：AnySearch 和 SciVerse 是必选搜索源。**唯一调用方式：Python SDK**，v6.0.0 起**严格禁止 MCP**。
 
 ```python
-async with AgentToolsClient(base_url="https://api.sciverse空间", token=os.environ["SCIVERSE_API_TOKEN"]) as c:
+async with AgentToolsClient(base_url="https://api.sciverse.space", token=os.environ["SCIVERSE_API_TOKEN"]) as c:
     for hit in (await c.semantic_search(query="...", top_k=3)).get("hits", []): print(hit["title"], hit["doc_id"])
 ```
 
@@ -105,12 +105,14 @@ async with AgentToolsClient(base_url="https://api.sciverse空间", token=os.envi
 
 ### 搜索执行规范
 
-> ⚠️ **硬约束：每个维度 × 每个源 × 中文 + 英文 = 必须全部执行。**
+> ⚠️ **硬约束：每个维度 × 每个源 × 中文 + 英文 = 必须全部执行。** 禁止只搜英文不搜中文，禁止只搜中文不搜英文。
 
-1. 每维度拆 1-2 个精准 query（中英双语），在所有可用源上各搜一遍
+1. 每维度拆 1-2 个精准 query（中英双语），**全源覆盖**——在所有可用源上各搜一遍
 2. 垂直领域→先 `get_sub_domains`，再 `--sub_domain_params` 传参
 3. 高价值 URL → `extract` 提取全文（**禁止加 `--format`**）
 4. 每查询都要中英双补；SerpApi 分中文轮和英文轮
+
+**示例**（单维度中英双补）：SciVerse `semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation labor displacement"`；AnySearch / Exa `batch_search --query "AI替代就业" --query "AI job displacement"`。
 
 **结果不足时**：同义改写 query 再搜一轮→仍不足则标记"证据薄弱"如实说明，**不降门槛凑数**。
 
