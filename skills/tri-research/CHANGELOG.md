@@ -2,6 +2,18 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.3.0] - 2026-07-29
+
+### Added
+- **大纲适配（借鉴 deep-research Phase 3.5）**：第七步综合时对比计划结构 vs 实际证据，调整幅度 ≤50%（超出时须在执行情况标注原因），证据驱动不凭空添加。调整记录写入执行情况。
+- **多波次检索（借鉴 deep-research Wave 设计）**：第二步检索计划标注波次：Wave 1 广覆盖 → 质量门判定 → Wave 2 精准补漏 → Wave 3（deep 模式）。
+- **综合子代理（借鉴 deep-research Synthesis Agent）**：第七步 deep 模式（来源 >20 条）可选派 Synthesis 子代理预写各维度摘要，Lead Agent 整合进报告。仅预写维度摘要，不代写最终报告。
+- **优雅降级（借鉴 deep-research）**：安全边界增加整波失败处理——缩减报告 + 执行情况标注降级 + 受影响章节置信降 `[低]`；零来源时告知用户停止。
+- **声明-来源匹配核验（借鉴 deep-research Phase 3.1）**：第六步增加二级核验，选 5-10 条核心结论检查引用来源是否实际支撑声明，判定 SUPPORTED/PARTIAL/UNSUPPORTED 三级。
+
+### Changed
+- SKILL.md 因新增功能增至 383 行（合约上限 450 行）
+
 ## [6.2.0] - 2026-07-29
 
 ### Added
@@ -56,7 +68,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Verified
 - 端到端测试完成：会话 `ai-creative-destruction-20260722`，主题"AI是创造性破坏吗"
 - 3 个子代理并行搜索，26 篇引用（中 10 / 英 16），validate_report.py 验收通过
-- 13 项合约测试全部通过（SKILL.md 393 行 ≤ 400 限制）
+- 13 项合约测试全部通过（SKILL.md 393 行 ≤ 400 行限制）
 
 ## [5.8.0] - 2026-07-20
 
