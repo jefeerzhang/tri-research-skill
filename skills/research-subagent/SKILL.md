@@ -4,7 +4,7 @@ description: |
   tri-research 研究子代理，使用 AnySearch、SciVerse 和 Exa 执行双语聚焦研究任务。
   触发场景：被 tri-research 主导代理派发，按子任务返回结构化检索结果。
   不要用于：写最终报告（由主导代理完成）、不与 tri-research 联动的单独调用、需联网但无 AnySearch/SciVerse 任一后端可用、单一本地代码问题或事实查询、主动安装或执行外部命令的请求。
-version: "6.3.0"
+version: "6.3.1"
 ---
 
 # 研究子代理
@@ -56,8 +56,9 @@ asyncio.run(search())
 
 ## 研究流程
 
-> ⚠️ **硬约束：每个研究角度 × 每个源 × 中文 + 英文 = 必须全部执行。**
+> ⚠️ **流程要求：每个研究角度 × 每个可用源 × 中文 + 英文 = 应全部执行。**
 > 禁止只搜英文不搜中文，禁止只搜中文不搜英文。缺少任一语言视为流程缺陷。
+> 说明：主 skill 的 `validate_report.py` 只做报告级双语检查，不审计子代理是否逐角度双补。
 
 1. **预检**：对 AnySearch、SciVerse、Exa 各执行一次轻量查询确认可用性
 2. **并行搜索**：对 AnySearch、SciVerse、Exa 同时发起不同角度的查询

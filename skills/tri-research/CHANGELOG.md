@@ -2,6 +2,17 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.3.1] - 2026-08-09
+
+### Changed
+- **收缩文档承诺（硬门禁 vs 推荐流程）**：在 `SKILL.md` 文首明确两层纪律——仅 `state_machine.py` + `validate_report.py` 为代码硬门禁；质量门、来源核验、Gap-Fill、红队、置信标签、大纲适配、综合子代理、声明-来源匹配、多波次等标为**推荐流程**（跳过不阻断 `DONE`）。
+- **双语/全源覆盖措辞**：搜索执行规范改为「流程要求」+「强制范围说明」——验收器只做**报告级**中英证据检查，不逐维度/逐源/逐 query 审计。
+- 根 README / skill README / marketplace / test-prompts / citations 与 6.3.1 叙事对齐；去掉已删除 API（`record_dispatch` 等）与旧章节名（`TL;DR`）残留。
+- 测试计数文案改为与当前 unittest 发现数一致（75）；对比表「5 搜索源」改为六源。
+
+### Fixed
+- `.claude-plugin/marketplace.json` 版本从 6.0.0 对齐到 6.3.1；research-subagent 插件描述补 Exa。
+
 ## [6.3.0] - 2026-07-29
 
 ### Fixed

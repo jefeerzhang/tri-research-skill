@@ -17,12 +17,12 @@ class SkillContractTests(unittest.TestCase):
         cls.root_readme = (ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
         cls.test_prompts = (ROOT / "test-prompts.json").read_text(encoding="utf-8")
 
-    def test_version_aligned_to_6_3_0(self) -> None:
-        self.assertIn('version: "6.3.0"', self.skill)
-        self.assertIn('version: "6.3.0"', self.subagent)
-        self.assertIn("当前版本：`6.3.0`", self.readme)
-        self.assertIn("version-6.3.0", self.root_readme)
-        self.assertIn('"version": "6.3.0"', self.test_prompts)
+    def test_version_aligned_to_6_3_1(self) -> None:
+        self.assertIn('version: "6.3.1"', self.skill)
+        self.assertIn('version: "6.3.1"', self.subagent)
+        self.assertIn("当前版本：`6.3.1`", self.readme)
+        self.assertIn("version-6.3.1", self.root_readme)
+        self.assertIn('"version": "6.3.1"', self.test_prompts)
 
     def test_six_source_table_present(self) -> None:
         for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "WebSearch"):
@@ -115,8 +115,30 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("record_dispatch", state_script)
         self.assertNotIn("record_result", state_script)
 
+
+    def test_hard_gates_documented(self) -> None:
+        # Soft policies must not be presented as the only completion criteria
+        self.assertIn("硬门禁", self.skill)
+        self.assertIn("推荐流程", self.skill)
+        self.assertIn("代码不审计", self.skill)
+        self.assertIn("报告级", self.skill)
+        # validate_report scope must be explicit
+        self.assertIn("validate_report.py", self.skill)
+        self.assertIn("只做报告级", self.skill)
+
+    def test_docs_do_not_promise_removed_ledger_apis(self) -> None:
+        # v6 removed dispatch ledger from state_machine; docs/prompts must not require it
+        for blob_name, blob in (
+            ("skill", self.skill),
+            ("readme", self.readme),
+            ("root_readme", self.root_readme),
+            ("test_prompts", self.test_prompts),
+        ):
+            self.assertNotIn("record_dispatch", blob, msg=blob_name)
+            self.assertNotIn("record_result", blob, msg=blob_name)
+
     def test_tavily_listed_in_main_skill(self) -> None:
-        # v6.3.0：Tavily 为六源之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa
+        # v6.3.1：Tavily 为六源之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa
         self.assertIn("Tavily", self.skill)
         self.assertNotIn("Tavily", self.subagent)
 

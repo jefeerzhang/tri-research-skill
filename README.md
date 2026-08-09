@@ -2,13 +2,13 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.3.0-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.3.1-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**状态机闸门 + 双语强制 + 报告验证器。每个子代理是否真跑了、来源是否中英双补、报告能否通过验收，都有据可查。**
+**状态机闸门 + 报告验证器（硬门禁）+ 双语/多源研究纪律（流程要求）。报告结构、引用闭环与完成哈希可机器验收；子代理是否逐维双补、是否做核验/红队，属推荐流程，代码不审计。**
 
 [快速开始](#快速开始) · [效果示例](#效果示例) · [触发方式](#触发方式) · [和同行有什么不同](#和同行有什么不同) · [安全边界](#安全边界)
 
@@ -18,9 +18,20 @@
 
 你有过一个「深度研究」让 Agent 跑完，结果发现某个子代理根本没搜中文、或者报告里的来源 URL 全是重复的、或者引用编号对不上号吗？
 
-Tri Research 不靠"让 Agent 认真一点"来解决问题。它把事情写进状态机和验收器：子代理搜没搜、搜了几种语言、报告能不能通过结构检查，每一步都有记录，最终报告必须通过主题、来源、双语覆盖和引用完整性四重门禁才能算完成。
+Tri Research 不靠"让 Agent 认真一点"来解决问题。它把**可机器检查**的完成标准写进状态机和验收器：最终报告必须通过主题、来源数量、报告级双语覆盖和引用完整性等硬门禁才能 `DONE`。检索过程中的质量门、来源核验、红队等是推荐流程——提高证据质量，但不假装已被代码强制。
 
 适合文献综述、政策分析、行业研究和多实体对比——任何需要**多个独立视角、中英文证据、可核验引用**的场景。简单事实查询或本地代码问题不需要这套流程。
+
+## 硬门禁 vs 推荐流程
+
+| 硬门禁（代码拦截 `DONE`） | 推荐流程（最佳实践，代码不审计） |
+|---------------------------|----------------------------------|
+| `start` / `set_params` / `done --report` | 研究意图澄清、`RESEARCH_CONTEXT.md` |
+| 七章结构、引用闭环、min_sources、合法唯一 URL | 质量门、Gap-Fill、多波次检索 |
+| 报告级中英证据、执行情况源使用行 | 来源内容核验、声明-来源匹配、红队 |
+| 参数冻结与报告 SHA-256 | 置信标签、大纲适配、综合子代理 |
+
+详情见 [`skills/tri-research/SKILL.md`](skills/tri-research/SKILL.md) 文首。
 
 ## 快速开始
 
@@ -135,7 +146,7 @@ python scripts/state_machine.py --session <id> check
 python scripts/state_machine.py --session <id> get_params
 ```
 
-状态只前进不后退，`done` 必经报告验证器（章节完整、来源数达标、URL 唯一、中英双补）。
+状态只前进不后退，`done` 必经报告验证器（章节完整、来源数达标、URL 唯一、报告级中英证据）。核验/红队/置信标签不在此强制。
 
 ## 增量研究
 
@@ -151,16 +162,16 @@ python scripts/state_machine.py --session <id> add_dimensions '{"keywords_zh":["
 
 | 维度 | 常见做法 | tri-research 的做法 |
 |---|---|---|
-| **门禁体系** | Agent 自行宣称"已完成" | 两步状态机 + validate_report.py 硬验收 |
-| **双语覆盖** | 只搜英文或随缘 | 每个维度、每个源强制中英双补 |
+| **门禁体系** | Agent 自行宣称"已完成" | 两步状态机 + validate_report.py **硬验收**；质量门/核验等为推荐流程 |
+| **双语覆盖** | 只搜英文或随缘 | 流程要求中英双补；验收器做**报告级**中英证据检查 |
 | **来源可核验** | 参考文献格式不统一 | 单行格式含层级+来源+URL，验证器检查 |
-| **来源真实性** | 格式合法即通过 | SciVerse SDK 按 DOI/标题逐条核验，拦截编造文献 |
+| **来源真实性** | 格式合法即通过 | 硬门禁只验格式/URL；**推荐** SciVerse/extract 核验（非代码强制） |
 | **置信标注** | 结论不标可信度 | 每条结论标 `[高]/[中]/[低]`，与来源层级联动 |
-| **质量门** | 无自动检查 | 5 项自动检查（来源数/维度覆盖/反面视角/语言/层级占比），不通过标红 |
+| **质量门** | 无自动检查 | **推荐** 5 项自检并标红薄弱维度（用户可仍选择继续） |
 | **增量研究** | 重头跑一遍 | `add_dimensions` 追加，旧结果保留 |
 | **跨运行时** | 绑特定 runtime | CLI + Python SDK，兼容 Claude Code/Codex/OpenCode/OpenClaw |
-| **结果确认闸门** | Agent 直接写报告 | 搜索完经用户确认 + 质量门检查再综合 |
-| **搜索后端** | 单一后端 | 5 搜索源并行，必选+可选分级 |
+| **结果确认闸门** | Agent 直接写报告 | **推荐**搜索完经用户确认再综合 |
+| **搜索后端** | 单一后端 | 六源并行（必选+可选分级） |
 
 ## 安全边界
 
@@ -188,7 +199,7 @@ tri-research-skill/
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 包装
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/
-|   |   |-- tests/                 # 64 项合约+验收测试
+|   |   |-- tests/                 # unittest 合约+验收测试（当前 75 项）
 |   |-- research-subagent/         # 子代理 skill
 |   |   `-- SKILL.md
 |   |-- serpapi/                   # SerpApi 辅助 skill

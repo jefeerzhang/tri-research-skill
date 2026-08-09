@@ -2,15 +2,25 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.3.0`
+当前版本：`6.3.1`
 
-## 从 v6.2.0 到 v6.3.0 的核心变化
+## 从 v6.3.0 到 v6.3.1 的核心变化
 
-| 变更项 | v6.2.0 | v6.3.0 |
+| 变更项 | v6.3.0 | v6.3.1 |
 |--------|--------|--------|
-| **综合能力** | 单轮综合 | 大纲适配 / 多波次 / Synthesis 子代理 / 优雅降级 / 声明-来源匹配 |
-| **搜索后端文档** | skill README 仍写五源 | **六源表**与 `SKILL.md` 对齐（含 Exa） |
-| **Tavily** | Lead Agent + `tavily_search.py` | 保持仅 Lead Agent，与 Runtime WebSearch 严格区分 |
+| **完成标准叙事** | 流程步骤与验收器边界易被读成同等强制 | 文首区分 **硬门禁**（代码）与 **推荐流程**（最佳实践） |
+| **双语/全源** | 易被理解为验收器逐维审计 | 明确：执行纪律 vs 报告级 `validate_report` |
+| **文档残留** | marketplace 6.0.0、测试数/旧 API 文案漂移 | 版本与 checklist 与实现对齐 |
+
+## 硬门禁（代码）vs 推荐流程（文档）
+
+| 硬门禁 | 推荐流程（不做也不阻断 DONE） |
+|--------|------------------------------|
+| `state_machine`：`STARTED` → `DONE`（+ `EXTENDED`） | 意图澄清、`RESEARCH_CONTEXT.md` |
+| `set_params` 冻结 topic / min_sources≥10 / 双语关键词 | 质量门五检、Gap-Fill、多波次 |
+| `validate_report`：七章、引用闭环、URL、报告级中英、源使用行 | 来源内容核验、声明-来源匹配、红队 |
+| 报告 SHA-256 写入 `report_validation` | 置信标签、大纲适配、综合子代理 |
+| | `citations` 软复核 |
 
 ## 能力边界
 
@@ -40,26 +50,28 @@
 
 ```text
 用户确认研究问题
-  → 源检测 + 交互式引导（首次使用时）
-  → state_machine.py start：初始化会话
+  → （推荐）意图澄清 / RESEARCH_CONTEXT
+  → 源检测 + 检索计划确认
+  → state_machine.py start
   → state_machine.py set_params：冻结 topic、双语关键词、min_sources
-  → 并行派发 1-6 个子代理（每个子代理预检后端，故障隔离）
-  → 主导代理综合 + 撰写最终报告（凝练总结，非列信息）
-  → validate_report.py 验收（章节、引用、来源元数据、双语覆盖）
-  → state_machine.py done：进入 DONE，记录 SHA-256
+  → 并行搜索（可选 1-6 子代理）
+  → （推荐）结果确认 / 质量门 / 核验 / Gap-Fill
+  → 主导综合撰写最终报告
+  → validate_report.py 验收（硬门禁）
+  → state_machine.py done：DONE + SHA-256
 ```
 
 ## 报告格式
 
-报告必须包含 7 个章节：
+报告必须包含 7 个章节（硬门禁）：
 
-1. **概述** — 3-5 句话概括核心结论
-2. **已有事实** — 凝练后的多源交叉验证结论（不是多源原文拼接）
-3. **主要文献观点** — 从多源文献中抽象出来的观点
-4. **主要矛盾与冲突点** — 来源间的不一致、争议
-5. **未来研究方向** — 基于多源凝练后的下一步研究路径
+1. **概述**
+2. **已有事实**（推荐带置信标签，验收器不强制）
+3. **主要文献观点**
+4. **主要矛盾与冲突点**
+5. **未来研究方向**
 6. **参考文献** — 单行格式，必须含 `层级:` `来源:` `URL:`
-7. **执行情况** — Markdown 表格（流程/子代理/源使用/覆盖质量/维度覆盖/耗时/报告位置）
+7. **执行情况** — 含搜索源使用行（AnySearch/SciVerse/Exa/SerpApi/WebSearch）
 
 参考文献格式示例：
 ```
@@ -75,57 +87,37 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`EXA_API_KEY`、`SERPAPI_KEY`、`SCIVERSE_API_TOKEN`。
 
 ```bash
-# SciVerse（必选）
 pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>
-
-# Exa（可选）
-pip install exa-py && export EXA_API_KEY=<your-key>
-
-# Tavily（可选，仅 Lead）
-pip install tavily-python && export TAVILY_API_KEY=<your-key>
+pip install exa-py && export EXA_API_KEY=<your-key>          # 可选
+pip install tavily-python && export TAVILY_API_KEY=<your-key> # 可选
 ```
 
 ## 测试
 
 ```bash
-# 合约测试（SKILL.md 结构检查）
-python -m pytest skills/tri-research/tests/test_skill_contract.py -v
-
-# 验收器测试
-python -m pytest skills/tri-research/tests/test_validate_report.py -v
-
-# 状态机测试
-python -m pytest skills/tri-research/tests/test_state_machine.py -v
+python -m unittest discover -s skills/tri-research/tests -v
 ```
+
+当前 tri-research 包内 unittest 75 项（含合约/状态机/验收器等；以 discover 输出为准）。
 
 ## 文件结构
 
 ```text
 tri-research/
-├── SKILL.md                  # 技能定义（中文，383 行）
-├── README.md                 # 本文件
-├── CHANGELOG.md              # 版本记录
-├── test-prompts.json         # 测试 prompt
+├── SKILL.md
+├── README.md
+├── CHANGELOG.md
+├── test-prompts.json
 ├── scripts/
-│   ├── _common.py            # 共享工具函数
-│   ├── state_machine.py      # 两步状态机（STARTED → DONE）
-│   ├── state_machine.sh      # Unix 兼容包装
-│   ├── validate_report.py    # 报告验收器
-│   ├── tavily_search.py      # Tavily Python SDK 封装（CLI 入口）
-│   └── exa_search.py         # Exa 搜索封装
+│   ├── _common.py
+│   ├── state_machine.py
+│   ├── state_machine.sh
+│   ├── validate_report.py
+│   ├── tavily_search.py
+│   └── exa_search.py
 ├── references/
-│   └── runtime-adapters.md   # 运行时适配细节
+│   └── runtime-adapters.md
 └── tests/
-    ├── test_state_machine.py
-    ├── test_skill_contract.py
-    ├── test_validate_report.py
-    ├── test_tavily_search.py  # Tavily 脚本测试
-    ├── test_exa_search.py     # Exa 脚本测试
-    ├── test_active_session_after_done.py
-    ├── test_changelog.py
-    ├── test_emit_silent_done.py
-    ├── test_get_commands_consistency.py
-    └── test_module_import.py
 ```
 
 ## 安全边界

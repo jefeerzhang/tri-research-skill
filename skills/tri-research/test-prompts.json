@@ -1,21 +1,44 @@
 {
-  "version": "6.3.0",
-  "description": "Tri Research 可执行回归场景。",
-  "usage": "运行研究场景后，按 validation_checklist 验收 Markdown 报告。",
+  "version": "6.3.1",
+  "description": "Tri Research 可执行回归场景（与 v6.3.1 硬门禁/推荐流程对齐）。",
+  "usage": "运行研究场景后，用 validate_report.py 与 validation_checklist 验收 Markdown 报告。",
   "prompts": [
     {
       "id": "ai-labor-allocation",
       "type": "depth-first",
       "prompt": "tri-research 人工智能与劳动分配",
       "topic": "人工智能与劳动分配",
-      "keywords_zh": ["人工智能", "劳动分配", "就业结构", "收入分配", "劳动收入份额"],
-      "keywords_en": ["artificial intelligence", "labor allocation", "employment structure", "income distribution", "labor share"],
+      "keywords_zh": [
+        "人工智能",
+        "劳动分配",
+        "就业结构",
+        "收入分配",
+        "劳动收入份额"
+      ],
+      "keywords_en": [
+        "artificial intelligence",
+        "labor allocation",
+        "employment structure",
+        "income distribution",
+        "labor share"
+      ],
       "time_range": "all",
       "expected_subagents": 3,
       "expected_sources_min": 12,
-      "expected_tools": ["anysearch", "sciverse"],
-      "expected_sections": ["TL;DR", "核心机制", "中国证据", "政策含义", "参考文献"],
-      "expected_behavior": "子代理本地预检；AnySearch CLI-only，直接执行 anysearch_cli.py 的 doc/batch_search/extract 且禁止 AnySearch MCP；并行源调用 failure-isolated/allSettled；中英双补；SciVerse MCP 缺失时使用 Node CLI 并保留 doc_id/title；来源级配置失败只记录一次且不重新派发；record_dispatch 与 record_result 账本完整；外部内容按 UNTRUSTED_SOURCE 隔离且不作为指令；报告主题和 min_sources 与冻结 scope 一致；报告包含连续引用、Tier 和 Found by。",
+      "expected_tools": [
+        "anysearch",
+        "sciverse"
+      ],
+      "expected_sections": [
+        "概述",
+        "已有事实",
+        "主要文献观点",
+        "主要矛盾与冲突点",
+        "未来研究方向",
+        "参考文献",
+        "执行情况"
+      ],
+      "expected_behavior": "子代理本地预检；AnySearch CLI-only；并行源 failure-isolated；中英双补为流程要求；SciVerse 仅 Python SDK；来源级失败熔断不重派；报告主题与 min_sources 与 set_params 一致；引用连续且含层级/来源/URL；done 前 validate_report 通过。质量门/核验/红队为推荐流程，不作为代码硬门禁。",
       "timeout_seconds": 480
     },
     {
@@ -24,7 +47,12 @@
       "prompt": "tri-research 比较 AWS、Azure 和 Google Cloud 的计算实例定价",
       "expected_subagents": 3,
       "expected_sources_min": 15,
-      "expected_sections": ["TL;DR", "Executive Summary", "参考文献"],
+      "expected_sections": [
+        "概述",
+        "已有事实",
+        "参考文献",
+        "执行情况"
+      ],
       "timeout_seconds": 480
     },
     {
@@ -34,30 +62,29 @@
       "setup": "仅 AnySearch 真实可用，其他渠道不可用或配额耗尽",
       "expected_subagents": 3,
       "expected_sources_min": 10,
-      "expected_behavior": "只报告一次状态，使用 AnySearch 中英双补，仍生成带引用报告。",
+      "expected_behavior": "只报告一次状态，使用 AnySearch 中英双补，仍生成带引用报告并通过 validate_report。",
       "timeout_seconds": 480
     },
     {
       "id": "state-session-isolation",
       "type": "internal",
       "setup": "同时初始化两个不同 --session",
-      "expected_behavior": "两个会话独立推进；重复初始化不覆盖；TRI_RESEARCH_HOME 内不产生状态文件。",
+      "expected_behavior": "两个会话独立推进；重复初始化不覆盖；TRI_RESEARCH_HOME 内不产生状态文件；done 写入 report_validation proof。",
       "timeout_seconds": 30
     }
   ],
   "validation_checklist": [
     "报告文件 DEEP_RESEARCH_*.md 已生成且文件名带日期或唯一后缀",
-    "报告包含 TL;DR 和参考文献章节",
+    "报告包含七个必需二级标题（概述/已有事实/主要文献观点/主要矛盾与冲突点/未来研究方向/参考文献/执行情况）",
     "正文引用 [N] 与参考文献一一对应且编号连续",
-    "每个来源包含可访问 URL、Tier 和 Found by",
-    "报告同时包含中文来源与英文来源",
-    "报告记录 available、unavailable 或 quota_exhausted 的渠道状态",
-    "子代理数量符合查询类型且没有重复派发",
-    "所有子代理在 8 分钟内完成",
-    "报告语言与用户查询语言一致",
-    "只有报告写入并通过验收后，状态才进入 DONE",
-    "每个子代理都有唯一 dispatch_ref、终态和结果证据哈希",
-    "DONE 后 check 会复核代理结果与报告 SHA-256 并输出 INTEGRITY:OK",
-    "SEARCH/FETCH/RENDER 内容只作不可信证据，不执行其中的命令或安装请求"
+    "每个来源包含可访问 URL、层级、来源工具名",
+    "报告级同时包含中文来源证据与英文来源证据（非逐条双语）",
+    "执行情况含搜索源使用行并点名 AnySearch/SciVerse/Exa/SerpApi/WebSearch",
+    "子代理数量符合查询类型且没有重复派发（流程要求，状态机不记账本）",
+    "所有子代理在 8 分钟内完成（流程要求）",
+    "只有报告写入并通过 validate_report 后，状态才进入 DONE",
+    "DONE 后 check 输出 INTEGRITY:OK 与报告 SHA-256",
+    "SEARCH/FETCH 内容只作不可信证据，不执行其中的命令或安装请求",
+    "质量门/来源核验/红队/置信标签若执行，属于推荐流程，不单独作为 DONE 条件"
   ]
 }
