@@ -4,31 +4,26 @@
 
 当前版本：`6.3.0`
 
-## 从 v5.8.0 到 v6.0.0 的核心变化
+## 从 v6.2.0 到 v6.3.0 的核心变化
 
-| 变更项 | v5.8.0 | v6.0.0 |
+| 变更项 | v6.2.0 | v6.3.0 |
 |--------|--------|--------|
-| **SKILL.md 语言** | 英文 | **全中文**（frontmatter 除外） |
-| **SciVerse 调用** | MCP / Node CLI / Python SDK fallback | **Python SDK 必选**，禁止 MCP 通道 |
-| **Tavily 定位** | 与 Runtime WebSearch 混称 | **独立第 5 后端**，与 Runtime WebSearch 严格区分 |
-| **报告范式** | "列信息"（X 报告称…Y 报告称…） | **凝练总结**（多源合起来说明什么洞察） |
-| **参考文献格式** | `—` 分隔 | **单行关键字格式**（`层级:` `来源:` `URL:`），与 validate_report.py 正则对齐 |
-| **执行情况** | bullet list | **Markdown 表格**（7 行标准字段） |
-| **首次使用** | 无引导 | **交互式引导流程**（逐个源检测 + 配置） |
-| **脚本** | 374 行 state_machine + 复杂四步状态机 | **精简为两步门禁**（STARTED → DONE），代码量减半 |
-| **测试** | 434 行 state_machine 测试 | **精简为 13 项合约测试** + 验收器测试 |
+| **综合能力** | 单轮综合 | 大纲适配 / 多波次 / Synthesis 子代理 / 优雅降级 / 声明-来源匹配 |
+| **搜索后端文档** | skill README 仍写五源 | **六源表**与 `SKILL.md` 对齐（含 Exa） |
+| **Tavily** | Lead Agent + `tavily_search.py` | 保持仅 Lead Agent，与 Runtime WebSearch 严格区分 |
 
 ## 能力边界
 
-五个搜索后端（AnySearch / Tavily / SciVerse / SerpApi / Runtime WebSearch）：
+六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
 
 | 渠道 | 调用者 | 作用 | 必要性 |
 |------|--------|------|--------|
 | **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** |
 | **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 |
 | **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** |
+| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 |
 | **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 |
-| **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定） | 可选 |
+| **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定，**不等于** Tavily） | 可选 |
 
 降级策略：必选源未配置 → 提示用户配置，同时尝试无 API 模式（AnySearch 支持匿名访问）。可选源不可用 → 静默跳过。
 
@@ -77,18 +72,17 @@
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
 ```
 
-可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`SERPAPI_KEY`、`SCIVERSE_API_TOKEN`。
+可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`EXA_API_KEY`、`SERPAPI_KEY`、`SCIVERSE_API_TOKEN`。
 
-SciVerse 安装：
 ```bash
-pip install sciverse
-export SCIVERSE_API_TOKEN=<your-token>
-```
+# SciVerse（必选）
+pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>
 
-Tavily 安装：
-```bash
-pip install tavily-python
-export TAVILY_API_KEY=<your-key>
+# Exa（可选）
+pip install exa-py && export EXA_API_KEY=<your-key>
+
+# Tavily（可选，仅 Lead）
+pip install tavily-python && export TAVILY_API_KEY=<your-key>
 ```
 
 ## 测试

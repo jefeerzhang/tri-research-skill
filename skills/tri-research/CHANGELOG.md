@@ -4,6 +4,9 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ## [6.3.0] - 2026-07-29
 
+### Fixed
+- **文档六源表对齐**：skill README / 根 README / `runtime-adapters.md` / 合约测试与 `SKILL.md` 统一为六源（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）；Tavily 仅 Lead Agent；参考文献 `来源:` 字段含 Tavily
+
 ### Added
 - **大纲适配（借鉴 deep-research Phase 3.5）**：第七步综合时对比计划结构 vs 实际证据，调整幅度 ≤50%（超出时须在执行情况标注原因），证据驱动不凭空添加。调整记录写入执行情况。
 - **多波次检索（借鉴 deep-research Wave 设计）**：第二步检索计划标注波次：Wave 1 广覆盖 → 质量门判定 → Wave 2 精准补漏 → Wave 3（deep 模式）。

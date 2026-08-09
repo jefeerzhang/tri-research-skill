@@ -36,6 +36,8 @@ version: "6.3.0"
 
 ## 搜索源
 
+六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
+
 | 源 | 使用者 | 用途 | 必要性 | 配置方式 |
 |----|--------|------|--------|----------|
 | **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | 安装 CLI + 可选 API Key |
@@ -324,7 +326,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 ## 未来研究方向（基于多源凝练后的下一步研究路径）
 
 ## 参考文献
-每条单行：`[N] 作者/来源, "标题", 出处/期刊, 年份, 层级: 1/2/3, 来源: AnySearch/SciVerse/Exa/SerpApi/WebSearch, URL: https://...`
+每条单行：`[N] 作者/来源, "标题", 出处/期刊, 年份, 层级: 1/2/3, 来源: AnySearch/Tavily/SciVerse/Exa/SerpApi/WebSearch, URL: https://...`
 - 层级：1=权威（同行评审/官方）、2=可信（知名机构/媒体）、3=补充
 - 编号从 1 连续，正文用 `[N]` 行内引用
 
@@ -333,7 +335,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 | 项目 | 说明 |
 |------|------|
 | 执行流程 | 源检测 → 计划确认 → 子代理搜索 → 结果确认 → 来源核验 → 综合撰写 → 验证 |
-| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / WebSearch: N |
+| 搜索源使用 | AnySearch: N / Tavily: N / SciVerse: N / Exa: N / SerpApi: N / WebSearch: N |
 | 来源核验 | 核验 N / 通过 N / 修正 N / 剔除 N |
 | 覆盖质量 | 中文 N / 英文 N / 同行评审 N / 政府/国际组织 N |
 | 维度覆盖 | [维度1]: 中✓英✓ / ... |
@@ -379,5 +381,5 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 - 仅查询 `http/https` 来源，不绕过访问控制
 - SerpApi 免费档 250 次/月，429 后静默降级
 - 不泄露 API Key，不写外部数据
-- 子代理可调用 AnySearch + SciVerse + Exa；SerpApi 仅 Lead Agent 调用
+- 子代理可调用 AnySearch + SciVerse + Exa；Tavily / SerpApi / Runtime WebSearch 仅 Lead Agent 调用
 - **优雅降级**：整波子代理全部失败时→缩减报告（用已有来源）+ 执行情况标注降级 + 受影响章节置信降 `[低]`。零来源时告知用户并停止

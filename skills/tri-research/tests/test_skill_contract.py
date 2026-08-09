@@ -10,9 +10,31 @@ class SkillContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
         cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
             encoding="utf-8"
         )
+        cls.root_readme = (ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
+        cls.test_prompts = (ROOT / "test-prompts.json").read_text(encoding="utf-8")
+
+    def test_version_aligned_to_6_3_0(self) -> None:
+        self.assertIn('version: "6.3.0"', self.skill)
+        self.assertIn('version: "6.3.0"', self.subagent)
+        self.assertIn("当前版本：`6.3.0`", self.readme)
+        self.assertIn("version-6.3.0", self.root_readme)
+        self.assertIn('"version": "6.3.0"', self.test_prompts)
+
+    def test_six_source_table_present(self) -> None:
+        for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "WebSearch"):
+            self.assertIn(name, self.skill)
+            self.assertIn(name, self.readme)
+            self.assertIn(name, self.root_readme)
+        self.assertIn("六个搜索后端", self.skill)
+        self.assertIn("六个搜索后端", self.readme)
+        # Tavily is Lead-only in the canonical table
+        self.assertIn("| **Tavily** | Lead Agent |", self.skill)
+        self.assertIn("**Tavily** | Lead Agent |", self.readme)
+        self.assertIn("**Tavily** | Lead Agent |", self.root_readme)
 
     def test_skill_is_concise(self) -> None:
         self.assertLessEqual(len(self.skill.splitlines()), 450)
@@ -94,9 +116,7 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("record_result", state_script)
 
     def test_tavily_listed_in_main_skill(self) -> None:
-        # v6.0.0 起 Tavily 重新列为独立的第 5 后端（与 Runtime WebSearch 区分），
-        # tri-research SKILL.md 必须提到 Tavily（用于子代理独立使用）；
-        # 但 research-subagent SKILL.md 仍不应提 Tavily（subagent 用 AnySearch+SciVerse）
+        # v6.3.0：Tavily 为六源之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa
         self.assertIn("Tavily", self.skill)
         self.assertNotIn("Tavily", self.subagent)
 
