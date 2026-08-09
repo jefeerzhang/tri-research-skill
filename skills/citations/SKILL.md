@@ -43,7 +43,7 @@ version: "6.3.0"
    - URL（`http` 或 `https`）
    - 日期
    - `层级: 1` / `2` / `3`
-   - `来源: AnySearch` / `SciVerse` / `SerpApi` / `WebSearch` 等
+   - `来源: AnySearch` / `Tavily` / `SciVerse` / `Exa` / `SerpApi` / `WebSearch` 等
 4. **URL 唯一性**：规范化后（去除 `utm_*`、端口归一、路径去尾斜杠）URL 不得重复。
 5. **URL 合法**：不接受 `localhost`、`127.0.0.1`、私网地址、占位域（`example.*` 等）、URL 内嵌凭据。
 6. **中英双补**：参考文献条目在作者/标题段必须同时含中文与英文证据，否则视为单语偏向。
