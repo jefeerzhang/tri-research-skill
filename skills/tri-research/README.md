@@ -2,7 +2,14 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.4.1`
+当前版本：`6.4.2`
+
+## 从 v6.4.1 到 v6.4.2 的核心变化
+
+| 变更项 | v6.4.1 | v6.4.2 |
+|--------|--------|--------|
+| **免费额度表述** | Exa 行「$20 注册 + $10/月」易被读成付费 | 明确为注册送额度（$20 + 每月 $10） |
+| **Key 申请链接** | 文档未给申请入口 | 六源全部附上申请链接（源表新增列 + 快速开始注释） |
 
 ## 从 v6.4.0 到 v6.4.1 的核心变化
 
@@ -40,14 +47,14 @@
 
 六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
 
-| 渠道 | 调用者 | 作用 | 必要性 |
-|------|--------|------|--------|
-| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** |
-| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 |
-| **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 |
-| **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定，**不等于** Tavily） | 可选 |
+| 渠道 | 调用者 | 作用 | 必要性 | Key 申请 |
+|------|--------|------|--------|----------|
+| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | https://anysearch.com/console/api-keys |
+| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 | https://app.tavily.com/home |
+| **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** | https://sciverse.space/tokens |
+| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 | https://dashboard.exa.ai/api-keys |
+| **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 | https://serpapi.com/dashboard |
+| **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定，**不等于** Tavily） | 可选 | 无需申请（宿主内置） |
 
 降级策略：必选源未配置 → 提示用户配置，同时尝试无 API 模式（AnySearch 支持匿名访问）。可选源不可用 → 静默跳过。
 

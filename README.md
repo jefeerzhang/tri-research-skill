@@ -2,7 +2,7 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.4.1-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.4.2-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -48,18 +48,18 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 装依赖的搜索后端（**六源**：AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
 
 ```bash
-# AnySearch（必选，通用网页搜索）
+# AnySearch（必选，通用网页搜索）— Key 申请：https://anysearch.com/console/api-keys
 npx skills add anysearch-ai/anysearch-skill
 
-# SciVerse（必选，学术论文）
+# SciVerse（必选，学术论文）— Key 申请：https://sciverse.space/tokens
 pip install sciverse
 export SCIVERSE_API_TOKEN=<your-token>
 
-# Exa（可选，补充搜索 + 公司/学术/新闻分类）
+# Exa（可选，补充搜索 + 公司/学术/新闻分类）— Key 申请：https://dashboard.exa.ai/api-keys
 pip install exa-py
 export EXA_API_KEY=<your-key>
 
-# Tavily / SerpApi（可选，仅 Lead Agent）
+# Tavily / SerpApi（可选，仅 Lead Agent）— Key 申请：https://app.tavily.com/home / https://serpapi.com/dashboard
 export TAVILY_API_KEY=<your-key>
 export SERPAPI_KEY=<your-key>
 ```
@@ -96,14 +96,14 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 
 六个搜索后端（与 `skills/tri-research/SKILL.md` 源表一致）：
 
-| 源 | 调用者 | 用途 | 必要性 | 免费额度 |
-|---|---|---|---|---|
-| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索 | **必选** | CLI 自带，匿名可用 |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（**不等于** Runtime WebSearch） | 可选 | 按 Tavily 账户 |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（Python SDK） | **必选** | 注册即用 |
-| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（分类搜索） | 可选 | $20 注册 + $10/月 |
-| **SerpApi** | Lead Agent | 中文 Google + Scholar | 可选 | 250 次/月免费 |
-| **Runtime WebSearch** | Lead Agent | 宿主内建补充（Bing/Brave/Google 等） | 可选 | 宿主提供 |
+| 源 | 调用者 | 用途 | 必要性 | 免费额度 | Key 申请 |
+|---|---|---|---|---|---|
+| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索 | **必选** | 匿名可用（低限额），免费 key 提额 | https://anysearch.com/console/api-keys |
+| **Tavily** | Lead Agent | 深度网页搜索与提取（**不等于** Runtime WebSearch） | 可选 | 免费档（额度以官网为准） | https://app.tavily.com/home |
+| **SciVerse** | Lead + 子代理 | 学术论文语义检索（Python SDK） | **必选** | 注册送试用额度 | https://sciverse.space/tokens |
+| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（分类搜索） | 可选 | 注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10 | https://dashboard.exa.ai/api-keys |
+| **SerpApi** | Lead Agent | 中文 Google + Scholar | 可选 | 250 次/月免费 | https://serpapi.com/dashboard |
+| **Runtime WebSearch** | Lead Agent | 宿主内建补充（Bing/Brave/Google 等） | 可选 | 宿主提供 | 无需申请（宿主内置） |
 
 降级策略：必选源缺失时提示配置，可选源静默跳过，单源失败不阻断。
 
