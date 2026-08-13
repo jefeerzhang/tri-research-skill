@@ -2,7 +2,7 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.3.1-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.4.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -199,7 +199,7 @@ tri-research-skill/
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 包装
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/
-|   |   |-- tests/                 # unittest 合约+验收测试（当前 75 项）
+|   |   |-- tests/                 # unittest 合约+验收测试（当前 81 项）
 |   |-- research-subagent/         # 子代理 skill
 |   |   `-- SKILL.md
 |   |-- serpapi/                   # SerpApi 辅助 skill

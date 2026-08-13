@@ -30,8 +30,8 @@ def valid_report() -> str:
 方向一。
 
 ## 参考文献
-[1] Organization — English source — https://publisher-one.org/one — 2025 — 层级: 1 — 来源: AnySearch
-[2] 作者 — 中文来源 — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch
+[1] Organization — English source — 机构 — 中文资料 — https://publisher-one.org/one — 2025 — 层级: 1 — 来源: AnySearch
+[2] 作者 — 中文来源 — China Research Institute — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch
 
 ## 执行情况
 
@@ -43,6 +43,50 @@ def valid_report() -> str:
 | 耗时 | 3.0 分钟 |
 | 报告位置 | ~/tri-research-reports/report.md |
 """
+
+
+def language_report(entries: list[str]) -> str:
+    """Build a structurally valid report from raw reference-entry text.
+
+    Entries are numbered in order; the body cites all of them so the only
+    language-check dimension under test is per-entry evidence strength.
+    """
+    inline = "".join(f"[{i}]" for i in range(1, len(entries) + 1))
+    refs = "\n".join(f"[{i}] {entry}" for i, entry in enumerate(entries, 1))
+    return f"""# 主题
+
+## 概述
+概述{inline}。
+
+## 已有事实
+事实{inline}。
+
+## 主要文献观点
+观点{inline}。
+
+## 主要矛盾与冲突点
+矛盾。
+
+## 未来研究方向
+方向。
+
+## 参考文献
+{refs}
+
+## 执行情况
+
+| 项目 | 说明 |
+|------|------|
+| 执行流程 | 预检 → 搜索 → 综合 → 验证 |
+| 子代理派发 | 否 |
+| 搜索源使用 | AnySearch: {len(entries)}条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |
+| 耗时 | 3.0 分钟 |
+| 报告位置 | ~/tri-research-reports/report.md |
+"""
+
+
+EN_ENTRY = "Author — English study — https://source-{i}.org/paper-{i} — 2025 — 层级: 1 — 来源: SciVerse"
+ZH_ENTRY = "作者{i} — 中文研究 — https://source-{i}.cn/article-{i} — 2024 — 层级: 2 — 来源: AnySearch"
 
 
 class ReportValidatorTests(unittest.TestCase):
@@ -120,15 +164,54 @@ class ReportValidatorTests(unittest.TestCase):
         errors = MODULE.validate(valid_report(), 2, expected_topic="量子芯片供应链")
         self.assertTrue(any("主题" in error for error in errors))
 
-    def test_language_coverage(self) -> None:
-        # Replace entire second reference with all-English entry
-        report = valid_report().replace(
-            "[2] 作者 — 中文来源 — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
-            "[2] Author — English — https://publisher-two.cn/two — 2024 — level: 2 — via: AnySearch"
+    def test_rejects_report_without_chinese_evidence(self) -> None:
+        """All-English references must fail the Chinese coverage check."""
+        report = (
+            valid_report()
+            .replace(
+                "[1] Organization — English source — 机构 — 中文资料 — ",
+                "[1] Organization — English source — ",
+            )
+            .replace(
+                "[2] 作者 — 中文来源 — China Research Institute — ",
+                "[2] Author — Chinese Research Institute — ",
+            )
         )
         errors = MODULE.validate(report, 2)
-        # Should contain Chinese language missing error (other errors like tier/source format are expected too)
         self.assertTrue(any("缺少中文" in error for error in errors))
+
+    def test_stray_latin_token_is_not_english_evidence(self) -> None:
+        """A stray Latin token (e.g. "CCTV") inside Chinese entries must not
+        count as English evidence — the old ANY-style ENGLISH_RE check let
+        reports with zero real English sources pass."""
+        entries = [
+            ZH_ENTRY.format(i=i).replace("中文研究", "中文研究 CCTV") for i in range(1, 11)
+        ]
+        errors = MODULE.validate(language_report(entries), 10)
+        self.assertTrue(
+            any("英文证据不足" in error for error in errors),
+            f"stray Latin tokens must not count as English evidence: {errors}",
+        )
+
+    def test_accepts_three_real_english_entries(self) -> None:
+        """min(MIN_ENGLISH_ENTRIES, n) real English entries satisfies the gate."""
+        entries = [ZH_ENTRY.format(i=i) for i in range(1, 11)]
+        for i in (1, 3, 5):
+            entries[i - 1] = EN_ENTRY.format(i=i)
+        errors = MODULE.validate(language_report(entries), 10)
+        self.assertFalse(any("英文证据不足" in e for e in errors), f"{errors}")
+        self.assertFalse(any("缺少中文" in e for e in errors), f"{errors}")
+
+    def test_rejects_two_real_english_entries(self) -> None:
+        """One short of the report-level English threshold must fail."""
+        entries = [ZH_ENTRY.format(i=i) for i in range(1, 11)]
+        for i in (1, 2):
+            entries[i - 1] = EN_ENTRY.format(i=i)
+        errors = MODULE.validate(language_report(entries), 10)
+        self.assertTrue(
+            any("英文证据不足" in error for error in errors),
+            f"two English entries must not satisfy the gate: {errors}",
+        )
 
     def test_rejects_missing_tier(self) -> None:
         report = valid_report().replace("层级: 1", "无层级")
@@ -153,7 +236,7 @@ class ReportValidatorTests(unittest.TestCase):
 
     def test_rejects_duplicate_reference_numbers(self) -> None:
         report = valid_report().replace(
-            "[2] 作者 — 中文来源 — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
+            "[2] 作者 — 中文来源 — China Research Institute — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
             "[1] Dup — duplicate number — https://publisher-two.cn/two — 2024 — 层级: 2 — 来源: AnySearch",
         )
         errors = MODULE.validate(report, 2)

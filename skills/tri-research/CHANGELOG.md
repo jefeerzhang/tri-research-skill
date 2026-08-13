@@ -2,6 +2,16 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.4.0] - 2026-08-13
+
+### Fixed
+- **英文证据检查不再被孤立拉丁词放行**：`validate_report.py` 报告级双语检查从 ANY 式（条目里任意 4+ 字母英文词即算「有英文来源」）改为**条目级判定**——一条参考文献必须在作者/标题段出现 ≥2 个汉字或 ≥3 个英文单词（`Author1` 这类数字后缀不计词）才计入对应语言。真实报告（min_sources ≥ 10）需 ≥3 条真实英文条目（按比例缩放）。修复纯中文报告仅凭 `CCTV` 等孤立词混过英文门禁的漏洞。
+- **并发读-改-写丢失更新**：`set_params` / `add_dimensions` / `done` 此前无跨进程锁，两个进程同时对同一会话执行变更会互相覆盖 history 与 updated_at（原子写只防撕裂读，不防丢失更新）。新增按会话的跨进程文件锁（POSIX `fcntl` / Windows `msvcrt`，均不可用时降级为锁文件轮询），整个变更命令全程持锁。
+
+### Added
+- 并发回归测试 `tests/test_concurrency.py`：并行 `done` 只能有一个胜者且其余显式失败；并行 `add_dimensions` 两个扩展都不丢失。
+- 报告级英文门槛测试：孤立拉丁词不计证据、恰好 3 条真实英文条目通过、2 条被拒。
+
 ## [6.3.1] - 2026-08-09
 
 ### Changed

@@ -10,9 +10,10 @@ import os
 import re
 import sys
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 # Make sibling `validate_report` and `_common` importable regardless of how
 # this file is invoked. Direct script execution (python state_machine.py)
@@ -28,6 +29,71 @@ from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
 from validate_report import validate as validate_report  # noqa: E402
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+# Cross-process file locking, with a lock-file poll (the adversarial fallback
+# for filesystems without advisory locks). fcntl is POSIX-only; msvcrt is
+# Windows-only; on other platforms both imports fail and we degrade to
+# blocking-with-poll. See StateStore.write_lock below.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - platform-dependent
+    try:
+        import msvcrt  # type: ignore[import-not-found]
+
+        _HAVE_MSVCRT = True
+    except ImportError:
+        _HAVE_MSVCRT = False
+    fcntl = None  # type: ignore[assignment]
+
+LOCK_WAIT_SECONDS = 30.0
+LOCK_POLL_SECONDS = 0.1
+
+
+@contextmanager
+def session_lock(lock_path: Path) -> Iterator[None]:
+    """Serialize read-modify-write access to a session's state file.
+
+    Every mutating command (set_params / add_dimensions / done) takes this
+    lock for the whole command. Atomic file writes (temp + os.replace) only
+    prevent torn reads; they do not serialize two processes that both load,
+    mutate and save — without the lock, two concurrent `done` calls on the
+    same session silently drop each other's history entry and updated_at.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_handle = lock_path.open("a+", encoding="utf-8")
+    try:
+        if fcntl is not None:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        elif _HAVE_MSVCRT:  # pragma: no cover - Windows only
+            msvcrt.locking(lock_handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:  # pragma: no cover - exotic platforms
+            deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
+            while lock_path.exists() and lock_path.stat().st_size > 0:
+                if datetime.now().timestamp() > deadline:
+                    raise StateError(
+                        f"timed out waiting for state lock: {lock_path}"
+                    )
+                _sleep(LOCK_POLL_SECONDS)
+            lock_path.write_text(str(os.getpid()) + "\n", encoding="utf-8")
+        yield
+    finally:
+        if fcntl is not None:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+        elif _HAVE_MSVCRT:  # pragma: no cover - Windows only
+            lock_handle.seek(0)
+            msvcrt.locking(lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
+        elif lock_path.exists():  # pragma: no cover - exotic platforms
+            try:
+                lock_path.unlink()
+            except FileNotFoundError:
+                pass
+        lock_handle.close()
+
+
+def _sleep(seconds: float) -> None:  # pragma: no cover - Windows only
+    import time
+
+    time.sleep(seconds)
 
 
 class StateError(RuntimeError):
@@ -150,6 +216,20 @@ class StateStore:
             raise StateError(f"invalid state file: {exc}") from exc
         return data
 
+    @contextmanager
+    def write_lock(self, session_id: str) -> Iterator[None]:
+        """Cross-process lock guarding a session's read-modify-write.
+
+        Advisory locks (fcntl / msvcrt) are authoritative when available;
+        the lock file then persists on disk as an empty marker and is
+        deliberately NOT unlinked (deleting a locked file lets a third
+        process lock the orphaned inode — a classic race). On platforms
+        with neither module the file is removed on unlock and its presence
+        with content doubles as the held flag (see session_lock).
+        """
+        with session_lock(self.state_path(session_id).with_suffix(".lock")):
+            yield
+
     def save(self, data: dict[str, Any]) -> None:
         payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
         self._atomic_write_text(self.state_path(data["session_id"]), payload)
@@ -221,21 +301,22 @@ def run(args: argparse.Namespace) -> int:
         session_id = validate_session_id(
             args.session or datetime.now().strftime("research-%Y%m%d-%H%M")
         )
-        path = store.state_path(session_id)
-        if path.exists():
-            raise StateError(f"session already exists: {session_id}")
-        timestamp = now_iso()
-        data = {
-            "session_id": session_id,
-            "schema_version": 3,
-            "phase": "STARTED",
-            "params": None,
-            "created_at": timestamp,
-            "updated_at": timestamp,
-            "history": [{"phase": "STARTED", "at": timestamp}],
-        }
-        store.save(data)
-        store.set_active(session_id)
+        with store.write_lock(session_id):
+            path = store.state_path(session_id)
+            if path.exists():
+                raise StateError(f"session already exists: {session_id}")
+            timestamp = now_iso()
+            data = {
+                "session_id": session_id,
+                "schema_version": 3,
+                "phase": "STARTED",
+                "params": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "history": [{"phase": "STARTED", "at": timestamp}],
+            }
+            store.save(data)
+            store.set_active(session_id)
         print(f"OK:Session {session_id} started")
         emit(data, store)
         return 0
@@ -266,90 +347,96 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "set_params":
-        if data["phase"] != "STARTED":
-            raise StateError("parameters can only be set in STARTED phase")
-        if data.get("params") is not None:
-            raise StateError("parameters already set and immutable")
-        try:
-            params = json.loads(args.params_json)
-        except json.JSONDecodeError as exc:
-            raise StateError(f"invalid JSON: {exc.msg}") from exc
-        params = validate_params(params)
-        data["params"] = params
-        data["updated_at"] = now_iso()
-        store.save(data)
+        with store.write_lock(session_id):
+            data = store.load(session_id)
+            if data["phase"] != "STARTED":
+                raise StateError("parameters can only be set in STARTED phase")
+            if data.get("params") is not None:
+                raise StateError("parameters already set and immutable")
+            try:
+                params = json.loads(args.params_json)
+            except json.JSONDecodeError as exc:
+                raise StateError(f"invalid JSON: {exc.msg}") from exc
+            params = validate_params(params)
+            data["params"] = params
+            data["updated_at"] = now_iso()
+            store.save(data)
         print("OK:Parameters saved")
         return 0
 
     if args.command == "add_dimensions":
-        params = data.get("params")
-        if params is None:
-            raise StateError("parameters not set; run set_params first")
-        try:
-            extension = json.loads(args.extension_json)
-        except json.JSONDecodeError as exc:
-            raise StateError(f"invalid JSON: {exc.msg}") from exc
-        extension = validate_extension(extension)
-        was_done = data["phase"] == "DONE"
-        for field in ("keywords_zh", "keywords_en", "dimensions"):
-            added = extension.get(field)
-            if added:
-                existing = params.setdefault(field, [])
-                for item in added:
-                    if item not in existing:
-                        existing.append(item)
-        data["updated_at"] = now_iso()
-        extend_phase = "EXTENDED" if was_done else data["phase"]
-        data["history"].append({"phase": extend_phase, "at": now_iso(), "extension": extension})
-        if was_done:
-            # Stale report_validation is no longer valid after extension
-            data.pop("report_validation", None)
-            # Reset phase so the workflow can continue
-            data["phase"] = "EXTENDED"
-            # Re-set active session pointer since done cleared it
-            store.set_active(session_id)
-        store.save(data)
+        with store.write_lock(session_id):
+            data = store.load(session_id)
+            params = data.get("params")
+            if params is None:
+                raise StateError("parameters not set; run set_params first")
+            try:
+                extension = json.loads(args.extension_json)
+            except json.JSONDecodeError as exc:
+                raise StateError(f"invalid JSON: {exc.msg}") from exc
+            extension = validate_extension(extension)
+            was_done = data["phase"] == "DONE"
+            for field in ("keywords_zh", "keywords_en", "dimensions"):
+                added = extension.get(field)
+                if added:
+                    existing = params.setdefault(field, [])
+                    for item in added:
+                        if item not in existing:
+                            existing.append(item)
+            data["updated_at"] = now_iso()
+            extend_phase = "EXTENDED" if was_done else data["phase"]
+            data["history"].append({"phase": extend_phase, "at": now_iso(), "extension": extension})
+            if was_done:
+                # Stale report_validation is no longer valid after extension
+                data.pop("report_validation", None)
+                # Reset phase so the workflow can continue
+                data["phase"] = "EXTENDED"
+                # Re-set active session pointer since done cleared it
+                store.set_active(session_id)
+            store.save(data)
         print(f"OK:Session {session_id} extended")
         emit(data, store)
         return 0
 
     if args.command == "done":
-        if data["phase"] == "DONE":
-            raise StateError("session already completed")
-        params = data.get("params")
-        if params is None:
-            raise StateError("parameters not set; run set_params first")
-        report_path = args.report.expanduser().resolve()
-        if not report_path.is_file():
-            raise StateError(f"report does not exist: {report_path}")
-        try:
-            report_text = report_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise StateError(f"cannot read report: {exc}") from exc
-        min_sources = params["min_sources"]
-        if args.min_sources is not None and args.min_sources != min_sources:
-            raise StateError(
-                f"--min-sources does not match confirmed min_sources ({min_sources})"
-            )
-        errors = validate_report(report_text, min_sources, expected_topic=params["topic"])
-        if errors:
-            raise StateError("validation failed: " + "; ".join(errors))
-        report_bytes = report_text.encode("utf-8")
-        timestamp = now_iso()
-        data["phase"] = "DONE"
-        data["updated_at"] = timestamp
-        data["report_validation"] = {
-            "path": str(report_path),
-            "sha256": sha256_bytes(report_bytes),
-            "topic": params["topic"],
-            "min_sources": min_sources,
-            "validated_at": timestamp,
-        }
-        data["history"].append({"phase": "DONE", "at": timestamp})
-        store.save(data)
-        # Clear the active-session pointer only if it still points at this
-        # session. Completing B must not wipe an active pointer for A.
-        store.clear_active(session_id)
+        with store.write_lock(session_id):
+            data = store.load(session_id)
+            if data["phase"] == "DONE":
+                raise StateError("session already completed")
+            params = data.get("params")
+            if params is None:
+                raise StateError("parameters not set; run set_params first")
+            report_path = args.report.expanduser().resolve()
+            if not report_path.is_file():
+                raise StateError(f"report does not exist: {report_path}")
+            try:
+                report_text = report_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise StateError(f"cannot read report: {exc}") from exc
+            min_sources = params["min_sources"]
+            if args.min_sources is not None and args.min_sources != min_sources:
+                raise StateError(
+                    f"--min-sources does not match confirmed min_sources ({min_sources})"
+                )
+            errors = validate_report(report_text, min_sources, expected_topic=params["topic"])
+            if errors:
+                raise StateError("validation failed: " + "; ".join(errors))
+            report_bytes = report_text.encode("utf-8")
+            timestamp = now_iso()
+            data["phase"] = "DONE"
+            data["updated_at"] = timestamp
+            data["report_validation"] = {
+                "path": str(report_path),
+                "sha256": sha256_bytes(report_bytes),
+                "topic": params["topic"],
+                "min_sources": min_sources,
+                "validated_at": timestamp,
+            }
+            data["history"].append({"phase": "DONE", "at": timestamp})
+            store.save(data)
+            # Clear the active-session pointer only if it still points at this
+            # session. Completing B must not wipe an active pointer for A.
+            store.clear_active(session_id)
         print(f"OK:Session {session_id} completed")
         emit(data, store)
         return 0

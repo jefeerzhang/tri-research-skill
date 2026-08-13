@@ -2,7 +2,14 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.3.1`
+当前版本：`6.4.0`
+
+## 从 v6.3.1 到 v6.4.0 的核心变化
+
+| 变更项 | v6.3.1 | v6.4.0 |
+|--------|--------|--------|
+| **英文证据门禁** | 任意 4+ 字母拉丁词即算「有英文来源」（`CCTV` 混过） | 条目级判定：≥3 个英文单词/条，报告级 ≥3 条真实英文条目 |
+| **并发安全** | 读-改-写无锁，双进程互相覆盖 history | 按会话跨进程锁（fcntl/msvcrt），变更全程持锁 |
 
 ## 从 v6.3.0 到 v6.3.1 的核心变化
 
@@ -98,7 +105,7 @@ pip install tavily-python && export TAVILY_API_KEY=<your-key> # 可选
 python -m unittest discover -s skills/tri-research/tests -v
 ```
 
-当前 tri-research 包内 unittest 75 项（含合约/状态机/验收器等；以 discover 输出为准）。
+当前 tri-research 包内 unittest 81 项（含合约/状态机/并发/验收器等；以 discover 输出为准）。
 
 ## 文件结构
 

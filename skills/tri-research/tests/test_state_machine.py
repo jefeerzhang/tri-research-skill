@@ -55,7 +55,7 @@ class StateMachineTests(unittest.TestCase):
             if i % 2 == 0:
                 refs.append(f"[{i}] 作者{i} — 中文研究 — https://source-{i}.cn/article-{i} — 2024 — 层级: 2 — 来源: AnySearch")
             else:
-                refs.append(f"[{i}] Author{i} — English study — https://source-{i}.org/paper-{i} — 2025 — 层级: 1 — 来源: SciVerse")
+                refs.append(f"[{i}] Author — English study — https://source-{i}.org/paper-{i} — 2025 — 层级: 1 — 来源: SciVerse")
         report.write_text(
             f"""# {topic}
 
