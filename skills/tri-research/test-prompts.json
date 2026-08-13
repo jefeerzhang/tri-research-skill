@@ -71,6 +71,57 @@
       "setup": "同时初始化两个不同 --session",
       "expected_behavior": "两个会话独立推进；重复初始化不覆盖；TRI_RESEARCH_HOME 内不产生状态文件；done 写入 report_validation proof。",
       "timeout_seconds": 30
+    },
+    {
+      "id": "did-staggered-methods",
+      "type": "depth-first",
+      "prompt": "tri-research 双重差分法的最新理论进展与经验研究",
+      "topic": "双重差分法的最新理论进展与经验研究",
+      "keywords_zh": [
+        "双重差分法",
+        "异质性处理效应",
+        "双向固定效应",
+        "负权重",
+        "交错处理",
+        "平行趋势",
+        "事件研究",
+        "合成双重差分",
+        "连续处理",
+        "政策评估",
+        "稳健估计量"
+      ],
+      "keywords_en": [
+        "difference-in-differences",
+        "staggered adoption",
+        "heterogeneous treatment effects",
+        "two-way fixed effects",
+        "negative weights",
+        "parallel trends",
+        "event study",
+        "synthetic difference-in-differences",
+        "continuous treatment",
+        "policy evaluation",
+        "Callaway Sant'Anna"
+      ],
+      "time_range": "2020-至今",
+      "expected_subagents": 3,
+      "expected_sources_min": 18,
+      "expected_tools": [
+        "anysearch",
+        "sciverse",
+        "exa"
+      ],
+      "expected_sections": [
+        "概述",
+        "已有事实",
+        "主要文献观点",
+        "主要矛盾与冲突点",
+        "未来研究方向",
+        "参考文献",
+        "执行情况"
+      ],
+      "expected_behavior": "3 子代理并行（TWFE偏误+稳健估计量 / 平行趋势+前沿拓展 / 经验应用）+ Lead 六路补强；中英双补；成果示例见 examples/DEEP_RESEARCH_双重差分法_2026-08-14.md（30 条参考文献，validate_report 通过）。",
+      "timeout_seconds": 480
     }
   ],
   "validation_checklist": [
