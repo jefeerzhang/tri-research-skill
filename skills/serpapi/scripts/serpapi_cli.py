@@ -5,9 +5,11 @@ Usage:
   python serpapi_cli.py doc
   python serpapi_cli.py engines
   python serpapi_cli.py search --query "KEYWORD" [--engine google] [--hl zh-cn] [--gl cn] [--num 10] [--json] [--api_key KEY]
+  python serpapi_cli.py search --query "KEYWORD" --no-proxy   # clear proxy vars for this run
 
-Environment note: this machine's HTTP proxy breaks HTTPS to serpapi.com.
-We clear HTTP_PROXY/HTTPS_PROXY before every request automatically.
+Pass --no-proxy (before the subcommand) if your HTTP_PROXY/HTTPS_PROXY
+breaks the HTTPS handshake to serpapi.com. Proxy variables are only cleared
+when explicitly requested — the CLI never mutates the environment otherwise.
 """
 import argparse
 import json
@@ -22,9 +24,15 @@ except ImportError:
 
 BASE_URL = "https://serpapi.com/search"
 
-# Clear proxy vars that break the SSL handshake on this machine.
-for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-    os.environ.pop(_p, None)
+
+def clear_proxy_vars() -> None:
+    """Drop proxy env vars for this process only (opt-in via --no-proxy).
+
+    Global auto-clearing was removed: it mutated a shared environment and
+    could break other tools in the same process. The caller decides.
+    """
+    for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+        os.environ.pop(_p, None)
 
 
 def _key_from_env_file(env_path):
@@ -133,7 +141,8 @@ def fetch(engine, query, hl, gl, num, api_key, since=None):
         r = requests.get(BASE_URL, params=params, timeout=60)
     except requests.exceptions.SSLError as e:
         sys.stderr.write(
-            f"SSL error: {e}\nIf behind a proxy, clear HTTP_PROXY/HTTPS_PROXY env vars.\n"
+            f"SSL error: {e}\nIf behind a proxy, retry with --no-proxy "
+            f"(clears HTTP_PROXY/HTTPS_PROXY for this run).\n"
         )
         sys.exit(3)
     except requests.exceptions.RequestException as e:
@@ -223,6 +232,11 @@ def run_export(engine, query, hl, gl, num, out_path, api_key, since=None):
 
 def main():
     parser = argparse.ArgumentParser(description="SerpApi CLI wrapper")
+    parser.add_argument(
+        "--no-proxy",
+        action="store_true",
+        help="Clear HTTP_PROXY/HTTPS_PROXY for this run (if your proxy breaks the SSL handshake)",
+    )
     sub = parser.add_subparsers(dest="cmd")
 
     sub.add_parser("doc", help="Print full interface spec")
@@ -249,6 +263,8 @@ def main():
     p_export.add_argument("--api_key", default=None, help="SerpApi API key")
 
     args = parser.parse_args()
+    if args.no_proxy:
+        clear_proxy_vars()
     if args.cmd == "doc":
         cmd_doc()
     elif args.cmd == "engines":

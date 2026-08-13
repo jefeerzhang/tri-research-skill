@@ -18,10 +18,10 @@ search engines. It handles proxies, CAPTCHA solving, and global geolocation so y
 get exactly what a human sees. This skill bundles a cross-platform CLI that wraps
 `https://serpapi.com/search`.
 
-**Hard environment note (this machine):** an HTTP proxy breaks the HTTPS handshake
-to `serpapi.com` (`SSL: UNEXPECTED_EOF_WHILE_READING`). The bundled CLI auto-clears
-`HTTP_PROXY`/`HTTPS_PROXY` before every request. If you call the API directly, you
-MUST `os.environ.pop("HTTP_PROXY"); os.environ.pop("HTTPS_PROXY")` first.
+**Proxy note:** if a proxy environment variable (`HTTP_PROXY`/`HTTPS_PROXY`)
+breaks the HTTPS handshake to `serpapi.com` (e.g. `SSL: UNEXPECTED_EOF_WHILE_READING`),
+pass `--no-proxy` before the subcommand — the CLI clears those variables for
+that run only, and never mutates the environment otherwise.
 
 ## Trigger
 
@@ -67,7 +67,7 @@ Run the CLI `doc` command for the full interface spec (offline, no network):
 | No key | Refuse to run; show the setup guide above. |
 | Invalid key | API returns `{"error": "API key not valid..."}`. Report and ask user to recheck key. |
 | Quota exhausted | API returns `{"error": "Your search limit is exhausted..."}`. Inform user, suggest upgrading plan. |
-| Network/SSL error | Usually the proxy issue — the CLI auto-clears proxy vars; if calling directly, clear them manually. |
+| Network/SSL error | Usually a proxy issue — retry with `--no-proxy` (clears `HTTP_PROXY`/`HTTPS_PROXY` for that run). |
 
 ## CLI Usage
 

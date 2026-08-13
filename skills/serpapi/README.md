@@ -1,13 +1,13 @@
 # serpapi
 
-> 搜完直接出可归档的 Markdown 研究报告，本机代理坑已填平——不用自己写爬虫，也不用和 CAPTCHA、反爬、SSL 握手较劲。
+> 搜完直接出可归档的 Markdown 研究报告——不用自己写爬虫，也不用和 CAPTCHA、反爬、SSL 握手较劲。
 
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-18C964)](https://docs.anthropic.com/en/docs/agents-and-tools/agent-skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 你什么时候需要它？
 - 想拿 **真实 Google / Bing / Baidu / YouTube / Amazon / Scholar** 搜索结果做研究、竞品监测、价格追踪，但不想写爬虫。
-- 在本机跑 SerpApi 总报 `SSL UNEXPECTED_EOF` / 代理掐断——这个 skill 的 CLI 已自动清掉 `HTTP_PROXY`/`HTTPS_PROXY`。
+- 跑 SerpApi 报 `SSL UNEXPECTED_EOF` / 代理掐断——用 `--no-proxy` 跳过代理变量（仅本次运行）。
 - 想把搜索结果**落盘成报告**归档，而不是只看一眼终端输出。
 
 ## 它会交付什么？
@@ -45,7 +45,7 @@ python <skill_dir>/scripts/serpapi_cli.py search --query "资产搁浅风险" --
 - "用 SerpApi 搜一下 XXX"
 - "抓取谷歌结果 / 抓一下 Google Scholar"
 - "把搜索结果存成文件 / 导出报告"
-- "本机调 SerpApi 报 SSL 错，帮忙看看"
+- "调 SerpApi 报 SSL 错，帮忙看看"
 
 ## 示例
 ```bash
@@ -73,11 +73,11 @@ python serpapi_cli.py engines
 | 维度 | 官方 serpapi/skills (MCP) | 本 skill |
 |---|---|---|
 | 接入形态 | 托管 MCP server，一行接入 | 本地 Python CLI，零服务端 |
-| 代理/SSL 坑 | 未特别处理 | 自动清除本机代理变量 |
+| 代理/SSL 坑 | 未特别处理 | 可选 `--no-proxy` 跳过代理变量（仅本次运行） |
 | 结果落盘 | 需自己接 | 内置 `export` 出 Markdown 报告 |
 | 中文场景 | 通用 | zh-cn / gl=cn 开箱即用 |
 
-不重复造官方 MCP 的轮子——本 skill 主打**本机兼容 + 一键出报告**。
+不重复造官方 MCP 的轮子——本 skill 主打**零服务端 + 一键出报告**。
 
 ## 安全边界
 - 只向 `https://serpapi.com/search` 发 GET 请求，不写、不改任何外部数据。

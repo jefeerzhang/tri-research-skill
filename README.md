@@ -2,7 +2,7 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.4.0-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.4.1-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -197,6 +197,8 @@ tri-research-skill/
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
 |   |   |   |-- validate_report.py # 报告验收器
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 包装
+|   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 包装
+|   |   |   |-- _search_cli.py     # 搜索 CLI 共享骨架（后端注册表）
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/
 |   |   |-- tests/                 # unittest 合约+验收测试（当前 81 项）

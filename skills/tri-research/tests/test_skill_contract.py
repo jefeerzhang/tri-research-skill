@@ -17,12 +17,12 @@ class SkillContractTests(unittest.TestCase):
         cls.root_readme = (ROOT.parents[1] / "README.md").read_text(encoding="utf-8")
         cls.test_prompts = (ROOT / "test-prompts.json").read_text(encoding="utf-8")
 
-    def test_version_aligned_to_6_4_0(self) -> None:
-        self.assertIn('version: "6.4.0"', self.skill)
-        self.assertIn('version: "6.4.0"', self.subagent)
-        self.assertIn("当前版本：`6.4.0`", self.readme)
-        self.assertIn("version-6.4.0", self.root_readme)
-        self.assertIn('"version": "6.4.0"', self.test_prompts)
+    def test_version_aligned_to_6_4_1(self) -> None:
+        self.assertIn('version: "6.4.1"', self.skill)
+        self.assertIn('version: "6.4.1"', self.subagent)
+        self.assertIn("当前版本：`6.4.1`", self.readme)
+        self.assertIn("version-6.4.1", self.root_readme)
+        self.assertIn('"version": "6.4.1"', self.test_prompts)
 
     def test_six_source_table_present(self) -> None:
         for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "WebSearch"):

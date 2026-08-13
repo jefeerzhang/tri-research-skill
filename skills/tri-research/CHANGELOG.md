@@ -2,6 +2,18 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.4.1] - 2026-08-13
+
+### Changed
+- **搜索 CLI 包装去重**：`exa_search.py` 与 `tavily_search.py` 近重复（各 ~180 行，错误消息与 `check` 行为已漂移），抽取共享骨架 `scripts/_search_cli.py`（`Backend` 注册表 + 统一 `check`/`search`/`batch_search` 命令、JSON 错误契约与 argparse 布局），两文件各减至 ~140 行。CLI 表面不变：子命令与标志、JSON 输出形状、SDK 缺失时 `check` 打印 `{"available": false}` 等契约由既有回归测试钉住；顺带修复 Exa `check` 探针失败曾 traceback（现统一打印 JSON）。
+- **serpapi 移除机器特定自动清代理**：`serpapi_cli.py` 不再在导入时全局清除 `HTTP_PROXY`/`HTTPS_PROXY`（会污染同进程其他工具），改为 opt-in `--no-proxy`（子命令前，仅本次运行清除）；`SKILL.md` / `README.md` 的「本机代理坑」备注移除。
+
+### Fixed
+- `tavily_search.py batch_search` 此前缺少 `--include-domains` / `--exclude-domains` 标志（与 `search` 漂移）；共享骨架按标志注册表统一挂到两个子命令后补齐。
+
+### Added
+- 新增 `scripts/_search_cli.py`（搜索 CLI 共享骨架，后端注册表）。
+
 ## [6.4.0] - 2026-08-13
 
 ### Fixed

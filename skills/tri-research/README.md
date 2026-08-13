@@ -2,7 +2,14 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.4.0`
+当前版本：`6.4.1`
+
+## 从 v6.4.0 到 v6.4.1 的核心变化
+
+| 变更项 | v6.4.0 | v6.4.1 |
+|--------|--------|--------|
+| **搜索 CLI 包装** | exa/tavily 两 wrapper 各 ~180 行重复代码，已漂移 | 抽共享 `_search_cli.py` 骨架（后端注册表），各减至 ~140 行 |
+| **serpapi 代理** | 导入即全局清 `HTTP_PROXY`/`HTTPS_PROXY`（机器特定） | opt-in `--no-proxy`（仅本次运行），分发包不含机器备注 |
 
 ## 从 v6.3.1 到 v6.4.0 的核心变化
 
@@ -117,6 +124,7 @@ tri-research/
 ├── test-prompts.json
 ├── scripts/
 │   ├── _common.py
+│   ├── _search_cli.py             # 搜索 CLI 共享骨架（后端注册表）
 │   ├── state_machine.py
 │   ├── state_machine.sh
 │   ├── validate_report.py
