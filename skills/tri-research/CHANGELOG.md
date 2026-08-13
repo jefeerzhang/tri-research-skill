@@ -2,11 +2,16 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [6.4.3] - 2026-08-13
+
+### Fixed
+- **SciVerse API key 申请链接更正**：`https://sciverse.space/tokens` 为控制台密钥路径，申请入口应为 `https://sciverse.space/docs#auth`（docs「统一鉴权」章节）。根 README 源表 + 快速开始注释、skill README 能力边界表、6.4.2 的 CHANGELOG 条目中的链接一并更正。
+
 ## [6.4.2] - 2026-08-13
 
 ### Changed
 - **六源表免费额度表述消除歧义**：Exa 一行由「$20 注册 + $10/月」改为「注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10」——原表述易被读成注册费/月费，实际为注册即送额度；AnySearch / Tavily / SciVerse 行的额度描述同步明确。
-- **各源 API key 申请链接入文档**：根 README 搜索源表新增「Key 申请」列，快速开始安装注释附带链接；skill README 能力边界表同步。链接（已核实）：AnySearch `anysearch.com/console/api-keys`、Tavily `app.tavily.com/home`、SciVerse `sciverse.space/tokens`、Exa `dashboard.exa.ai/api-keys`、SerpApi `serpapi.com/dashboard`、Runtime WebSearch 无需申请。
+- **各源 API key 申请链接入文档**：根 README 搜索源表新增「Key 申请」列，快速开始安装注释附带链接；skill README 能力边界表同步。链接（已核实）：AnySearch `anysearch.com/console/api-keys`、Tavily `app.tavily.com/home`、SciVerse `sciverse.space/docs#auth`、Exa `dashboard.exa.ai/api-keys`、SerpApi `serpapi.com/dashboard`、Runtime WebSearch 无需申请。
 
 ## [6.4.1] - 2026-08-13
 

@@ -2,7 +2,13 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.4.2`
+当前版本：`6.4.3`
+
+## 从 v6.4.2 到 v6.4.3 的核心变化
+
+| 变更项 | v6.4.2 | v6.4.3 |
+|--------|--------|--------|
+| **SciVerse Key 申请链接** | `sciverse.space/tokens`（控制台密钥路径） | `sciverse.space/docs#auth`（docs 统一鉴权章节，申请入口） |
 
 ## 从 v6.4.1 到 v6.4.2 的核心变化
 
@@ -51,7 +57,7 @@
 |------|--------|------|--------|----------|
 | **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | https://anysearch.com/console/api-keys |
 | **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 | https://app.tavily.com/home |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** | https://sciverse.space/tokens |
+| **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** | https://sciverse.space/docs#auth |
 | **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 | https://dashboard.exa.ai/api-keys |
 | **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 | https://serpapi.com/dashboard |
 | **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定，**不等于** Tavily） | 可选 | 无需申请（宿主内置） |

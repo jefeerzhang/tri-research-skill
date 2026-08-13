@@ -2,7 +2,7 @@
 
 > *把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。*
 
-[![Version](https://img.shields.io/badge/version-6.4.2-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.4.3-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -51,7 +51,7 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 # AnySearch（必选，通用网页搜索）— Key 申请：https://anysearch.com/console/api-keys
 npx skills add anysearch-ai/anysearch-skill
 
-# SciVerse（必选，学术论文）— Key 申请：https://sciverse.space/tokens
+# SciVerse（必选，学术论文）— Key 申请：https://sciverse.space/docs#auth
 pip install sciverse
 export SCIVERSE_API_TOKEN=<your-token>
 
@@ -100,7 +100,7 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 |---|---|---|---|---|---|
 | **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索 | **必选** | 匿名可用（低限额），免费 key 提额 | https://anysearch.com/console/api-keys |
 | **Tavily** | Lead Agent | 深度网页搜索与提取（**不等于** Runtime WebSearch） | 可选 | 免费档（额度以官网为准） | https://app.tavily.com/home |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（Python SDK） | **必选** | 注册送试用额度 | https://sciverse.space/tokens |
+| **SciVerse** | Lead + 子代理 | 学术论文语义检索（Python SDK） | **必选** | 注册送试用额度 | https://sciverse.space/docs#auth |
 | **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（分类搜索） | 可选 | 注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10 | https://dashboard.exa.ai/api-keys |
 | **SerpApi** | Lead Agent | 中文 Google + Scholar | 可选 | 250 次/月免费 | https://serpapi.com/dashboard |
 | **Runtime WebSearch** | Lead Agent | 宿主内建补充（Bing/Brave/Google 等） | 可选 | 宿主提供 | 无需申请（宿主内置） |
