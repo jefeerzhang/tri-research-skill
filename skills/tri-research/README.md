@@ -6,7 +6,7 @@
 
 ## 示例与佐证
 
-- `examples/DEEP_RESEARCH_双重差分法_2026-08-14.md`：完整示例报告（主题「双重差分法的最新理论进展与经验研究」，时间范围 2020 至今）。3 子代理并行 + Lead 六路补强，30 条参考文献（英文 23 + 中文 7，权威期刊层级 1 共 22 条），`validate_report.py --min-sources 18` 验证通过。对应可复现回归场景见 `test-prompts.json` 的 `did-staggered-methods`。
+- `examples/DEEP_RESEARCH_双重差分法_2026-08-14.md`：完整示例报告（主题「双重差分法的最新理论进展与经验研究」，时间范围 2020 至今）。3 子代理并行 + Lead 六路补强，30 条参考文献（英文 23 + 中文 7，权威期刊层级 1 共 22 条），含「核心模型与估计量公式」附录（LaTeX 数学渲染），`validate_report.py --min-sources 18` 验证通过。对应可复现回归场景见 `test-prompts.json` 的 `did-staggered-methods`。
 
 ## 从 v6.4.2 到 v6.4.3 的核心变化
 

@@ -40,79 +40,93 @@
 
 ## 附录：核心模型与估计量公式
 
-> 记号说明：`i` 个体、`t` 时期、`g` 组（首次受处理期）、`D_it` 处理状态指示变量、`G_i` 个体 i 首次受处理期、`Y_it(g)` 潜在结果。公式为文本式记号，`Σ` 求和、`E[·]` 期望、`mean` 样本均值、`∂` 偏导；精确设定以各原文为准。
+> 记号说明：$i$ 个体、$t$ 时期、$g$ 组（首次受处理期）、$D_{it}$ 处理状态指示变量、$G_i$ 个体 $i$ 首次受处理期、$Y_{it}(g)$ 潜在结果。$\sum$ 求和、$E[\cdot]$ 期望、$\operatorname{mean}$ 样本均值、$\partial$ 偏导；精确设定以各原文为准。
 
 ### 1. 经典 DiD 与 TWFE 设定
 
 2×2 情形的双重差分识别平均处理效应（ATT）[2]：
 
-```text
-ATT = ( E[Y | T=1, Post=1] - E[Y | T=1, Post=0] )
-      - ( E[Y | T=0, Post=1] - E[Y | T=0, Post=0] )
-```
+$$
+\mathrm{ATT} = \big( E[Y \mid T=1, \mathrm{Post}=1] - E[Y \mid T=1, \mathrm{Post}=0] \big) - \big( E[Y \mid T=0, \mathrm{Post}=1] - E[Y \mid T=0, \mathrm{Post}=0] \big)
+$$
 
 面板数据下最常用的双向固定效应（TWFE）回归[2]：
 
-```text
-Y_it = α_i + λ_t + β · D_it + ε_it
-```
+$$
+Y_{it} = \alpha_i + \lambda_t + \beta\, D_{it} + \varepsilon_{it}
+$$
 
-`β` 正是全部 2×2 比较的加权平均，其权重性质是后续偏误讨论的起点。
+$\beta$ 正是全部 2×2 比较的加权平均，其权重性质是后续偏误讨论的起点。
 
 ### 2. TWFE 分解与负权重
 
 Goodman-Bacon 的分解定理：交错处理下，TWFE-DiD 估计量是全部 2×2 DiD 的加权平均[1]：
 
-```text
-β̂_DD = Σ_{k≠U} s_{kU} · β̂^{2x2}_{kU}
-        + Σ_{k≠U} Σ_{l>k} ( s^k_{kl} · β̂^{2x2,k}_{kl} + s^l_{kl} · β̂^{2x2,l}_{kl} )
-```
+$$
+\hat{\beta}_{DD} = \sum_{k \neq U} s_{kU}\, \hat{\beta}^{2\times 2}_{kU} + \sum_{k \neq U} \sum_{l > k} \Big( s^{k}_{kl}\, \hat{\beta}^{2\times 2,k}_{kl} + s^{l}_{kl}\, \hat{\beta}^{2\times 2,l}_{kl} \Big)
+$$
 
-第一项是"处理组 vs 从未处理组"的干净比较；第二项是"早处理组 vs 晚处理组"的坏比较。当处理效应随时间变化时，第二项的某些权重 `s < 0`，使 `β̂_DD` 可能落到真实处理效应范围之外。
+第一项是"处理组 vs 从未处理组"的干净比较；第二项是"早处理组 vs 晚处理组"的坏比较。当处理效应随时间变化时，第二项的某些权重 $s < 0$，使 $\hat{\beta}_{DD}$ 可能落到真实处理效应范围之外。
 
 de Chaisemartin 与 D'Haultfœuille 把 TWFE 系数写成组-期处理效应的加权和，并给出负权重充要条件[2]：
 
-```text
-β̂_fe = Σ_{(g,t)} w_{g,t} · TE_{g,t}       （存在 w_{g,t} < 0）
-```
+$$
+\hat{\beta}_{fe} = \sum_{(g,t)} w_{g,t} \cdot TE_{g,t}
+$$
+
+其中部分 $w_{g,t} < 0$。
 
 ### 3. 平行趋势假设
 
 DiD 识别 ATT 的核心条件：若无处理，处理组与对照组的结果遵循相同趋势[9][10]：
 
-```text
-E[Y_it(0) - Y_{i,t-1}(0) | D_i=1] = E[Y_it(0) - Y_{i,t-1}(0) | D_i=0]
-```
+$$
+E[Y_{it}(0) - Y_{i,t-1}(0) \mid D_i = 1] = E[Y_{it}(0) - Y_{i,t-1}(0) \mid D_i = 0]
+$$
 
 ### 4. 异质性稳健估计量
 
-**Callaway & Sant'Anna（组别-时期 ATT）**[5]：以"尚未处理组"或"从未处理组"为对照，估计每个 `(g,t)` 的处理效应后按权重聚合：
+**Callaway & Sant'Anna（组别-时期 ATT）**[5]：以"尚未处理组"或"从未处理组"为对照，估计每个 $(g,t)$ 的处理效应：
 
-```text
-ATT(g,t) = E[Y_t - Y_{g-1} | G=g] - E[Y_t - Y_{g-1} | C]
-C ∈ { never-treated, not-yet-treated }
-ATT = Σ_{g,t} w(g,t) · ATT(g,t)
-```
+$$
+ATT(g,t) = E[Y_t - Y_{g-1} \mid G = g] - E[Y_t - Y_{g-1} \mid C]
+$$
+
+其中 $C$ 为"尚未处理组"（not-yet-treated）或"从未处理组"（never-treated）。按权重聚合：
+
+$$
+ATT = \sum_{g,t} w(g,t) \cdot ATT(g,t)
+$$
 
 **Sun & Abraham（交互加权 IWE）**[6]：用"组 × 相对期"交互项直接估计动态效应，再按组规模聚合，避免 TWFE 负权重污染：
 
-```text
-Y_it = α_i + λ_t + Σ_g Σ_e β_{g,e} · ( 1{G_i=g} · 1{t-g=e} ) + ε_it
-```
+$$
+Y_{it} = \alpha_i + \lambda_t + \sum_g \sum_e \beta_{g,e} \cdot \big( \mathbf{1}\{G_i = g\} \cdot \mathbf{1}\{t - g = e\} \big) + \varepsilon_{it}
+$$
 
-**Borusyak、Jaravel & Spiess（插补估计量）**[7]：只用未处理观测估计固定效应，再插补反事实：
+**Borusyak、Jaravel & Spiess（插补估计量）**[7]：只用未处理观测估计固定效应，再插补反事实。第一步在 $D_{it}=0$ 的样本上估计：
 
-```text
-Y_it(0) = α_i + λ_t + ε_it            （仅在 D_it=0 的样本上估计）
-τ̂ = mean_{(i,t): D_it=1} ( Y_it - (α̂_i + λ̂_t) )
-```
+$$
+Y_{it}(0) = \alpha_i + \lambda_t + \varepsilon_{it}
+$$
 
-**Gardner（两阶段 did2s）**[8]：先剔除固定效应，再对残差做第二阶段回归：
+第二步对处理观测插补并取平均：
 
-```text
-第一阶段：Y_it = α_i + λ_t + ε_it             （未处理样本）
-第二阶段：Y_it - α̂_i - λ̂_t = β · D_it + ν_it
-```
+$$
+\hat{\tau} = \operatorname{mean}_{(i,t):\, D_{it}=1} \big( Y_{it} - (\hat{\alpha}_i + \hat{\lambda}_t) \big)
+$$
+
+**Gardner（两阶段 did2s）**[8]：先剔除固定效应，再对残差做第二阶段回归。第一阶段（未处理样本）：
+
+$$
+Y_{it} = \alpha_i + \lambda_t + \varepsilon_{it}
+$$
+
+第二阶段：
+
+$$
+Y_{it} - \hat{\alpha}_i - \hat{\lambda}_t = \beta\, D_{it} + \nu_{it}
+$$
 
 **de Chaisemartin & D'Haultfœuille（did_multiplegt）**[26]：估计处理"切换者"的瞬时与跨期效应，允许处理状态多次切换。
 
@@ -120,41 +134,48 @@ Y_it(0) = α_i + λ_t + ε_it            （仅在 D_it=0 的样本上估计）
 
 Rambachan & Roth 不要求平行趋势精确成立，而是假设事后偏离幅度受事前偏离约束[10]：
 
-```text
-Δ = { δ_t : |δ_t - δ_{t-1}| ≤ M̄ }       （M̄ 由事前趋势偏离幅度设定）
-```
+$$
+\Delta = \big\{ \delta_t : |\delta_t - \delta_{t-1}| \leq \bar{M} \big\}
+$$
 
-由此构造处理效应的敏感性区间（置信集），替代二值"通过 / 不通过"的预检验。
+其中 $\bar{M}$ 由事前趋势偏离幅度设定。由此构造处理效应的敏感性区间（置信集），替代二值"通过 / 不通过"的预检验。
 
 ### 6. 前沿拓展
 
-**合成 DiD**[13]：在双重差分基础上引入单位权重 `ω̂` 与时间权重 `λ̂`：
+**合成 DiD**[13]：在双重差分基础上引入单位权重 $\hat{\omega}$ 与时间权重 $\hat{\lambda}$：
 
-```text
-τ̂_SDID = Σ_i ω̂_i · ( Ȳ_{i,post} - Ȳ_{i,pre} )
-          - Σ_t λ̂_t · ( Ȳ_{t,T} - Ȳ_{t,C} )
-```
+$$
+\hat{\tau}_{\mathrm{SDID}} = \sum_i \hat{\omega}_i \cdot (\bar{Y}_{i,\mathrm{post}} - \bar{Y}_{i,\mathrm{pre}}) - \sum_t \hat{\lambda}_t \cdot (\bar{Y}_{t,T} - \bar{Y}_{t,C})
+$$
 
-**连续处理 DiD**[14]：识别"剂量-反应"函数与边际因果响应：
+**连续处理 DiD**[14]：识别"剂量-反应"函数与边际因果响应。平均剂量响应：
 
-```text
-ATT(d|d)   = E[ Y_t(d) - Y_t(0) | D=d ]                  （平均剂量响应）
-ACRT(d|d)  = ∂ E[ Y_t(d') | D=d ] / ∂d'  |_{d'=d}        （边际因果响应）
-```
+$$
+ATT(d|d) = E[Y_t(d) - Y_t(0) \mid D = d]
+$$
+
+边际因果响应：
+
+$$
+ACRT(d|d) = \left.\frac{\partial\, E[Y_t(d') \mid D = d]}{\partial d'}\right|_{d'=d}
+$$
 
 **模糊 DiD**[15]：处理不完全依从时，用 Wald-DiD 识别处理切换者的局部平均处理效应（LATE）：
 
-```text
-Wald-DiD = DD_Y / DD_D = LATE
-```
+$$
+\mathrm{Wald\text{-}DiD} = \frac{DD_Y}{DD_D} = \mathrm{LATE}
+$$
 
 ### 7. 少量簇推断
 
-少量处理组或少量簇下，标准聚类稳健推断会过度拒绝[16][17]。MacKinnon & Webb 建议用基于 `t` 统计量的随机化推断替代 CRVE 正态近似：
+少量处理组或少量簇下，标准聚类稳健推断会过度拒绝[16][17]。MacKinnon & Webb 建议用基于 $t$ 统计量的随机化推断替代 CRVE 正态近似：
 
-```text
-p̂ = Pr( |t*| ≥ |t̂| )       （t* 为置换后的统计量）
-```
+$$
+\hat{p} = \Pr\big( |t^{*}| \geq |\hat{t}| \big)
+$$
+
+其中 $t^{*}$ 为置换后的统计量。
+
 
 ## 参考文献
 
