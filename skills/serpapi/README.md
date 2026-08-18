@@ -88,7 +88,7 @@ python serpapi_cli.py engines
 
 ## 文件结构
 - `SKILL.md` — 技能说明、触发条件、API key 指南、安全边界
-- `scripts/serpapi_cli.py` — 跨平台 CLI（doc / search / export / engines）
+- `scripts/serpapi_cli.py` — 跨平台 CLI 薄入口（doc / search / export / engines），后端声明统一在 `tri-research/scripts/search_backends.py`
 - `.env.example` — key 模板（实际 key 请用环境变量，不要落盘）
 
 ## 验证与测试

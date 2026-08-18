@@ -39,7 +39,7 @@ class Flag:
     to lack the include/exclude-domains flags its `search` had).
     """
 
-    __slots__ = ("dest", "args", "help", "type", "choices", "default")
+    __slots__ = ("dest", "args", "help", "type", "choices", "default", "action")
 
     def __init__(
         self,
@@ -50,6 +50,7 @@ class Flag:
         type: type | None = None,
         choices: list[str] | None = None,
         default: Any = None,
+        action: str | None = None,
     ) -> None:
         self.dest = dest
         self.args = args
@@ -57,9 +58,12 @@ class Flag:
         self.type = type
         self.choices = choices
         self.default = default
+        self.action = action
 
     def add_to(self, parser: argparse.ArgumentParser) -> None:
         kwargs: dict[str, Any] = {"dest": self.dest, "help": self.help, "default": self.default}
+        if self.action is not None:
+            kwargs["action"] = self.action
         if self.type is not None:
             kwargs["type"] = self.type
         if self.choices is not None:
@@ -77,7 +81,7 @@ class Command:
         name: str,
         help: str,
         add_args: Callable[[argparse.ArgumentParser], None],
-        run: Callable[[Any, argparse.Namespace], None],
+        run: Callable[[argparse.Namespace], None],
     ) -> None:
         self.name = name
         self.help = help
@@ -99,9 +103,14 @@ class Backend:
     missing_sdk_message: str = ""         # JSON error when sdk is None
     env_key: str = ""                     # API key environment variable
     client_factory: Callable[[str], Any] = None
-    flags: list[Flag] = []
+    flags: list[Flag] = []                # flags attached to search/batch_search
+    global_flags: list[Flag] = []         # flags attached to the root parser
     commands: list[Command] = []          # extra subcommands
     results_key: str = "results"          # key of the result list in search() output
+    search_handler: Callable[[Any, argparse.Namespace], None] | None = None
+    batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
+    search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
+    batch_search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
 
     def client(self) -> Any:
         """Build the SDK client, honoring the wrapper's JSON-error contract."""
@@ -150,6 +159,9 @@ def check(backend: Backend) -> None:
 
 
 def search(backend: Backend, args: argparse.Namespace) -> None:
+    if backend.search_handler is not None:
+        backend.search_handler(backend, args)
+        return
     client = backend.client()
     try:
         output = backend.search(client, args.query, search_options(backend, args))
@@ -161,6 +173,9 @@ def search(backend: Backend, args: argparse.Namespace) -> None:
 
 
 def batch_search(backend: Backend, args: argparse.Namespace) -> None:
+    if backend.batch_search_handler is not None:
+        backend.batch_search_handler(backend, args)
+        return
     client = backend.client()
     all_results: dict[str, Any] = {}
     for query in args.query:
@@ -174,19 +189,27 @@ def batch_search(backend: Backend, args: argparse.Namespace) -> None:
 
 def build_parser(backend: Backend) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=backend.help)
+    for flag in backend.global_flags:
+        flag.add_to(parser)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("check", help="Check availability")
 
     search_p = subparsers.add_parser("search", help=f"Search the web via {backend.name}")
-    search_p.add_argument("query", help="Search query")
-    for flag in backend.flags:
-        flag.add_to(search_p)
+    if backend.search_args_builder is not None:
+        backend.search_args_builder(search_p)
+    else:
+        search_p.add_argument("query", help="Search query")
+        for flag in backend.flags:
+            flag.add_to(search_p)
 
     batch_p = subparsers.add_parser("batch_search", help="Batch search multiple queries")
-    batch_p.add_argument("--query", action="append", required=True, help="Query (can repeat)")
-    for flag in backend.flags:
-        flag.add_to(batch_p)
+    if backend.batch_search_args_builder is not None:
+        backend.batch_search_args_builder(batch_p)
+    else:
+        batch_p.add_argument("--query", action="append", required=True, help="Query (can repeat)")
+        for flag in backend.flags:
+            flag.add_to(batch_p)
 
     for command in backend.commands:
         command_p = subparsers.add_parser(command.name, help=command.help)
@@ -206,7 +229,7 @@ def run(backend: Backend, argv: list[str] | None = None) -> int:
     else:
         for command in backend.commands:
             if command.name == args.command:
-                command.run(backend.client(), args)
+                command.run(args)
                 return 0
         parser.print_help()
         return 2

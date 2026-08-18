@@ -213,8 +213,9 @@ tri-research-skill/
 |   |   |   |-- state_machine.py   # 两步状态机
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
 |   |   |   |-- validate_report.py # 报告验收器
-|   |   |   |-- exa_search.py      # Exa 搜索 CLI 包装
-|   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 包装
+|   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
+|   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
+|   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / SerpApi）
 |   |   |   |-- _search_cli.py     # 搜索 CLI 共享骨架（后端注册表）
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/

@@ -2,6 +2,13 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **搜索后端统一到单一 module**：新增 `scripts/search_backends.py`，Exa / Tavily / SerpApi 三个 Backend 声明集中在一处；`exa_search.py`、`tavily_search.py`、`serpapi_cli.py` 收敛为薄 CLI 入口，外部命令路径与输出契约保持不变。
+- **SerpApi 接入共享搜索 skeleton**：`search` / `check` / `batch_search` 复用 `_search_cli`，`doc` / `engines` / `export` 保留为 extra commands；`--no-proxy`、`--json`、`--api_key` 等 SerpApi 特性保持原语义。
+- **测试 fixture 去重**：`tests/_test_helpers.py` 提供共享 `make_valid_report` 与 `load_module`，现有状态机 / 并发 / 验收测试改为复用。
+
 ## [6.4.3] - 2026-08-13
 
 ### Fixed

@@ -142,11 +142,12 @@ tri-research/
 ├── scripts/
 │   ├── _common.py
 │   ├── _search_cli.py             # 搜索 CLI 共享骨架（后端注册表）
+│   ├── search_backends.py         # 统一搜索后端声明（Exa / Tavily / SerpApi）
 │   ├── state_machine.py
 │   ├── state_machine.sh
 │   ├── validate_report.py
-│   ├── tavily_search.py
-│   └── exa_search.py
+│   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口
+│   └── exa_search.py              # Exa 搜索 CLI 薄入口
 ├── references/
 │   └── runtime-adapters.md
 └── tests/

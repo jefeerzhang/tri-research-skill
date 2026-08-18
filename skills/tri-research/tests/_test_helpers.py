@@ -54,3 +54,14 @@ def make_valid_report(
 """,
         encoding="utf-8",
     )
+
+
+def load_module(script: Path, module_name: str):
+    """Load a Python file as a module via importlib."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(module_name, str(script))
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod

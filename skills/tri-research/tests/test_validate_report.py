@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import importlib.util
 import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_report.py"
-SPEC = importlib.util.spec_from_file_location("validate_report", SCRIPT)
-MODULE = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
-SPEC.loader.exec_module(MODULE)
+from _test_helpers import load_module
+MODULE = load_module(SCRIPT, "validate_report")
 
 
 def valid_report() -> str:

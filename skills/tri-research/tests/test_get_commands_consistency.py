@@ -14,7 +14,6 @@ fallback) can attribute the result.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import subprocess
@@ -26,14 +25,10 @@ from pathlib import Path
 REPO = Path(__file__).parents[3]
 SCRIPT = REPO / "skills" / "tri-research" / "scripts" / "state_machine.py"
 
+from _test_helpers import load_module
 
 def _load_state_machine():
-    spec = importlib.util.spec_from_file_location(
-        "sm_under_test_xyz", str(SCRIPT)
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    return load_module(SCRIPT, "sm_under_test_xyz")
 
 
 class GetCommandsConsistencyTests(unittest.TestCase):

@@ -7,24 +7,14 @@ pointer lifecycle, and validation.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report
+from _test_helpers import load_module, make_valid_report
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
-
-
-def _load_state_machine():
-    spec = importlib.util.spec_from_file_location(
-        "sm_store_test", str(SCRIPTS_DIR / "state_machine.py")
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def _params(**overrides):
@@ -40,7 +30,7 @@ def _params(**overrides):
 
 class StateStoreTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.sm = _load_state_machine()
+        self.sm = load_module(SCRIPTS_DIR / "state_machine.py", "sm_store_test")
         self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.state_dir = Path(self.tmp.name) / "state"
         self.store = self.sm.StateStore(self.state_dir)

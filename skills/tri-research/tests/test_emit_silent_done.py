@@ -13,7 +13,6 @@ emit() (or its caller) must raise so this is loud, not silent.
 """
 from __future__ import annotations
 
-import importlib.util
 import io
 import json
 import os
@@ -25,14 +24,10 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
+from _test_helpers import load_module
 
 def _load_state_machine():
-    spec = importlib.util.spec_from_file_location(
-        "sm_under_test", str(SCRIPTS_DIR / "state_machine.py")
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    return load_module(SCRIPTS_DIR / "state_machine.py", "sm_under_test")
 
 
 class EmitSilentDoneTests(unittest.TestCase):

@@ -53,3 +53,23 @@ class EnvFileKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CliNoKeyTests(unittest.TestCase):
+    def test_engines_does_not_require_api_key(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            MODULE._search_cli.run(MODULE.SERPAPI_BACKEND, ["engines"])
+        self.assertIn("## General", buf.getvalue())
+
+    def test_doc_does_not_require_api_key(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            MODULE._search_cli.run(MODULE.SERPAPI_BACKEND, ["doc"])
+        self.assertIn("serpapi_cli.py", buf.getvalue())

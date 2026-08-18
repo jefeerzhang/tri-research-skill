@@ -7,28 +7,18 @@ build report_validation proof -> assert proof completeness.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report
+from _test_helpers import load_module, make_valid_report
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
 
-def _load_validate_report():
-    spec = importlib.util.spec_from_file_location(
-        "validate_report_proof_test", str(SCRIPTS_DIR / "validate_report.py")
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
 class ReportValidationProofTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.vr = _load_validate_report()
+        self.vr = load_module(SCRIPTS_DIR / "validate_report.py", "validate_report_proof_test")
         self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.tmp_path = Path(self.tmp.name)
 
