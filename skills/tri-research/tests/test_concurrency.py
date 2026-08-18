@@ -21,8 +21,8 @@ from pathlib import Path
 
 from _test_helpers import make_valid_report
 
-REPO = Path(__file__).parents[3]
-SCRIPT = REPO / "skills" / "tri-research" / "scripts" / "state_machine.py"
+SKILL_ROOT = Path(__file__).parents[1]
+SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
 
 
 def run_cli(state_dir: Path, *args: str) -> subprocess.CompletedProcess:

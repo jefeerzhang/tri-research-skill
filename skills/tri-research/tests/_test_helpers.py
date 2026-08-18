@@ -65,3 +65,12 @@ def load_module(script: Path, module_name: str):
     assert spec.loader is not None
     spec.loader.exec_module(mod)
     return mod
+
+
+def example_report() -> Path:
+    """Locate the canonical sample report in either repo or installed layout."""
+    skill_examples = Path(__file__).resolve().parents[1] / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+    if skill_examples.is_file():
+        return skill_examples
+    repo_examples = Path(__file__).resolve().parents[3] / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+    return repo_examples

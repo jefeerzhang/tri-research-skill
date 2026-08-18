@@ -24,9 +24,11 @@ import types
 import unittest
 from pathlib import Path
 
-REPO = Path(__file__).parents[3]
-SCRIPT = REPO / "skills" / "tri-research" / "scripts" / "state_machine.py"
-SAMPLE = REPO / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+from _test_helpers import example_report
+
+SKILL_ROOT = Path(__file__).parents[1]
+SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
+SAMPLE = example_report()
 
 
 def _load_module(cwd: str) -> types.ModuleType:

@@ -17,8 +17,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-REPO = Path(__file__).parents[3]
-SCRIPT = REPO / "skills" / "tri-research" / "scripts" / "state_machine.py"
+from _test_helpers import example_report
+
+SKILL_ROOT = Path(__file__).parents[1]
+SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
 
 
 class ActiveSessionAfterDoneTests(unittest.TestCase):
@@ -51,7 +53,7 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
             }, ensure_ascii=False)
             run("--session", session, "start")
             run("--session", session, "set_params", params)
-            sample = REPO / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+            sample = example_report()
             run("--session", session, "done", "--report", str(sample))
 
             # Contract: after DONE, the active-session pointer must not
@@ -77,7 +79,7 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
         """Completing session B must not wipe active-session when it points at A."""
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             state_dir = Path(tmp) / "state"
-            sample = REPO / "examples" / "DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md"
+            sample = example_report()
 
             def run(*args: str, ok: bool = True):
                 import subprocess
