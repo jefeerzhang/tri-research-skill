@@ -10,6 +10,7 @@ ever raised one without the other).
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 
 MIN_REPORT_SOURCES = 10
 
@@ -20,3 +21,7 @@ def source_threshold(value: str) -> int:
     if parsed < MIN_REPORT_SOURCES:
         raise argparse.ArgumentTypeError(f"至少为 {MIN_REPORT_SOURCES}")
     return parsed
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="minutes")

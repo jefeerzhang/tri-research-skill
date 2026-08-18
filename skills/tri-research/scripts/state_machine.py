@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import sys
 import tempfile
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -25,8 +24,12 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
-from validate_report import validate as validate_report  # noqa: E402
+from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
+from validate_report import (  # noqa: E402
+    ReportValidationError,
+    require_complete_proof,
+    validate_and_build_proof,
+)
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -100,10 +103,6 @@ class StateError(RuntimeError):
     pass
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="minutes")
-
-
 def default_state_dir() -> Path:
     configured = os.environ.get("TRI_RESEARCH_STATE_DIR")
     if configured:
@@ -115,10 +114,6 @@ def validate_session_id(session_id: str) -> str:
     if not SESSION_RE.fullmatch(session_id):
         raise StateError("session id must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
     return session_id
-
-
-def sha256_bytes(content: bytes) -> str:
-    return hashlib.sha256(content).hexdigest()
 
 
 def require_text(value: Any, field: str) -> str:
@@ -199,6 +194,119 @@ class StateStore:
         except FileNotFoundError:
             pass  # already gone — no-op
 
+    def start_session(self, session_id: str | None = None) -> dict[str, Any]:
+        """Start a new session and make it the active session."""
+        if session_id is None:
+            session_id = datetime.now().strftime("research-%Y%m%d-%H%M")
+        session_id = validate_session_id(session_id)
+        with self.write_lock(session_id):
+            path = self.state_path(session_id)
+            if path.exists():
+                raise StateError(f"session already exists: {session_id}")
+            timestamp = now_iso()
+            data = {
+                "session_id": session_id,
+                "schema_version": 3,
+                "phase": "STARTED",
+                "params": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "history": [{"phase": "STARTED", "at": timestamp}],
+            }
+            self.save(data)
+            self.set_active(session_id)
+        return data
+
+    def set_params(self, session_id: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Set immutable research parameters for a STARTED session."""
+        session_id = validate_session_id(session_id)
+        with self.write_lock(session_id):
+            data = self.load(session_id)
+            if data["phase"] != "STARTED":
+                raise StateError("parameters can only be set in STARTED phase")
+            if data.get("params") is not None:
+                raise StateError("parameters already set and immutable")
+            normalized = validate_params(params)
+            data["params"] = normalized
+            data["updated_at"] = now_iso()
+            self.save(data)
+        return data
+
+    def extend(self, session_id: str, extension: dict[str, Any]) -> dict[str, Any]:
+        """Append dimensions/keywords to a session, preserving prior work."""
+        session_id = validate_session_id(session_id)
+        with self.write_lock(session_id):
+            data = self.load(session_id)
+            params = data.get("params")
+            if params is None:
+                raise StateError("parameters not set; run set_params first")
+            normalized = validate_extension(extension)
+            was_done = data["phase"] == "DONE"
+            for field in ("keywords_zh", "keywords_en", "dimensions"):
+                added = normalized.get(field)
+                if added:
+                    existing = params.setdefault(field, [])
+                    for item in added:
+                        if item not in existing:
+                            existing.append(item)
+            data["updated_at"] = now_iso()
+            extend_phase = "EXTENDED" if was_done else data["phase"]
+            data["history"].append(
+                {"phase": extend_phase, "at": now_iso(), "extension": normalized}
+            )
+            if was_done:
+                # Stale report_validation is no longer valid after extension.
+                data.pop("report_validation", None)
+                # Reset phase so the workflow can continue.
+                data["phase"] = "EXTENDED"
+                # Re-set active session pointer since done cleared it.
+                self.set_active(session_id)
+            self.save(data)
+        return data
+
+    def complete(
+        self,
+        session_id: str,
+        report_path: Path,
+        min_sources: int | None = None,
+    ) -> dict[str, Any]:
+        """Validate a report, transition the session to DONE, and clear active.
+
+        `min_sources` is an optional CLI-level override check; when provided it
+        must match the confirmed ``params.min_sources``.
+        """
+        session_id = validate_session_id(session_id)
+        with self.write_lock(session_id):
+            data = self.load(session_id)
+            if data["phase"] == "DONE":
+                raise StateError("session already completed")
+            params = data.get("params")
+            if params is None:
+                raise StateError("parameters not set; run set_params first")
+            confirmed_min_sources = params["min_sources"]
+            if min_sources is not None and min_sources != confirmed_min_sources:
+                raise StateError(
+                    f"--min-sources does not match confirmed min_sources ({confirmed_min_sources})"
+                )
+            try:
+                proof = validate_and_build_proof(
+                    report_path,
+                    confirmed_min_sources,
+                    expected_topic=params["topic"],
+                )
+            except ReportValidationError as exc:
+                raise StateError(str(exc)) from exc
+            timestamp = proof["validated_at"]
+            data["phase"] = "DONE"
+            data["updated_at"] = timestamp
+            data["report_validation"] = proof
+            data["history"].append({"phase": "DONE", "at": timestamp})
+            self.save(data)
+            # Clear the active-session pointer only if it still points at this
+            # session. Completing B must not wipe an active pointer for A.
+            self.clear_active(session_id)
+        return data
+
     def resolve_session(self, requested: str | None) -> str:
         if requested:
             return validate_session_id(requested)
@@ -250,22 +358,14 @@ def emit(data: dict[str, Any], store: StateStore) -> None:
         # A DONE phase MUST carry a complete report_validation proof.
         # Missing or partial proof means the state file is corrupt (hand
         # edit, or a code path that advanced to DONE without populating
-        # all fields). Raise StateError — never KeyError — so the CLI
-        # prints ERROR: and exits 1 instead of a traceback.
-        proof = data.get("report_validation")
-        required = ("path", "sha256", "min_sources")
-        if not isinstance(proof, dict):
-            raise StateError(
-                f"phase=DONE but report_validation is missing for session "
-                f"{data['session_id']!r} — state file is corrupt"
-            )
-        missing = [key for key in required if key not in proof or proof[key] in (None, "")]
-        if missing:
-            raise StateError(
-                f"phase=DONE but report_validation is incomplete for session "
-                f"{data['session_id']!r} (missing: {', '.join(missing)}) "
-                f"— state file is corrupt"
-            )
+        # all fields). Delegate the assertion to the report-validation
+        # module; translate its error to StateError so the CLI prints
+        # ERROR: and exits 1 instead of a traceback.
+        try:
+            require_complete_proof(data.get("report_validation"), data["session_id"])
+        except ReportValidationError as exc:
+            raise StateError(str(exc)) from exc
+        proof = data["report_validation"]
         print(f"REPORT:{proof['path']}")
         print(f"REPORT_SHA256:{proof['sha256']}")
         print(f"MIN_SOURCES:{proof['min_sources']}")
@@ -294,30 +394,19 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _parse_json(raw: str) -> Any:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise StateError(f"invalid JSON: {exc.msg}") from exc
+
+
 def run(args: argparse.Namespace) -> int:
     store = StateStore(args.state_dir)
 
     if args.command == "start":
-        session_id = validate_session_id(
-            args.session or datetime.now().strftime("research-%Y%m%d-%H%M")
-        )
-        with store.write_lock(session_id):
-            path = store.state_path(session_id)
-            if path.exists():
-                raise StateError(f"session already exists: {session_id}")
-            timestamp = now_iso()
-            data = {
-                "session_id": session_id,
-                "schema_version": 3,
-                "phase": "STARTED",
-                "params": None,
-                "created_at": timestamp,
-                "updated_at": timestamp,
-                "history": [{"phase": "STARTED", "at": timestamp}],
-            }
-            store.save(data)
-            store.set_active(session_id)
-        print(f"OK:Session {session_id} started")
+        data = store.start_session(args.session)
+        print(f"OK:Session {data['session_id']} started")
         emit(data, store)
         return 0
 
@@ -347,96 +436,18 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "set_params":
-        with store.write_lock(session_id):
-            data = store.load(session_id)
-            if data["phase"] != "STARTED":
-                raise StateError("parameters can only be set in STARTED phase")
-            if data.get("params") is not None:
-                raise StateError("parameters already set and immutable")
-            try:
-                params = json.loads(args.params_json)
-            except json.JSONDecodeError as exc:
-                raise StateError(f"invalid JSON: {exc.msg}") from exc
-            params = validate_params(params)
-            data["params"] = params
-            data["updated_at"] = now_iso()
-            store.save(data)
+        data = store.set_params(session_id, _parse_json(args.params_json))
         print("OK:Parameters saved")
         return 0
 
     if args.command == "add_dimensions":
-        with store.write_lock(session_id):
-            data = store.load(session_id)
-            params = data.get("params")
-            if params is None:
-                raise StateError("parameters not set; run set_params first")
-            try:
-                extension = json.loads(args.extension_json)
-            except json.JSONDecodeError as exc:
-                raise StateError(f"invalid JSON: {exc.msg}") from exc
-            extension = validate_extension(extension)
-            was_done = data["phase"] == "DONE"
-            for field in ("keywords_zh", "keywords_en", "dimensions"):
-                added = extension.get(field)
-                if added:
-                    existing = params.setdefault(field, [])
-                    for item in added:
-                        if item not in existing:
-                            existing.append(item)
-            data["updated_at"] = now_iso()
-            extend_phase = "EXTENDED" if was_done else data["phase"]
-            data["history"].append({"phase": extend_phase, "at": now_iso(), "extension": extension})
-            if was_done:
-                # Stale report_validation is no longer valid after extension
-                data.pop("report_validation", None)
-                # Reset phase so the workflow can continue
-                data["phase"] = "EXTENDED"
-                # Re-set active session pointer since done cleared it
-                store.set_active(session_id)
-            store.save(data)
+        data = store.extend(session_id, _parse_json(args.extension_json))
         print(f"OK:Session {session_id} extended")
         emit(data, store)
         return 0
 
     if args.command == "done":
-        with store.write_lock(session_id):
-            data = store.load(session_id)
-            if data["phase"] == "DONE":
-                raise StateError("session already completed")
-            params = data.get("params")
-            if params is None:
-                raise StateError("parameters not set; run set_params first")
-            report_path = args.report.expanduser().resolve()
-            if not report_path.is_file():
-                raise StateError(f"report does not exist: {report_path}")
-            try:
-                report_text = report_path.read_text(encoding="utf-8")
-            except OSError as exc:
-                raise StateError(f"cannot read report: {exc}") from exc
-            min_sources = params["min_sources"]
-            if args.min_sources is not None and args.min_sources != min_sources:
-                raise StateError(
-                    f"--min-sources does not match confirmed min_sources ({min_sources})"
-                )
-            errors = validate_report(report_text, min_sources, expected_topic=params["topic"])
-            if errors:
-                raise StateError("validation failed: " + "; ".join(errors))
-            report_bytes = report_text.encode("utf-8")
-            timestamp = now_iso()
-            data["phase"] = "DONE"
-            data["updated_at"] = timestamp
-            data["report_validation"] = {
-                "path": str(report_path),
-                "sha256": sha256_bytes(report_bytes),
-                "topic": params["topic"],
-                "min_sources": min_sources,
-                "validated_at": timestamp,
-            }
-            data["history"].append({"phase": "DONE", "at": timestamp})
-            store.save(data)
-            # Clear the active-session pointer only if it still points at this
-            # session. Completing B must not wipe an active pointer for A.
-            store.clear_active(session_id)
+        data = store.complete(session_id, args.report, args.min_sources)
         print(f"OK:Session {session_id} completed")
         emit(data, store)
         return 0

@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import ipaddress
 import re
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 # Make sibling `_common` importable when this file is loaded via importlib
@@ -16,7 +18,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
+from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
 
 REFERENCE_RE = re.compile(r"^\[(\d+)]\s+(.+)$", re.MULTILINE)
 INLINE_RE = re.compile(r"\[(\d+)]")
@@ -53,6 +55,10 @@ TRACKING_QUERY_KEYS = {
 }
 RESERVED_HOSTS = {"example.com", "example.net", "example.org", "localhost"}
 RESERVED_SUFFIXES = (".example", ".invalid", ".localhost", ".test")
+
+
+class ReportValidationError(RuntimeError):
+    """Raised when report validation or proof lifecycle fails."""
 
 
 def normalize_topic(value: str) -> str:
@@ -288,6 +294,63 @@ def validate(
         if marker.lower() in text.lower():
             errors.append(f"禁止标记: {marker}")
     return errors
+
+
+def sha256_bytes(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
+
+
+def validate_and_build_proof(
+    report_path: Path,
+    min_sources: int,
+    *,
+    expected_topic: str,
+) -> dict[str, Any]:
+    """Validate a report file and build its ``report_validation`` proof.
+
+    This is the path-level entry point for the report acceptance lifecycle:
+    resolve/read the file, run the structural validator, compute the SHA-256,
+    and return the proof dict that a DONE session must persist. A proof always
+    records the confirmed topic string.
+    """
+    resolved_report = report_path.expanduser().resolve()
+    if not resolved_report.is_file():
+        raise ReportValidationError(f"report does not exist: {resolved_report}")
+    try:
+        report_text = resolved_report.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReportValidationError(f"cannot read report: {exc}") from exc
+    errors = validate(report_text, min_sources, expected_topic=expected_topic)
+    if errors:
+        raise ReportValidationError("validation failed: " + "; ".join(errors))
+    validated_at = now_iso()
+    return {
+        "path": str(resolved_report),
+        "sha256": sha256_bytes(report_text.encode("utf-8")),
+        "topic": expected_topic,
+        "min_sources": min_sources,
+        "validated_at": validated_at,
+    }
+
+
+def require_complete_proof(proof: Any, session_id: str) -> None:
+    """Assert that a DONE state carries a complete report_validation proof.
+
+    Raises ReportValidationError — never KeyError — so callers can translate
+    it to a CLI-friendly error without a traceback.
+    """
+    required = ("path", "sha256", "min_sources")
+    if not isinstance(proof, dict):
+        raise ReportValidationError(
+            f"phase=DONE but report_validation is missing for session "
+            f"{session_id!r} — state file is corrupt"
+        )
+    missing = [key for key in required if key not in proof or proof[key] in (None, "")]
+    if missing:
+        raise ReportValidationError(
+            f"phase=DONE but report_validation is incomplete for session "
+            f"{session_id!r} (missing: {', '.join(missing)}) — state file is corrupt"
+        )
 
 
 def create_parser() -> argparse.ArgumentParser:

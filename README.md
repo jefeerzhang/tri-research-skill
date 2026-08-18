@@ -218,7 +218,7 @@ tri-research-skill/
 |   |   |   |-- _search_cli.py     # 搜索 CLI 共享骨架（后端注册表）
 |   |   |   |-- _common.py         # 共享常量
 |   |   |-- references/
-|   |   |-- tests/                 # unittest 合约 + 验收测试（当前 81 项）
+|   |   |-- tests/                 # unittest 合约 + 验收测试（当前 99 项）
 |   |-- research-subagent/         # 子代理 skill
 |   |   `-- SKILL.md
 |   |-- serpapi/                   # SerpApi 辅助 skill
