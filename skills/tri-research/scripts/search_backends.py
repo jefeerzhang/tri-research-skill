@@ -70,7 +70,8 @@ class ExaBackend(_search_cli.Backend):
     ]
 
     def probe(self, client: Any) -> bool:
-        client.search("test", num_results=1)
+        # contents=False: probe must be fast and must not hang fetching a page.
+        client.search("test", num_results=1, contents=False)
         return True
 
     def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
