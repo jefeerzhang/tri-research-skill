@@ -175,6 +175,8 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 ### 第七步：综合与报告
 
+动笔前先读 [`references/report-format.md`](references/report-format.md)——报告是验收对象，七章节模板、`[N]` 引用行格式、置信标签 `[高]/[中]/[低]` 判定、默认输出目录、DONE 后的 `add_dimensions` 增量研究均以该文件为准。
+
 1. **推荐**：动笔前内部红队三问（缺视角？最弱结论？反对者攻击点？）——内化到置信措辞与「矛盾」章，不单独成章
 2. 去重合并；子代理结论相反时**禁止静默二选一**，写入「主要矛盾与冲突点」
 3. 大纲可按证据小幅调整（推荐记录在执行情况）
@@ -185,55 +187,6 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 整波检索失败时：**优雅降级**（用已有来源缩减报告并在执行情况注明）；零来源则停止并告知用户。
 
-## 报告格式
-
-> **范式**：凝练总结，禁止「X 称…Y 称…」式拼接。
-
-```markdown
-# [研究主题]
-
-## 概述（3-5 句话概括核心结论和研究价值）
-
-## 已有事实
-（多源交叉验证结论；每条带 [N]；**推荐**末尾标置信 `[高]`/`[中]`/`[低]`——验收器不检查置信标签）
-
-## 主要文献观点（从多源文献中抽象的观点，不是逐条摘要）
-
-## 主要矛盾与冲突点（来源间的不一致、争议、证据不足之处）
-
-## 未来研究方向（基于多源凝练后的下一步研究路径）
-
-## 参考文献
-每条单行：`[N] 作者/来源, "标题", 出处/期刊, 年份, 层级: 1/2/3, 来源: AnySearch/Tavily/SciVerse/Exa/SerpApi/WebSearch, URL: https://...`
-- 层级：1=权威、2=可信、3=补充；编号从 1 连续，正文 `[N]`
-
-## 执行情况（表格形式）
-
-| 项目 | 说明 |
-|------|------|
-| 执行流程 | 源检测 → 计划确认 → 搜索 → 综合撰写 → 验证 |
-| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / WebSearch: N（Tavily 可并入说明；上列五名称为验收必填） |
-| 覆盖质量 | 中文 N / 英文 N / … |
-| 维度覆盖 | … |
-| 耗时 | … | 报告位置 | ~/tri-research-reports/DEEP_RESEARCH_*.md |
-```
-
-## 置信标签（推荐写作规范）
-
-「已有事实」**建议**标注 `[高]`/`[中]`/`[低]`（**非** `validate_report` 硬门禁）：
-
-| 标签 | 建议判定 |
-|------|----------|
-| `[高]` | 3+ 独立来源一致，且至少 1 个层级 1 或 2 |
-| `[中]` | 2 来源一致；或 1 个层级 1；或 3+ 层级 3 一致 |
-| `[低]` | 单一来源；或仅层级 3 且不足 3 个 |
-
-纯层级 3 堆叠建议封顶 `[中]`。
-
-## 输出目录
-
-默认 `~/tri-research-reports/`，文件名 `DEEP_RESEARCH_<主题>_<日期>.md`。
-
 ## 状态管理
 
 脚本：`${TRI_RESEARCH_HOME}/scripts/state_machine.py`（Unix 可用 `state_machine.sh`）；状态目录：`${TRI_RESEARCH_STATE_DIR}` 或系统临时目录。
@@ -241,10 +194,6 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 命令：`start` → `set_params` → `done --report`；`add_dimensions` 追加；`check` / `get_params` 查看。
 
 规则：状态只前进不后退；`start` 同 id 不可重复；`done` 必须通过报告验证器。
-
-## 增量研究
-
-完成后可 `add_dimensions` 追加关键词/维度，只对新维度检索，合并进原报告后重新 `done` 验证。DONE 上追加会清除旧 `report_validation` 并进入 `EXTENDED`。
 
 ## 安全边界
 
