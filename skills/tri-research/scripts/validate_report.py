@@ -317,16 +317,22 @@ def validate_and_build_proof(
     if not resolved_report.is_file():
         raise ReportValidationError(f"report does not exist: {resolved_report}")
     try:
-        report_text = resolved_report.read_text(encoding="utf-8")
+        # Read raw bytes: the SHA-256 proof must fingerprint the file as it
+        # exists on disk. read_text() applies universal-newline translation,
+        # so hashing its result would not match CRLF-authored files.
+        report_bytes = resolved_report.read_bytes()
+        report_text = report_bytes.decode("utf-8")
     except OSError as exc:
         raise ReportValidationError(f"cannot read report: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ReportValidationError(f"report is not valid UTF-8: {exc}") from exc
     errors = validate(report_text, min_sources, expected_topic=expected_topic)
     if errors:
         raise ReportValidationError("validation failed: " + "; ".join(errors))
     validated_at = now_iso()
     return {
         "path": str(resolved_report),
-        "sha256": sha256_bytes(report_text.encode("utf-8")),
+        "sha256": sha256_bytes(report_bytes),
         "topic": expected_topic,
         "min_sources": min_sources,
         "validated_at": validated_at,
