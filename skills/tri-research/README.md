@@ -137,7 +137,7 @@ pip install tavily-python && export TAVILY_API_KEY=<your-key> # 可选
 python -m unittest discover -s skills/tri-research/tests -v
 ```
 
-当前 tri-research 包内 unittest 99 项（含合约/状态机/并发/验收器等；以 discover 输出为准）。
+测试数量以 `python -m unittest discover` 输出为准（含合约/状态机/并发/验收器等）。
 
 ## 文件结构
 
