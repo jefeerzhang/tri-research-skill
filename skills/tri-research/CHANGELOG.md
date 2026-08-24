@@ -2,6 +2,11 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **金样例回归测试**：`tests/test_golden_examples.py` 钉住 `examples/` 下 4 份示例报告过当前 `validate_report.py`，每份按各自承诺的 `min_sources` 契约验收（DID 样例 18，其余 10）+ H1 主题检查；并强制 GOLDEN 契约表与磁盘文件一一对应（新增样例不登记就红），防止「验收器规则收紧、样例悄悄不再合法」的漂移。
+
 ## [6.5.0] - 2026-08-24
 
 ### Changed
