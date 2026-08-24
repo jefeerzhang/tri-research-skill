@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import re
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
+REPO_ROOT = ROOT.parents[1]
 
 
 class SkillContractTests(unittest.TestCase):
@@ -14,17 +17,43 @@ class SkillContractTests(unittest.TestCase):
         cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
             encoding="utf-8"
         )
-        _root_readme_path = ROOT.parents[1] / "README.md"
+        _root_readme_path = REPO_ROOT / "README.md"
         cls.root_readme = _root_readme_path.read_text(encoding="utf-8") if _root_readme_path.exists() else ""
         cls.test_prompts = (ROOT / "test-prompts.json").read_text(encoding="utf-8")
 
-    def test_version_aligned_to_6_4_3(self) -> None:
-        self.assertIn('version: "6.4.3"', self.skill)
-        self.assertIn('version: "6.4.3"', self.subagent)
-        self.assertIn("当前版本：`6.4.3`", self.readme)
+    def test_version_reconciliation(self) -> None:
+        """跨文件版本对账:全部发布通道与 SKILL.md frontmatter 单一真源对齐。
+
+        历史教训:6.3.1 时 marketplace.json 曾漂移到 6.0.0;此前本测试为
+        硬编码版本字符串,且未覆盖 marketplace.json / citations SKILL.md。
+        现改为从 frontmatter 动态读取,发版时无需改测试;[Unreleased] 期间
+        CHANGELOG 最新「已发布」条目仍应等于 frontmatter 版本。
+        """
+        m = re.search(r'^version:\s*"([^"]+)"', self.skill, re.MULTILINE)
+        self.assertIsNotNone(m, "tri-research SKILL.md frontmatter 缺少 version")
+        v = m.group(1)
+
+        self.assertIn(f'version: "{v}"', self.subagent, "research-subagent SKILL.md 版本漂移")
+        citations = (ROOT.parent / "citations" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(f'version: "{v}"', citations, "citations SKILL.md 版本漂移")
+        self.assertIn(f"当前版本：`{v}`", self.readme, "skill README 当前版本漂移")
         if self.root_readme:
-            self.assertIn("version-6.4.3", self.root_readme)
-        self.assertIn('"version": "6.4.3"', self.test_prompts)
+            self.assertIn(f"version-{v}", self.root_readme, "根 README 徽章版本漂移")
+        self.assertIn(f'"version": "{v}"', self.test_prompts, "test-prompts.json 版本漂移")
+
+        marketplace = json.loads(
+            (REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            v, marketplace["metadata"]["version"], "marketplace.json metadata.version 漂移"
+        )
+
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        rel = re.search(
+            r"^##\s+\[([^\]]+)\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$", changelog, re.MULTILINE
+        )
+        self.assertIsNotNone(rel, "CHANGELOG 缺少已发布版本条目")
+        self.assertEqual(v, rel.group(1), "CHANGELOG 最新发布版本与 frontmatter 不一致")
 
     def test_six_source_table_present(self) -> None:
         for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "WebSearch"):
