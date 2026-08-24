@@ -12,7 +12,7 @@
 
 | 变更项 | v6.4.3 | v6.5.0 |
 |--------|--------|--------|
-| **搜索后端声明** | Exa / Tavily / SerpApi 声明散落各 CLI | 集中到 `search_backends.py`，CLI 收敛为薄入口 |
+| **搜索后端声明** | Exa / Tavily / SerpApi 声明散落各 CLI | 集中到 `search_backends.py`（Exa + Tavily 对称骨架）+ `serpapi_cli.py`（SerpApi 自包含，因 key/proxy/3 个 extra cmd 体量更大） |
 | **SerpApi CLI** | 独立实现（与共享骨架漂移） | 接入 `_search_cli`，`search`/`check`/`batch_search` 契约统一 |
 | **版本对账** | 硬编码版本断言，marketplace / citations 未覆盖 | frontmatter 单一真源动态对账，覆盖 7 处发布通道 |
 
@@ -150,7 +150,7 @@ tri-research/
 ├── scripts/
 │   ├── _common.py
 │   ├── _search_cli.py             # 搜索 CLI 共享骨架（后端注册表）
-│   ├── search_backends.py         # 统一搜索后端声明（Exa / Tavily / SerpApi）
+│   ├── search_backends.py         # 统一搜索后端声明（Exa + Tavily 对称骨架；SerpApi 自包含于 serpapi skill）
 │   ├── state_machine.py
 │   ├── state_machine.sh
 │   ├── validate_report.py
