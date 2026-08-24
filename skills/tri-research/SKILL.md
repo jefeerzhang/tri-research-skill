@@ -115,6 +115,7 @@ async with AgentToolsClient(base_url="https://api.sciverse.space", token=os.envi
 2. 垂直领域→先 `get_sub_domains`，再传子域参数
 3. 高价值 URL → `extract`（禁止 `--format`）
 4. 结果不足：同义改写再搜一轮→仍不足则标「证据薄弱」，**不降门槛凑数**
+5. Exa / Tavily / SerpApi 的 `search` / `batch_search` 已在 CLI 内对超时、连接、429、5xx 做重试与熔断；配置错误立即失败。耗尽后按可选源静默跳过，不必在 Agent 侧再套一层重试
 
 示例：SciVerse `semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation labor displacement"`；AnySearch / Exa `batch_search --query "AI替代就业" --query "AI job displacement"`。
 

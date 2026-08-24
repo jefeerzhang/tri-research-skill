@@ -115,6 +115,7 @@ def _serpapi_fetch(
     num: int | None,
     api_key: str,
     since: str | None = None,
+    timeout: int = 60,
 ) -> dict[str, Any]:
     """Return parsed SerpApi JSON; raise SerpApiError with a CLI exit code."""
     if requests is None:
@@ -138,7 +139,7 @@ def _serpapi_fetch(
         params["tbs"] = tbs
 
     try:
-        r = requests.get(SERPAPI_BASE_URL, params=params, timeout=60)
+        r = requests.get(SERPAPI_BASE_URL, params=params, timeout=timeout)
     except requests.exceptions.SSLError as e:
         raise SerpApiError(
             f"SSL error: {e}\nIf behind a proxy, retry with --no-proxy "
@@ -156,13 +157,41 @@ def _serpapi_fetch(
     return data
 
 
-def _serpapi_fetch_cli(engine, query, hl, gl, num, api_key, since=None) -> dict[str, Any]:
+def _serpapi_invoke_fetch(
+    backend: Any,
+    engine: str,
+    query: str,
+    hl: str | None,
+    gl: str | None,
+    num: int | None,
+    api_key: str,
+    since: str | None,
+) -> dict[str, Any]:
+    timeout = int(backend.call_timeout or 60)
+    return _search_cli.invoke(
+        backend,
+        lambda: _serpapi_fetch(
+            engine, query, hl, gl, num, api_key, since, timeout=timeout
+        ),
+    )
+
+
+def _serpapi_fetch_cli(
+    engine, query, hl, gl, num, api_key, since=None, *, backend: Any | None = None
+) -> dict[str, Any]:
     """CLI-facing fetch that preserves the original SerpApi exit codes."""
     try:
-        return _serpapi_fetch(engine, query, hl, gl, num, api_key, since)
+        if backend is None:
+            return _serpapi_fetch(engine, query, hl, gl, num, api_key, since)
+        return _serpapi_invoke_fetch(
+            backend, engine, query, hl, gl, num, api_key, since
+        )
     except SerpApiError as exc:
         sys.stderr.write(str(exc) + "\n")
         sys.exit(exc.exit_code)
+    except Exception as exc:
+        sys.stderr.write(str(exc) + "\n")
+        sys.exit(3)
 
 
 class _SerpApiClient:
@@ -194,7 +223,9 @@ def _serpapi_cmd_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
         clear_proxy_vars()
     api_key = load_key(args.api_key)
-    data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since)
+    data = _serpapi_fetch_cli(
+        args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend
+    )
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -212,11 +243,18 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
     all_results: dict[str, Any] = {}
     for query in args.query:
         try:
-            data = _serpapi_fetch(
-                args.engine, query, args.hl, args.gl, args.num, api_key, args.since
+            data = _serpapi_invoke_fetch(
+                backend,
+                args.engine,
+                query,
+                args.hl,
+                args.gl,
+                args.num,
+                api_key,
+                args.since,
             )
             all_results[query] = {"results": data.get("organic_results", [])}
-        except SerpApiError as exc:
+        except Exception as exc:
             all_results[query] = {"error": str(exc)}
     print(json.dumps(all_results, ensure_ascii=False))
 
@@ -323,6 +361,7 @@ class SerpApiBackend(_search_cli.Backend):
     missing_sdk_message = "requests not installed"
     env_key = "SERPAPI_KEY"
     client_factory = staticmethod(_serpapi_make_client)
+    call_timeout = 60.0
     global_flags = [
         _search_cli.Flag("no_proxy", ("--no-proxy",), "Clear proxy env vars for this run", action="store_true"),
     ]

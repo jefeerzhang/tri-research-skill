@@ -8,6 +8,7 @@ and its value is wrongly returned as THE key.
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -53,6 +54,122 @@ class EnvFileKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SerpApiRetryTests(unittest.TestCase):
+    def test_batch_search_retries_transient_network_error(self) -> None:
+        import argparse
+        import io
+        from contextlib import redirect_stdout
+
+        backend = MODULE.SerpApiBackend()
+        backend.retry_backoff = 0.0
+        backend.max_attempts = 3
+        calls = {"n": 0}
+
+        def flaky_fetch(*_args, **_kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise MODULE.SerpApiError("Network error: connection reset\n", 3)
+            return {"organic_results": [{"title": "ok", "link": "https://example.org"}]}
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = flaky_fetch
+        try:
+            args = argparse.Namespace(
+                query=["q1"],
+                engine="google",
+                hl=None,
+                gl=None,
+                num=None,
+                since=None,
+                api_key="k",
+                no_proxy=False,
+            )
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                MODULE._serpapi_cmd_batch_search(backend, args)
+            payload = json.loads(buf.getvalue())
+        finally:
+            MODULE._serpapi_fetch = original
+
+        self.assertEqual(calls["n"], 2)
+        self.assertIn("q1", payload)
+        self.assertEqual(payload["q1"]["results"][0]["title"], "ok")
+
+    def test_missing_key_is_not_retried(self) -> None:
+        import argparse
+        import io
+        from contextlib import redirect_stdout
+
+        backend = MODULE.SerpApiBackend()
+        backend.retry_backoff = 0.0
+        calls = {"n": 0}
+
+        def missing_key(*_args, **_kwargs):
+            calls["n"] += 1
+            raise MODULE.SerpApiError("No SerpApi key found.\n", 1)
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = missing_key
+        try:
+            args = argparse.Namespace(
+                query=["q1"],
+                engine="google",
+                hl=None,
+                gl=None,
+                num=None,
+                since=None,
+                api_key="k",
+                no_proxy=False,
+            )
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                MODULE._serpapi_cmd_batch_search(backend, args)
+            payload = json.loads(buf.getvalue())
+        finally:
+            MODULE._serpapi_fetch = original
+
+        self.assertEqual(calls["n"], 1)
+        self.assertIn("No SerpApi key found", payload["q1"]["error"])
+
+    def test_http_429_is_retried(self) -> None:
+        import argparse
+        import io
+        from contextlib import redirect_stdout
+
+        backend = MODULE.SerpApiBackend()
+        backend.retry_backoff = 0.0
+        calls = {"n": 0}
+
+        def rate_limited(*_args, **_kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise MODULE.SerpApiError("HTTP 429: rate limited\n", 4)
+            return {"organic_results": [{"title": "ok", "link": "https://publisher.org"}]}
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = rate_limited
+        try:
+            args = argparse.Namespace(
+                query=["q1"],
+                engine="google",
+                hl=None,
+                gl=None,
+                num=None,
+                since=None,
+                api_key="k",
+                no_proxy=False,
+            )
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                MODULE._serpapi_cmd_batch_search(backend, args)
+            payload = json.loads(buf.getvalue())
+        finally:
+            MODULE._serpapi_fetch = original
+
+        self.assertEqual(calls["n"], 2)
+        self.assertEqual(payload["q1"]["results"][0]["title"], "ok")
 
 
 class CliNoKeyTests(unittest.TestCase):

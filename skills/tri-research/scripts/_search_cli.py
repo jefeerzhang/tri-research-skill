@@ -14,6 +14,11 @@ file declares a `Backend` spec (module, env key, client factory, flags,
 extra commands) and inherits everything else. Contract: the CLI surface
 each backend exposes is unchanged (same subcommands and flags, same JSON
 output shapes), so sub-agents and the regression tests keep working.
+
+Transient failures (timeout, connection, 429, 5xx) are retried with
+backoff behind `search` / `batch_search`. Repeated exhausted failures
+open a per-backend circuit so later calls fail fast. `check` applies
+timeout but not retry. Missing SDK / missing key still fail immediately.
 """
 
 from __future__ import annotations
@@ -21,14 +26,23 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
-from typing import Any, Callable, Sequence
+import threading
+import time
+from typing import Any, Callable, Sequence, TypeVar
+
+_T = TypeVar("_T")
 
 
 def json_error(message: str) -> None:
     """Print a JSON error and exit 1 — the wrapper contract for failures."""
     print(json.dumps({"error": message}, ensure_ascii=False))
     sys.exit(1)
+
+
+class CircuitOpenError(RuntimeError):
+    """Raised when a backend circuit is open; not retryable, fail-fast."""
 
 
 class Flag:
@@ -114,6 +128,13 @@ class Backend:
     batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
     batch_search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
+    max_attempts: int = 3
+    retry_backoff: float = 0.5
+    call_timeout: float = 30.0
+    circuit_threshold: int = 5
+    circuit_cooldown: float = 60.0
+    _circuit_failures: int = 0
+    _circuit_opened_at: float | None = None
 
     def client(self) -> Any:
         """Build the SDK client, honoring the wrapper's JSON-error contract."""
@@ -144,6 +165,119 @@ def search_options(backend: Backend, args: argparse.Namespace) -> dict[str, Any]
     }
 
 
+def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
+    """Run ``fn`` on a daemon thread; raise TimeoutError if it exceeds timeout.
+
+    Daemon threads are required: a worker-pool shutdown(wait=True) would
+    block the CLI for the remainder of a hung SDK call, which is the
+    failure mode this timeout exists to prevent. Windows has no SIGALRM.
+    """
+    result: dict[str, _T] = {}
+    error: dict[str, BaseException] = {}
+    done = threading.Event()
+
+    def worker() -> None:
+        try:
+            result["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller thread
+            error["exc"] = exc
+        finally:
+            done.set()
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    if not done.wait(timeout):
+        raise TimeoutError(f"timed out after {timeout}s")
+    if "exc" in error:
+        raise error["exc"]
+    return result["value"]
+
+
+def _circuit_allow(backend: Backend) -> None:
+    opened_at = backend._circuit_opened_at
+    if opened_at is None:
+        return
+    cooldown = getattr(backend, "circuit_cooldown", 60.0)
+    if time.monotonic() - opened_at >= cooldown:
+        return
+    name = backend.name or "backend"
+    raise CircuitOpenError(f"circuit open for {name}")
+
+
+def _circuit_success(backend: Backend) -> None:
+    backend._circuit_failures = 0
+    backend._circuit_opened_at = None
+
+
+def _circuit_exhausted(backend: Backend) -> None:
+    backend._circuit_failures += 1
+    threshold = getattr(backend, "circuit_threshold", 5)
+    if backend._circuit_failures >= threshold:
+        backend._circuit_opened_at = time.monotonic()
+
+
+def _http_status(exc: BaseException) -> int | None:
+    message = str(exc)
+    match = re.search(r"\bHTTP\s+(\d{3})\b", message, flags=re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, CircuitOpenError):
+        return False
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, ConnectionError):
+        return True
+    status = _http_status(exc)
+    if status == 429 or (status is not None and status >= 500):
+        return True
+    if status is not None and 400 <= status < 500:
+        return False
+    exit_code = getattr(exc, "exit_code", None)
+    if exit_code in (1, 2, 4, 5):
+        return False
+    if exit_code == 3:
+        return True
+    message = str(exc).lower()
+    return any(
+        token in message
+        for token in ("timeout", "timed out", "connection", "rate limit", "ssl")
+    )
+
+
+def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
+    """Run ``fn`` with timeout, retry, and circuit. Public for SerpApi handlers."""
+    max_attempts = getattr(backend, "max_attempts", 3)
+    retry_backoff = getattr(backend, "retry_backoff", 0.5)
+    call_timeout = getattr(backend, "call_timeout", 30.0)
+    last_error: BaseException | None = None
+    for attempt in range(max_attempts):
+        _circuit_allow(backend)
+        try:
+            value = _run_with_timeout(fn, call_timeout)
+        except CircuitOpenError:
+            raise
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except BaseException as exc:
+            last_error = exc
+            if not _is_retryable(exc) or attempt + 1 >= max_attempts:
+                if _is_retryable(exc):
+                    _circuit_exhausted(backend)
+                raise
+            delay = retry_backoff * (2 ** attempt)
+            if delay > 0:
+                time.sleep(delay)
+            continue
+        _circuit_success(backend)
+        return value
+    assert last_error is not None
+    raise last_error
+
+
 def check(backend: Backend) -> None:
     """Availability probe: always prints JSON, never a traceback."""
     if backend.sdk is None:
@@ -154,7 +288,10 @@ def check(backend: Backend) -> None:
         print(json.dumps({"available": False, "error": f"{backend.env_key} not set"}))
         return
     try:
-        ok = backend.probe(backend.client_factory(api_key))
+        ok = _run_with_timeout(
+            lambda: backend.probe(backend.client_factory(api_key)),
+            getattr(backend, "call_timeout", 30.0),
+        )
     except Exception as exc:
         print(json.dumps({"available": False, "error": str(exc)}))
         return
@@ -167,7 +304,10 @@ def search(backend: Backend, args: argparse.Namespace) -> None:
         return
     client = backend.client()
     try:
-        output = backend.search(client, args.query, search_options(backend, args))
+        output = invoke(
+            backend,
+            lambda: backend.search(client, args.query, search_options(backend, args)),
+        )
     except Exception as exc:
         print(json.dumps({"error": str(exc), "query": args.query}, ensure_ascii=False))
         sys.exit(1)
@@ -183,7 +323,10 @@ def batch_search(backend: Backend, args: argparse.Namespace) -> None:
     all_results: dict[str, Any] = {}
     for query in args.query:
         try:
-            output = backend.search(client, query, search_options(backend, args))
+            output = invoke(
+                backend,
+                lambda q=query: backend.search(client, q, search_options(backend, args)),
+            )
             all_results[query] = output.get(backend.results_key, [])
         except Exception as exc:
             all_results[query] = {"error": str(exc)}
