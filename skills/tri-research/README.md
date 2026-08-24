@@ -2,11 +2,19 @@
 
 > 多源并行、中英双补、带可核验引用的深度研究流程。
 
-当前版本：`6.4.3`
+当前版本：`6.5.0`
 
 ## 示例与佐证
 
 - `examples/DEEP_RESEARCH_双重差分法_2026-08-14.md`：完整示例报告（主题「双重差分法的最新理论进展与经验研究」，时间范围 2020 至今）。3 子代理并行 + Lead 六路补强，30 条参考文献（英文 23 + 中文 7，权威期刊层级 1 共 22 条），含「核心模型与估计量公式」附录（LaTeX 数学渲染），`validate_report.py --min-sources 18` 验证通过。对应可复现回归场景见 `test-prompts.json` 的 `did-staggered-methods`。
+
+## 从 v6.4.3 到 v6.5.0 的核心变化
+
+| 变更项 | v6.4.3 | v6.5.0 |
+|--------|--------|--------|
+| **搜索后端声明** | Exa / Tavily / SerpApi 声明散落各 CLI | 集中到 `search_backends.py`，CLI 收敛为薄入口 |
+| **SerpApi CLI** | 独立实现（与共享骨架漂移） | 接入 `_search_cli`，`search`/`check`/`batch_search` 契约统一 |
+| **版本对账** | 硬编码版本断言，marketplace / citations 未覆盖 | frontmatter 单一真源动态对账，覆盖 7 处发布通道 |
 
 ## 从 v6.4.2 到 v6.4.3 的核心变化
 

@@ -1,6 +1,6 @@
 {
- "version": "6.4.3",
- "description": "Tri Research 可执行回归场景（与 v6.4.3 硬门禁/推荐流程对齐）。",
+ "version": "6.5.0",
+ "description": "Tri Research 可执行回归场景（与 v6.5.0 硬门禁/推荐流程对齐）。",
   "usage": "运行研究场景后，用 validate_report.py 与 validation_checklist 验收 Markdown 报告。",
   "prompts": [
     {

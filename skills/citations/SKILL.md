@@ -1,7 +1,7 @@
 ---
 name: citations
 description: "tri-research 引文复核：可选地复核研究报告中 [N] 行内引用、参考文献条目、层级与来源字段。不负责写报告、不联网、不修改源文件。"
-version: "6.4.3"
+version: "6.5.0"
 ---
 
 ## 用途

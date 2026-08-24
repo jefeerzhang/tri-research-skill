@@ -2,12 +2,15 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.5.0] - 2026-08-24
 
 ### Changed
 - **搜索后端统一到单一 module**：新增 `scripts/search_backends.py`，Exa / Tavily / SerpApi 三个 Backend 声明集中在一处；`exa_search.py`、`tavily_search.py`、`serpapi_cli.py` 收敛为薄 CLI 入口，外部命令路径与输出契约保持不变。
 - **SerpApi 接入共享搜索 skeleton**：`search` / `check` / `batch_search` 复用 `_search_cli`，`doc` / `engines` / `export` 保留为 extra commands；`--no-proxy`、`--json`、`--api_key` 等 SerpApi 特性保持原语义。
 - **测试 fixture 去重**：`tests/_test_helpers.py` 提供共享 `make_valid_report` 与 `load_module`，现有状态机 / 并发 / 验收测试改为复用。
+
+### Added
+- **跨文件版本对账动态化**：`tests/test_skill_contract.py` 的版本断言从硬编码字符串改为以 tri-research `SKILL.md` frontmatter 为单一真源动态对账，新覆盖 `.claude-plugin/marketplace.json`、`citations/SKILL.md` 与 CHANGELOG 最新发布条目（6.3.1 时 marketplace.json 曾漂移到 6.0.0 未被测试捕获）；发版不再需改测试。
 
 ## [6.4.3] - 2026-08-13
 
