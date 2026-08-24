@@ -52,16 +52,16 @@ version: "6.4.3"
 
 ## 搜索源
 
-六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
+六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）。安装与验证见「首次使用引导」：
 
-| 源 | 使用者 | 用途 | 必要性 | 配置方式 |
-|----|--------|------|--------|----------|
-| **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | 安装 CLI + 可选 API Key |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 | `pip install tavily-python` + `TAVILY_API_KEY` 环境变量 |
-| **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** | `pip install sciverse` + `SCIVERSE_API_TOKEN` 环境变量 |
-| **Exa** | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK） | 可选 | `pip install exa-py` + `EXA_API_KEY` 环境变量 |
-| **SerpApi** | Lead Agent | 中文 Google/Scholar | 可选 | SERPAPI_KEY 环境变量 |
-| **Runtime WebSearch** | Lead Agent | 通用补充（宿主内置抽象，**不**等于 Tavily） | 可选 | 无需配置，由宿主决定实现（Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种） |
+| 源 | 使用者 | 用途 | 必要性 |
+|----|--------|------|--------|
+| **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** |
+| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 |
+| **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** |
+| **Exa** | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK） | 可选 |
+| **SerpApi** | Lead Agent | 中文 Google/Scholar | 可选 |
+| **Runtime WebSearch** | Lead Agent | 通用补充（宿主内置抽象，**不**等于 Tavily） | 可选（无需配置，由宿主决定实现） |
 
 **降级策略**：必选源未配→提示+尝试匿名；全部失败→仅 AnySearch(匿名)+WebSearch；可选源不可用→静默跳过。AnySearch 和 SciVerse 是必选搜索源。
 
@@ -72,6 +72,7 @@ version: "6.4.3"
 | 源 | 安装 | 验证 |
 |----|------|------|
 | **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | 验证命令；失败可用匿名模式 |
+| **Tavily** | `pip install tavily-python` → `export TAVILY_API_KEY=<key>` | `python scripts/tavily_search.py check`；未配置则静默跳过 |
 | **SciVerse** | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` |
 | **Exa** | `pip install exa-py` → `export EXA_API_KEY=<key>` | `python scripts/exa_search.py check` |
 | **SerpApi** | 仅用户要求时设 `SERPAPI_KEY` | — |
@@ -106,7 +107,7 @@ async with AgentToolsClient(base_url="https://api.sciverse.space", token=os.envi
 
 ### 搜索执行规范
 
-> ⚠️ **流程要求：每个维度 × 每个可用源 × 中文 + 英文 = 应全部执行。** 禁止只搜英文不搜中文，禁止只搜中文不搜英文。
+> ⚠️ **流程要求：每个维度 × 每个可用源 × 中文 + 英文 = 应全部执行。** 每个维度都同时产出中文 query 和英文 query，并对当前可用源各执行一遍，即全源覆盖。硬性禁线：禁止只搜英文不搜中文。
 >
 > **强制范围说明**：上述是 Lead/子代理执行纪律。`validate_report.py` **只做报告级**检查（参考文献条目中同时存在中文与英文证据），**不**逐维度、逐源、逐 query 审计是否真的双补或全源覆盖。
 
