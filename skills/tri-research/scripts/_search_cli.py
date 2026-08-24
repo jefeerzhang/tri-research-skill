@@ -22,7 +22,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 
 def json_error(message: str) -> None:
@@ -103,9 +103,12 @@ class Backend:
     missing_sdk_message: str = ""         # JSON error when sdk is None
     env_key: str = ""                     # API key environment variable
     client_factory: Callable[[str], Any] = None
-    flags: list[Flag] = []                # flags attached to search/batch_search
-    global_flags: list[Flag] = []         # flags attached to the root parser
-    commands: list[Command] = []          # extra subcommands
+    # Immutable defaults: a class-level list shared across subclasses would
+    # leak runtime appends (e.g. registering an extra command) to every
+    # other backend. Subclasses may still assign their own sequence.
+    flags: Sequence[Flag] = ()            # flags attached to search/batch_search
+    global_flags: Sequence[Flag] = ()     # flags attached to the root parser
+    commands: Sequence[Command] = ()      # extra subcommands
     results_key: str = "results"          # key of the result list in search() output
     search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
