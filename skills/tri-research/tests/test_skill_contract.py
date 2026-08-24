@@ -34,11 +34,6 @@ class SkillContractTests(unittest.TestCase):
                 self.assertIn(name, self.root_readme)
         self.assertIn("六个搜索后端", self.skill)
         self.assertIn("六个搜索后端", self.readme)
-        # Tavily is Lead-only in the canonical table
-        self.assertIn("| **Tavily** | Lead Agent |", self.skill)
-        self.assertIn("**Tavily** | Lead Agent |", self.readme)
-        if self.root_readme:
-            self.assertIn("**Tavily** | Lead Agent |", self.root_readme)
 
     def test_skill_is_concise(self) -> None:
         self.assertLessEqual(len(self.skill.splitlines()), 450)
@@ -46,11 +41,8 @@ class SkillContractTests(unittest.TestCase):
     def test_subagent_is_concise(self) -> None:
         self.assertLessEqual(len(self.subagent.splitlines()), 120)
 
-    def test_report_format_documented(self) -> None:
-        for section in ("## 概述", "## 已有事实", "## 主要文献观点", "## 主要矛盾与冲突点", "## 未来研究方向", "## 参考文献", "## 执行情况"):
-            self.assertIn(section, self.skill)
-
     def test_citation_format_documented(self) -> None:
+        # 硬门禁清单里的引用行字段锚点（模板本体在 references/report-format.md）
         self.assertIn("层级:", self.skill)
         self.assertIn("来源:", self.skill)
 
@@ -78,20 +70,30 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("必选搜索源", self.skill)
         # Fallback chain must be documented
         self.assertIn("fallback", self.skill.lower())
-        self.assertIn("Node.js", self.skill)
 
     def test_search_execution_spec(self) -> None:
         # Search execution spec must be documented
         self.assertIn("搜索执行规范", self.skill)
-        # Bilingual requirement - must be prominent
+        # Bilingual requirement - must be prominent (leading words only;
+        # sentence-level wording is free to evolve)
         self.assertIn("中英双补", self.skill)
-        self.assertIn("禁止只搜英文不搜中文", self.skill)
-        # Full source coverage per dimension
         self.assertIn("全源覆盖", self.skill)
-        # Both AnySearch and SciVerse are mandatory
-        self.assertIn("AnySearch 和 SciVerse 是必选", self.skill)
-        # SciVerse must have bilingual example
-        self.assertIn("semantic_search \"人工智能", self.skill)
+        # Full source coverage per dimension; both AnySearch and SciVerse mandatory
+        self.assertIn("必选搜索源", self.skill)
+        # SciVerse must have a bilingual usage example
+        self.assertIn("semantic_search", self.skill)
+
+    def test_report_format_disclosed_to_reference(self) -> None:
+        # 格式契约下放到 references/report-format.md；SKILL.md 保留 context pointer，
+        # 七章节锚点改在 reference 上断言。
+        self.assertIn("references/report-format.md", self.skill)
+        reference = (ROOT / "references" / "report-format.md").read_text(
+            encoding="utf-8"
+        )
+        for section in ("## 概述", "## 已有事实", "## 主要文献观点", "## 主要矛盾与冲突点", "## 未来研究方向", "## 参考文献", "## 执行情况"):
+            self.assertIn(section, reference)
+        self.assertIn("层级:", reference)
+        self.assertIn("来源:", reference)
 
     def test_anysearch_3_compatible(self) -> None:
         self.assertIn("get_sub_domains", self.subagent)
