@@ -77,16 +77,20 @@ Run the CLI `doc` command for the full interface spec (offline, no network):
 
 ### Commands
 - `doc` — print full interface spec (offline).
+- `check` — availability probe: verifies SDK, key and a live 1-result query; always prints JSON (`{"available": true|false, "error": "..."}`), never a traceback.
 - `search --engine google --query "KEYWORD" [--hl zh-cn] [--gl cn] [--num 10] [--json]` — run a search (print to stdout).
+- `batch_search --query "Q1" --query "Q2" [--engine ...] [--hl ...] [--gl ...] [--num ...] [--since ...]` — run multiple queries sequentially; output maps each query to an object: `{"results": [...]}` on success, `{"error": "..."}` on failure.
 - `export --query "KEYWORD" [--hl zh-cn] [--gl cn] [--num 10] [--out path.md]` — run a search and save as a Markdown file (default: `data/output/<query>_检索结果.md`).
 - `engines` — list supported engines.
 
 ### Examples
 ```
+python serpapi_cli.py check
 python serpapi_cli.py search --query "OpenAI" --num 5
 python serpapi_cli.py search --engine google --query "北京天气" --hl zh-cn --gl cn
 python serpapi_cli.py search --engine google_scholar --query "transformer attention"
 python serpapi_cli.py search --query "python" --json > out.json
+python serpapi_cli.py batch_search --query "人工智能 就业" --query "AI job displacement" --num 5
 python serpapi_cli.py export --query "资产搁浅风险" --hl zh-cn --gl cn --num 10
 python serpapi_cli.py export --query "stranded assets" --out ./report.md
 ```
