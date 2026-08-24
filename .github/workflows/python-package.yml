@@ -2,7 +2,7 @@ name: python-package
 
 on:
   push:
-    branches: [master, refactor/slim-down]
+    branches: [master]
   pull_request:
     branches: [master]
 
