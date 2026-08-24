@@ -68,16 +68,56 @@ def session_lock(lock_path: Path) -> Iterator[None]:
         if fcntl is not None:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
         elif _HAVE_MSVCRT:  # pragma: no cover - Windows only
-            msvcrt.locking(lock_handle.fileno(), msvcrt.LK_LOCK, 1)
+            # msvcrt.LK_LOCK retries for ~10s then raises bare OSError;
+            # poll with LK_NBLCK instead so LOCK_WAIT_SECONDS is honored
+            # and timeouts surface as StateError (ERROR: line, exit 1),
+            # not a traceback.
+            lock_handle.seek(0)
+            deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
+            while True:
+                try:
+                    msvcrt.locking(lock_handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if datetime.now().timestamp() > deadline:
+                        raise StateError(
+                            f"timed out waiting for state lock: {lock_path}"
+                        ) from None
+                    _sleep(LOCK_POLL_SECONDS)
         else:  # pragma: no cover - exotic platforms
             deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
-            while lock_path.exists() and lock_path.stat().st_size > 0:
+            while True:
+                # Read-then-create with O_CREAT|O_EXCL: atomic claim, no
+                # exists()/stat() race window. An existing EMPTY file is an
+                # unheld marker (see write_lock docstring); content means
+                # some process recorded its pid there.
+                try:
+                    held_by = lock_path.read_text(encoding="utf-8").strip()
+                except FileNotFoundError:
+                    held_by = ""
+                except OSError:
+                    held_by = "?"  # unreadable — treat as held by unknown
+                if not held_by:
+                    try:
+                        fd = os.open(
+                            lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                        )
+                        os.write(fd, (str(os.getpid()) + "\n").encode("utf-8"))
+                        os.close(fd)
+                        break
+                    except FileExistsError:
+                        pass  # lost the claim race — re-check holder
+                elif held_by.isdigit() and not _pid_alive(int(held_by)):
+                    # Stale lock: holder crashed before cleanup. Steal it.
+                    try:
+                        lock_path.unlink()
+                    except FileNotFoundError:
+                        pass
                 if datetime.now().timestamp() > deadline:
                     raise StateError(
                         f"timed out waiting for state lock: {lock_path}"
                     )
                 _sleep(LOCK_POLL_SECONDS)
-            lock_path.write_text(str(os.getpid()) + "\n", encoding="utf-8")
         yield
     finally:
         if fcntl is not None:
@@ -97,6 +137,21 @@ def _sleep(seconds: float) -> None:  # pragma: no cover - Windows only
     import time
 
     time.sleep(seconds)
+
+
+def _pid_alive(pid: int) -> bool:  # pragma: no cover - exotic platforms only
+    """Best-effort liveness probe for stale-lock detection (POSIX semantics).
+
+    Only reached on platforms with neither fcntl nor msvcrt, so os.kill's
+    Windows TerminateProcess behavior is irrelevant here.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except (PermissionError, NotImplementedError, OSError):
+        return True
+    return True
 
 
 class StateError(RuntimeError):
@@ -197,7 +252,9 @@ class StateStore:
     def start_session(self, session_id: str | None = None) -> dict[str, Any]:
         """Start a new session and make it the active session."""
         if session_id is None:
-            session_id = datetime.now().strftime("research-%Y%m%d-%H%M")
+            # Second granularity: two researches opened within the same
+            # minute used to collide on "session already exists".
+            session_id = datetime.now().strftime("research-%Y%m%d-%H%M%S")
         session_id = validate_session_id(session_id)
         with self.write_lock(session_id):
             path = self.state_path(session_id)

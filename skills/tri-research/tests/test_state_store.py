@@ -49,7 +49,9 @@ class StateStoreTests(unittest.TestCase):
 
     def test_start_session_generates_default_id(self) -> None:
         data = self.store.start_session()
-        self.assertRegex(data["session_id"], r"^research-\d{8}-\d{4}$")
+        # Second granularity: two researches opened within the same minute
+        # must not collide on "session already exists".
+        self.assertRegex(data["session_id"], r"^research-\d{8}-\d{6}$")
         self.assertTrue((self.state_dir / "active-session").exists())
 
     def test_start_session_rejects_duplicate(self) -> None:
