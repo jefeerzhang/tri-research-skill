@@ -1,4 +1,8 @@
 __pycache__/
 
+# API keys（serpapi skill 会读取 skills/*/.env，严禁入库）
+.env
+skills/*/.env
+
 # 临时文件（shell 调试 / 状态机临时目录）
 .tmp-*
