@@ -399,13 +399,17 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
         clear_proxy_vars()
     api_key = load_key(args.api_key)
+    # Per-query value is always an object: {"results": [...]} on success,
+    # {"error": "..."} on failure — consumers never need type-switching.
+    # This also matches what the generic _search_cli batch path emits for
+    # Exa/Tavily ({"results": [...]}).
     all_results: dict[str, Any] = {}
     for query in args.query:
         try:
             data = _serpapi_fetch(
                 args.engine, query, args.hl, args.gl, args.num, api_key, args.since
             )
-            all_results[query] = data.get("organic_results", [])
+            all_results[query] = {"results": data.get("organic_results", [])}
         except SerpApiError as exc:
             all_results[query] = {"error": str(exc)}
     print(json.dumps(all_results, ensure_ascii=False))
@@ -437,15 +441,23 @@ def _serpapi_cmd_export(args: Any) -> None:
     out_path = args.out
     if not out_path:
         safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in args.query)
+        # Look for an existing project-level data/ dir near the skill;
+        # when none is found, fall back to the CURRENT directory instead of
+        # walking all the way to the filesystem root and creating
+        # <drive>/data/output there.
         here = os.path.dirname(os.path.abspath(__file__))
-        root = here
+        root = None
+        candidate = here
         for _ in range(5):
-            if os.path.isdir(os.path.join(root, "data")):
+            if os.path.isdir(os.path.join(candidate, "data")):
+                root = candidate
                 break
-            parent = os.path.dirname(root)
-            if parent == root:
+            parent = os.path.dirname(candidate)
+            if parent == candidate:
                 break
-            root = parent
+            candidate = parent
+        if root is None:
+            root = os.getcwd()
         out_dir = os.path.join(root, "data", "output")
         out_path = os.path.join(out_dir, f"{safe}_检索结果.md")
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
