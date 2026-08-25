@@ -67,7 +67,7 @@
 
 | 渠道 | 调用者 | 作用 | 必要性 | Key 申请 |
 |------|--------|------|--------|----------|
-| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** | https://anysearch.com/console/api-keys |
+| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP） | **必选** | https://anysearch.com/console/api-keys |
 | **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 | https://app.tavily.com/home |
 | **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** | https://sciverse.space/docs#auth |
 | **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 | https://dashboard.exa.ai/api-keys |

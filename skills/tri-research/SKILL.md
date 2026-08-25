@@ -56,7 +56,7 @@ version: "6.5.0"
 
 | 源 | 使用者 | 用途 | 必要性 |
 |----|--------|------|--------|
-| **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.0 版） | **必选** |
+| **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP） | **必选** |
 | **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 |
 | **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** |
 | **Exa** | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK） | 可选 |
@@ -85,10 +85,10 @@ version: "6.5.0"
 
 | 命令 | 用途 | 用法 |
 |------|------|------|
-| `search` | 单条搜索 | `<cmd> search "query" --max_results 5` |
-| `batch_search` | 多条并行 | `<cmd> batch_search --query "q1" --query "q2" --max_results 5` |
+| `search` | 单条搜索 | `<cmd> search "query" --max_results 5`；垂直领域也可用 REST-native `--tag`/`--params` |
+| `batch_search` | 多条并行（混合领域） | `<cmd> batch_search --query "q1" --query "q2" --max_results 5` |
 | `extract` | 提取 URL 全文（**禁止加 `--format`**） | `<cmd> extract "https://..."` |
-| `get_sub_domains` | 垂直领域子域发现 | `<cmd> get_sub_domains --domain finance` |
+| `get_sub_domains` | 垂直领域子域发现 | `<cmd> get_sub_domains --domain finance`；支持 `--domains finance,health` |
 
 **Tavily**（可选，仅 Lead Agent）：`python scripts/tavily_search.py search|batch_search|extract ...`；不可用→静默跳过。
 

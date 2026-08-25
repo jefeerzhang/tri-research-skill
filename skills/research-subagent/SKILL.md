@@ -13,25 +13,27 @@ version: "6.5.0"
 
 | 工具 | 调用方式 | 用途 |
 |------|---------|------|
-| **AnySearch** | CLI-only（3.0 版） | 通用网页 + 垂直领域 |
+| **AnySearch** | CLI-only（3.1 版，直接调 public HTTP） | 通用网页 + 垂直领域 |
 | **SciVerse** | Python SDK 必选（禁止 MCP） | 学术论文 |
 | **Exa** | Python SDK（`scripts/exa_search.py`） | 网页搜索 + 学术 + 公司 + 问答 |
 
 **路径**：AnySearch: `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`。SciVerse: `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。
 
-### AnySearch 3.0 用法
+### AnySearch 3.1 用法
 
-有 `runtime.conf` 时直接用配置的命令，不需要每次跑 `doc`。
+有 `runtime.conf` 时直接用配置的命令，不需要每次跑 `doc`。v3.1.0 起 CLI 直接调 `https://api.anysearch.com` public HTTP（Python 走 `requests`，Node 走内置 `https`）。
 
 ```bash
 # 通用搜索
 <cmd> search "查询" --max_results 5
 
-# 垂直领域搜索（先发现子领域）
+# 垂直领域搜索（先发现子领域）；搜索也支持 REST-native --tag/--params
 <cmd> get_sub_domains --domain finance
+<cmd> get_sub_domains --domains finance,health
 <cmd> search "AAPL" --domain finance --sub_domain finance.quote --sdp type=stock,symbol=AAPL
+<cmd> search "AAPL" --tag finance.quote --params type=stock,symbol=AAPL,cn_code=
 
-# 批量搜索（支持混合领域，v3.0.1+ 支持 shared --max_results）
+# 批量搜索（支持混合领域；shared --max_results 注入到每个未自设的 query 项）
 <cmd> batch_search --query "中文查询" --query "English query" --max_results 5
 <cmd> batch_search --queries '[{"query":"通用"},{"query":"AAPL","domain":"finance","sub_domain":"finance.quote"}]'
 

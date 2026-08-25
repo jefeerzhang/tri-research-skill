@@ -4,6 +4,9 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **AnySearch 接口同步到 v3.1.0**：上游 AnySearch 在 v3.1.0 将 CLI 迁到直接调 `https://api.anysearch.com` public HTTP（Python 走 `requests`，Node 走内置 `https`）。tri-research 主 SKILL / subagent SKILL / 能力边界表将版本标注由「3.0 版」改为「3.1 版（直接调 public HTTP）」，速查表补 `get_sub_domains --domains` 与 REST-native `--tag`/`--params`，subagent 命令示例同步更新。`runtime.conf` 作为预先探测的快速路径仍保留。
+
 ### Added
 - **金样例回归测试**：`tests/test_golden_examples.py` 钉住 `examples/` 下 4 份示例报告过当前 `validate_report.py`，每份按各自承诺的 `min_sources` 契约验收（DID 样例 18，其余 10）+ H1 主题检查；并强制 GOLDEN 契约表与磁盘文件一一对应（新增样例不登记就红），防止「验收器规则收紧、样例悄悄不再合法」的漂移。
 - **搜索 CLI 超时 / 重试 / 熔断**：`_search_cli.invoke` 给 `search` / `batch_search` 加上瞬时失败重试（超时、连接、429、5xx）、单次调用超时与按后端熔断；`check` 只超时不重试。JSON 形状与退出码不变。SerpApi `search` / `batch_search` 走同一策略。配置错误（缺 SDK / 缺 key / 4xx）立即失败。测试：`tests/test_search_cli_resilience.py`。
