@@ -13,18 +13,13 @@ emit() (or its caller) must raise so this is loud, not silent.
 """
 from __future__ import annotations
 
-import io
-import json
-import os
-import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
-
 from _test_helpers import load_module
+
+SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
 def _load_state_machine():
     return load_module(SCRIPTS_DIR / "state_machine.py", "sm_under_test")

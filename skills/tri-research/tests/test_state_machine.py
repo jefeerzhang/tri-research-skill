@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import unittest

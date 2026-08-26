@@ -152,7 +152,7 @@ class ConcurrencyTests(unittest.TestCase):
                 )
                 for _ in range(2)
             ]
-            results = [proc.communicate(timeout=60) for proc in procs]
+            [proc.communicate(timeout=60) for proc in procs]
             codes = [proc.returncode for proc in procs]
 
             self.assertEqual(sorted(codes), [0, 1])

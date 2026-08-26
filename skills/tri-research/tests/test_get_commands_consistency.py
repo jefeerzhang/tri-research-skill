@@ -15,17 +15,16 @@ fallback) can attribute the result.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from _test_helpers import load_module
+
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
-
-from _test_helpers import load_module
 
 def _load_state_machine():
     return load_module(SCRIPT, "sm_under_test_xyz")

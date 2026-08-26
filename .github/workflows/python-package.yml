@@ -7,6 +7,39 @@ on:
     branches: [master]
 
 jobs:
+  lint:
+    name: lint (ubuntu, Python 3.12)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install 'ruff==0.15.1'
+
+      - name: ruff (E + F, scoped)
+        run: |
+          ruff check --config .ruff.toml \
+            skills/tri-research/scripts \
+            skills/tri-research/tests \
+            skills/serpapi/scripts
+
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2
+
+      - name: markdownlint (with relaxed config)
+        run: |
+          markdownlint-cli2 "**/*.md" \
+            "#node_modules" "#.git" "#.venv" "#__pycache__"
+
   test:
     name: unittest (${{ matrix.os }}, Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}

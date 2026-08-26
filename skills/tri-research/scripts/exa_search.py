@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:

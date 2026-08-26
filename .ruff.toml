@@ -1,0 +1,29 @@
+# Ruff configuration for tri-research-skill
+# Scope: skills/tri-research/scripts, skills/tri-research/tests,
+#        skills/serpapi/scripts.
+# Rules enabled: E (pycodestyle errors) + F (pyflakes) only — minimal-noise
+# baseline. Add more rule families (D / N / W / UP) deliberately, never
+# silently.
+line-length = 120
+target-version = "py311"
+
+[lint]
+# KEEP: E + F  = pycodestyle errors + pyflakes
+# DELIBERATELY EXCLUDED to avoid history-flood on first run:
+#   D  docstrings
+#   N  pep8-naming
+#   W  pycodestyle warnings  (e.g. E501 line-too-long handled below)
+#   UP pyupgrade (Python-version hints)
+#   B  bugbear
+#   C  mccabe complexity
+#   S  bandit security
+select = ["E", "F"]
+ignore = [
+    "E501",  # line-too-long — handled semantically per file; allow long URLs/JSON literals.
+]
+
+[lint.per-file-ignores]
+# Test modules may legitimately use long fixture strings, magic numbers,
+# and wildcard imports in helpers.
+"skills/*/tests/*.py" = ["E501"]
+"skills/*/tests/_test_helpers.py" = ["E501", "F401", "F403"]

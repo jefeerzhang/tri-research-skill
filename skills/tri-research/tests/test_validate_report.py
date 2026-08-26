@@ -3,8 +3,9 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_report.py"
 from _test_helpers import load_module
+
+SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_report.py"
 MODULE = load_module(SCRIPT, "validate_report")
 
 
