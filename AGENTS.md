@@ -20,5 +20,6 @@ Single-context：repo 根目录一个 `CONTEXT.md` + `docs/adr/`。See `docs/age
 
 - Python 脚本位于 `skills/*/scripts/`，标准库优先；测试用 `unittest`
 - 运行全部测试：`python -m unittest discover -s skills/tri-research/tests` 与 `python -m unittest discover -s skills/serpapi/tests`
-- CI 同时跑 ubuntu + windows（见 `.github/workflows/python-package.yml`），涉及文件读写时注意跨平台换行与路径
+- **测试数对账守门员**：`skills/tri-research/tests/test_count_drift.py` 静态统计 tri-research/serpapi 测试数（4 条断言），防止 README / 示例 / CHANGELOG 中硬编码数字漂移；新增/删除测试时若该文件红，应同步更新文档
+- CI 同时跑 ubuntu + windows（见 `.github/workflows/python-package.yml`），并包含 ruff（E/F）+ markdownlint-cli2 静态校验（`lint` job），涉及文件读写时注意跨平台换行与路径
 - 提交信息遵循中文 Conventional Commits（type 英文、scope/描述中文）

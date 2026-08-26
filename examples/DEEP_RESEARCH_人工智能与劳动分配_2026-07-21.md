@@ -8,7 +8,7 @@
 
 ## 已有事实
 
-事实一：当前 v6.0.0 的本地测试套件为 13+13+9=35 个单元测试，包含状态机、报告验收器、Skill 契约三组测试[1]。CI 工作流 `.github/workflows/python-package.yml` 跑 3.11/3.12/3.13 三个 Python 版本的 unittest 矩阵并对账测试数[2]。
+事实一：v6.0.0 时的本地测试套件为 13+13+9=35 个单元测试（含状态机、报告验收器、Skill 契约三组）；至 v6.5.0 已增长到 **121/121 通过**（tri-research 111 + serpapi 10），新增覆盖包括 CHANGELOG 漂移对账、并发、CLI 韧性、跨文件版本对账等模块[1]。CI 工作流 `.github/workflows/python-package.yml` 跑 3.11/3.12/3.13 三个 Python 版本的 unittest 矩阵并对账测试数[2]。
 
 事实二：仓库采用 `TRI_RESEARCH_STATE_DIR`（或系统临时目录）隔离并发研究，会话 ID 通过显式 `--session` 参数显式传递，不依赖最近状态文件[3][4]。
 
@@ -28,7 +28,7 @@
 
 观点三：**Skill 套件应保持"主导 + 子代理 + 辅助"三角色清晰边界**。主导代理负责派发与综合，子代理负责聚焦检索，辅助 Skill（如 SerpApi、citations）按需补强而不喧宾夺主[9]。
 
-观点四：**端到端测试是"绿色 CI 不撒谎"的唯一办法**。README 中"自动化测试 35/35 通过"必须由 CI 工作流的一道对账步骤守住，否则维护期会出现文档与代码脱节[2]。
+观点四：**端到端测试是"绿色 CI 不撒谎"的唯一办法**。README 中"自动化测试 121/121 通过"必须由 CI 工作流的一道对账步骤守住，否则维护期会出现文档与代码脱节[2]；`skills/tri-research/tests/test_count_drift.py` 即为该对账守门员（静态计数 + 文档静态断言）。
 
 观点五：**状态机应是两步而非多步**。多步状态机（`S0 → S1 → S2 → S3 → DONE`）在维护期容易因阶段判定逻辑写错导致静默失败；两步门禁（`STARTED → DONE`）更易理解、测试与审计[3][4]。
 
@@ -52,11 +52,11 @@
 
 方向四：**跨 runtime 适配**。当前 `state_machine.sh` 已能在 PATH 找不到 Python 时回退扫常见 Windows 路径（v6.0.0 增量），但 `npx sciverse-mcp-server` 仍依赖 Node 18+；Codex / OpenClaw 等其他 Skill 形态 runtime 的兼容性矩阵还没建立[9]。
 
-方向五：**回测工具沉淀**。把"测试数 = 35"这种数字对账规矩固化成 `scripts/assert_test_count.py`，在 CI 中跑；未来若测试数量变动但 README 未同步，直接红。
+方向五：**回测工具沉淀**。把"测试数 = 121"（v6.5.0）这种数字对账规矩固化成 `skills/tri-research/tests/test_count_drift.py`（已落地，见 setUpClass 缓存的 _count_tests + 4 条静态断言），在 CI 中跑；未来若测试数量变动但 README 未同步，直接红。
 
 ## 参考文献
 
-[1] Project Owners — tri-research unit tests 35/35 — https://github.com/jefeerzhang/tri-research-skill/tree/master/skills/tri-research/tests — 2026 — 层级: 1 — 来源: WebSearch
+[1] Project Owners — tri-research unit tests 121/121 (111 tri-research + 10 serpapi, v6.5.0) — https://github.com/jefeerzhang/tri-research-skill/tree/master/skills/tri-research/tests — 2026 — 层级: 1 — 来源: WebSearch
 
 [2] Project Owners — CI workflow python-package.yml — https://github.com/jefeerzhang/tri-research-skill/blob/master/.github/workflows/python-package.yml — 2026 — 层级: 1 — 来源: WebSearch
 
