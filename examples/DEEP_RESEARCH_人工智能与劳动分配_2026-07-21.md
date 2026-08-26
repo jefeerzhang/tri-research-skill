@@ -56,23 +56,23 @@
 
 ## 参考文献
 
-[1] Project Owners — tri-research unit tests 35/35 — https://github.com/jefeerzhang/tri-research-skill/tree/refactor/slim-down/skills/tri-research/tests — 2026 — 层级: 1 — 来源: WebSearch
+[1] Project Owners — tri-research unit tests 35/35 — https://github.com/jefeerzhang/tri-research-skill/tree/master/skills/tri-research/tests — 2026 — 层级: 1 — 来源: WebSearch
 
-[2] Project Owners — CI workflow python-package.yml — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/.github/workflows/python-package.yml — 2026 — 层级: 1 — 来源: WebSearch
+[2] Project Owners — CI workflow python-package.yml — https://github.com/jefeerzhang/tri-research-skill/blob/master/.github/workflows/python-package.yml — 2026 — 层级: 1 — 来源: WebSearch
 
-[3] Project Owners — state machine scripts/state_machine.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py — 2026 — 层级: 1 — 来源: WebSearch
+[3] Project Owners — state machine scripts/state_machine.py — https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/scripts/state_machine.py — 2026 — 层级: 1 — 来源: WebSearch
 
-[4] Project Owners — CHANGELOG.md version history — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/CHANGELOG.md — 2026 — 层级: 1 — 来源: WebSearch
+[4] Project Owners — CHANGELOG.md version history — https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/CHANGELOG.md — 2026 — 层级: 1 — 来源: WebSearch
 
-[5] Project Owners — report validator scripts/validate_report.py — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py — 2026 — 层级: 1 — 来源: WebSearch
+[5] Project Owners — report validator scripts/validate_report.py — https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/scripts/validate_report.py — 2026 — 层级: 1 — 来源: WebSearch
 
-[6] Project Owners — README.md four-gate section — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/README.md — 2026 — 层级: 1 — 来源: WebSearch
+[6] Project Owners — README.md four-gate section — https://github.com/jefeerzhang/tri-research-skill/blob/master/README.md — 2026 — 层级: 1 — 来源: WebSearch
 
-[7] 作者 — citations Skill 软复核与硬门禁分工 — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/citations/SKILL.md — 2026 — 层级: 2 — 来源: SciVerse
+[7] 作者 — citations Skill 软复核与硬门禁分工 — https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/citations/SKILL.md — 2026 — 层级: 2 — 来源: SciVerse
 
 [8] Authors — firecrawl-deep-research SKILL onboarding interview — https://www.skills.sh/firecrawl/firecrawl-workflows/firecrawl-deep-research — 2026 — 层级: 2 — 来源: SerpApi
 
-[9] 作者 — tri-research 数据与安全边界段 — https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/SKILL.md — 2026 — 层级: 2 — 来源: AnySearch
+[9] 作者 — tri-research 数据与安全边界段 — https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/SKILL.md — 2026 — 层级: 2 — 来源: AnySearch
 
 [10] IMF — The Macroeconomics of Artificial Intelligence — https://www.imf.org/en/Publications/Staff-Discussion-Notes/Issues/2024/01/14/the-macroeconomics-of-artificial-intelligence — 2024 — 层级: 1 — 来源: SciVerse
 

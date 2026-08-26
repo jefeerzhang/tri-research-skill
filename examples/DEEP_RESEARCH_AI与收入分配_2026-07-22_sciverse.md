@@ -104,9 +104,9 @@
 
 [5] Yuan, Han, Cao & Cai — An Analysis of the Effect of Artificial Intelligence on Occupational Income Inequality in China (Kansas WP 2025-04) — <https://kuwpaper.ku.edu/2025Papers/202504.pdf> — 2025 — 层级: 1 — 来源: AnySearch
 
-[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
+[6] Project Owners — tri-research v6.0.0 state_machine.py — <https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/scripts/state_machine.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
-[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/refactor/slim-down/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
+[7] Project Owners — tri-research v6.0.0 validate_report.py — <https://github.com/jefeerzhang/tri-research-skill/blob/master/skills/tri-research/scripts/validate_report.py> — 2026 — 层级: 1 — 来源: Runtime WebSearch
 
 [8] OpenResearch — Unconditional Cash Study ($1,000/month, 3 years, 3,000 participants) — <https://www.openresearchlab.org/projects/unconditional-cash-study> — 2024 — 层级: 1 — 来源: AnySearch
 
