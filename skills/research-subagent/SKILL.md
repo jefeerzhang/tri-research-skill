@@ -11,13 +11,13 @@ version: "6.5.0"
 
 ## 搜索工具
 
-| 工具 | 调用方式 | 用途 |
-|------|---------|------|
-| **AnySearch** | CLI-only（3.1 版，直接调 public HTTP） | 通用网页 + 垂直领域 |
-| **SciVerse** | Python SDK 必选（禁止 MCP） | 学术论文 |
-| **Exa** | Python SDK（`scripts/exa_search.py`） | 网页搜索 + 学术 + 公司 + 问答 |
+| 工具          | 调用方式                               | 用途                          | 必要性                                                                                    |
+| ------------- | -------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| **AnySearch** | CLI-only（3.1 版，直接调 public HTTP） | 通用网页 + 垂直领域           | 必选（建议配置）`recommended`，匿名可用，Key 申请：https://anysearch.com/console/api-keys |
+| **SciVerse**  | Python SDK 必选（禁止 MCP）            | 学术论文                      | 必选 `required`，Key 申请：https://sciverse.space/docs#auth                               |
+| **Exa**       | Python SDK（`scripts/exa_search.py`）  | 网页搜索 + 学术 + 公司 + 问答 | 必选 `required`，Key 申请：https://dashboard.exa.ai/api-keys                              |
 
-**路径**：AnySearch: `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`。SciVerse: `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。
+**路径**：AnySearch: `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`。SciVerse: `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。分级定义见 `CONTEXT.md` 的 `BackendRequirementLevel`。
 
 ### AnySearch 3.1 用法
 
@@ -62,8 +62,8 @@ asyncio.run(search())
 > 禁止只搜英文不搜中文，禁止只搜中文不搜英文。缺少任一语言视为流程缺陷。
 > 说明：主 skill 的 `validate_report.py` 只做报告级双语检查，不审计子代理是否逐角度双补。
 
-1. **预检**：对 AnySearch、SciVerse、Exa 各执行一次轻量查询确认可用性
-2. **并行搜索**：对 AnySearch、SciVerse、Exa 同时发起不同角度的查询
+1. **预检**：对 AnySearch（`recommended`，匿名可用）、SciVerse（`required`）、Exa（`required`）各执行一次轻量查询确认可用性；`required` 缺失时应暂停并引导配置
+2. **并行搜索**：对 AnySearch、SciVerse、Exa 同时发起不同角度的查询（`required` 源缺失时按主 Skill 引导暂停，未配置的 `recommended` 源允许匿名降级）
    - **中英双补（强制）**：每个研究角度必须有中文 query 和英文 query，在每个源上各执行一遍
    - 示例：`AnySearch batch_search --queries '[{"query":"人工智能 就业替代"},{"query":"AI job displacement"}]'`
    - 示例：`SciVerse semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation employment"`

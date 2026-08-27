@@ -55,34 +55,34 @@ version: "6.5.0"
 
 六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）。安装与验证见「首次使用引导」：
 
-| 源                    | 使用者              | 用途                                                                            | 必要性                           |
-| --------------------- | ------------------- | ------------------------------------------------------------------------------- | -------------------------------- |
-| **AnySearch**         | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）                 | **必选**                         |
-| **Tavily**            | Lead Agent          | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选                             |
-| **SciVerse**          | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP）                                       | **必选**                         |
-| **Exa**               | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK）                             | 可选                             |
-| **SerpApi**           | Lead Agent          | 中文 Google/Scholar                                                             | 可选                             |
-| **Runtime WebSearch** | Lead Agent          | 通用补充（宿主内置抽象，**不**等于 Tavily）                                     | 可选（无需配置，由宿主决定实现） |
+| 源                    | 使用者              | 用途                                                                            | 必要性                                                 |
+| --------------------- | ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Exa**               | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK）                             | **必选** (`required`)                                  |
+| **AnySearch**         | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）                 | **必选（建议配置）** (`recommended`，匿名可用，低限额) |
+| **SciVerse**          | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP）                                       | **必选** (`required`)                                  |
+| **Tavily**            | Lead Agent          | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 (`optional`)                                      |
+| **SerpApi**           | Lead Agent          | 中文 Google/Scholar                                                             | 可选 (`optional`)                                      |
+| **Runtime WebSearch** | Lead Agent          | 通用补充（宿主内置抽象，**不**等于 Tavily）                                     | 可选（无需配置，由宿主决定实现） (`optional`)          |
 
-**降级策略**：必选源未配→提示+尝试匿名；全部失败→仅 AnySearch(匿名)+WebSearch；可选源不可用→静默跳过。AnySearch 和 SciVerse 是必选搜索源。
+**降级策略**：`required`（Exa / SciVerse）缺失→在源检测阶段暂停并引导配置；`recommended`（AnySearch）缺失→黄字提醒但允许匿名降级；`optional` 源不可用→静默跳过。Exa / SciVerse / AnySearch 为必选搜索源（AnySearch 为 `recommended` 允许匿名）。分级定义见 `CONTEXT.md` 的 `BackendRequirementLevel`。
 
 ### 首次使用引导
 
 研究开始前检测各源可用性并汇总。必选源没装好→逐个问要不要装；可选源没装→跳过不拦研究。无子代理时 Lead Agent 直接用所有可用源搜。
 
-| 源            | 安装                                                         | 验证                                                             |
-| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | 验证命令；失败可用匿名模式                                       |
-| **Tavily**    | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        |
-| **SciVerse**  | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` |
-| **Exa**       | `pip install exa-py` → `export EXA_API_KEY=<key>`            | `python scripts/exa_search.py check`                             |
-| **SerpApi**   | 仅用户要求时设 `SERPAPI_KEY`                                 | —                                                                |
+| 源            | 安装                                                         | 验证                                                             | 必要性                                                                                 |
+| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Exa**       | `pip install exa-py` → `export EXA_API_KEY=<key>`            | `python scripts/exa_search.py check`                             | **必选** (`required`)，Key 申请：https://dashboard.exa.ai/api-keys                     |
+| **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | 验证命令；失败可用匿名模式（建议配置以提额）                     | **必选（建议配置）** (`recommended`)，Key 申请：https://anysearch.com/console/api-keys |
+| **SciVerse**  | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` | **必选** (`required`)，Key 申请：https://sciverse.space/docs#auth                      |
+| **Tavily**    | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        | 可选                                                                                   |
+| **SerpApi**   | 仅用户要求时设 `SERPAPI_KEY`                                 | —                                                                | 可选                                                                                   |
 
 ### 各工具调用速查（子代理通过 Bash 调用）
 
 > ⚠️ 子 agent 是独立进程，只能通过 Bash 调外部 CLI，不能直接用内部工具。
 
-**AnySearch**（必选，所有 Agent）：路径 `${ANYSEARCH_HOME}` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 直接用，否则按 Python→Node.js→PowerShell→Bash 顺序 fallback 探测。
+**AnySearch**（必选（建议配置），所有 Agent）：路径 `${ANYSEARCH_HOME}` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 直接用，否则按 Python→Node.js→PowerShell→Bash 顺序 fallback 探测。未配置时匿名可用，低限额，建议配置以提额。
 
 | 命令              | 用途                                   | 用法                                                                                  |
 | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -93,7 +93,7 @@ version: "6.5.0"
 
 **Tavily**（可选，仅 Lead Agent）：`python scripts/tavily_search.py search|batch_search|extract ...`；不可用→静默跳过。
 
-**Exa**（可选，所有 Agent）：`python scripts/exa_search.py search|batch_search|answer|contents ...`；类别含 `research paper` / `company` / `news` 等。
+**Exa**（必选，所有 Agent）：`python scripts/exa_search.py search|batch_search|answer|contents ...`；类别含 `research paper` / `company` / `news` 等。Key 申请：https://dashboard.exa.ai/api-keys
 
 **SerpApi**（可选，仅 Lead Agent）：路径 `${SERPAPI_HOME}` → `${TRI_RESEARCH_HOME}/../serpapi` → `skills/serpapi/`。
 
@@ -132,7 +132,7 @@ Lead 的 Exa + SerpApi + Tavily + Runtime WebSearch 与子代理派发**并行�
 
 ### 第二步：源检测与研究拆解
 
-**不要直接搜**。轻量探测各源 → 汇报状态 → 拆 3-5 维度 → 列出中英关键词 → 用户确认计划。源不可用就降配，**永远不拦着跑**。
+**不要直接搜**。轻量探测各源 → 汇报状态（`required` 缺失则暂停并引导配置，`recommended` 缺失黄字提醒但允许匿名降级，`optional` 静默跳过）→ 拆 3-5 维度 → 列出中英关键词 → 用户确认计划。`required` 源未配置时应暂停并给出申请链接与验证命令，用户明确要求降级时方可继续。
 
 ### 第三步：初始化与执行
 

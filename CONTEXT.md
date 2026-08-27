@@ -9,7 +9,7 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags），当前含 Exa / Tavily / SerpApi。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags），分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:
@@ -27,6 +27,10 @@ _Avoid_: key loader、env helper 混称
 **BackendSpec**:
 声明式规格，描述单个 Search Backend 的 `name / env_key / flags / commands / timeout / circuit`，由 Registry 消费。
 _Avoid_: backend config 泛称
+
+**BackendRequirementLevel**:
+Search Backend 的三档必要性分级，决定缺 key 时的编排行为：`required` 缺失则暂停并引导配置，`recommended` 缺失仅黄字提醒但允许匿名降级，`optional` 缺失静默跳过。
+_Avoid_: 必选/可选二分、优先级混称
 
 **Report Validation**:
 报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface。
