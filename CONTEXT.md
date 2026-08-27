@@ -13,7 +13,7 @@ _Avoid_: 任务、会话 id 混称
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:
-深 Module，统一管理所有 Web 搜索类后端的注册、Result 归一与 `KeyProvider`，interface 仅 `register / get / search → Result[]`。
+深 Module，统一管理所有 Web 搜索类后端的注册、Result 归一与 `KeyProvider`，interface 仅 `register / get / search → Result[]`。定位为**程序化 seam**（测试与未来直接 import 的调用方）；Agent 消费的命令行表面走 `_search_cli`，两条路不得混用错误契约。
 _Avoid_: backend manager、search service
 
 **SearchResult**:

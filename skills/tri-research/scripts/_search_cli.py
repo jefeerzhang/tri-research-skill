@@ -49,6 +49,19 @@ def json_error(message: str) -> None:
     sys.exit(1)
 
 
+def _backend_api_key(env_key: str) -> str | None:
+    """Resolve a backend API key via KeyProvider (cli > env > .env).
+
+    Function-local import: `_search_registry` imports this module at top
+    level, so a module-level import would be circular. Centralised here so
+    `client` / `check` / managed commands share one key seam — a `.env`
+    key now works for probe and search, not just the managed commands.
+    """
+    from _search_registry import KeyProvider
+
+    return KeyProvider.resolve(None, env_key)
+
+
 class CircuitOpenError(RuntimeError):
     """Raised when a backend circuit is open; not retryable, fail-fast."""
 
@@ -170,7 +183,7 @@ class Backend:
         """Build the SDK client, honoring the wrapper's JSON-error contract."""
         if self.sdk is None:
             json_error(self.missing_sdk_message)
-        api_key = os.environ.get(self.env_key)
+        api_key = _backend_api_key(self.env_key)
         if not api_key:
             json_error(f"{self.env_key} not set")
         return self.client_factory(api_key)
@@ -304,7 +317,7 @@ def check(backend: Backend) -> None:
     if backend.sdk is None:
         print(json.dumps({"available": False, "error": backend.missing_sdk_message}))
         return
-    api_key = os.environ.get(backend.env_key)
+    api_key = _backend_api_key(backend.env_key)
     if not api_key:
         print(json.dumps({"available": False, "error": f"{backend.env_key} not set"}))
         return
@@ -384,13 +397,8 @@ def run_managed_command(backend: Backend, command: Command, args: argparse.Names
     SDK check must precede ``client_factory``, otherwise a missing SDK
     turns into a traceback instead of the documented JSON contract.
     """
-    # Function-local import: `_search_registry` imports this module, so a
-    # top-level import would be circular. The registry is guaranteed
-    # importable here (search_backends imports it unconditionally at top).
-    from _search_registry import KeyProvider
-
     _maybe_clear_proxy(args)
-    api_key = KeyProvider.resolve(None, backend.env_key)
+    api_key = _backend_api_key(backend.env_key)
     if not api_key:
         _emit_command_error(command, args, f"{backend.env_key} not set")
     if backend.sdk is None:

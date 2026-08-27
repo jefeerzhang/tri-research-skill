@@ -106,6 +106,7 @@ def _to_search_result(raw: dict[str, Any]) -> SearchResult:
 # KeyProvider — cli > env > .env seam
 # ---------------------------------------------------------------------------
 
+
 def _key_from_env_file(env_path: Path, env_key: str) -> str | None:
     try:
         with open(env_path, "r", encoding="utf-8") as f:
@@ -147,8 +148,9 @@ class KeyProvider:
             candidates.append(env_file)
         # tri-research .env
         candidates.append(_SCRIPT_DIR.parent / ".env")
-        # serpapi .env (legacy, for SerpApi key)
-        candidates.append(_SCRIPT_DIR.parent.parent.parent / "serpapi" / ".env")
+        # serpapi .env (legacy, for SerpApi key) — sibling skill dir
+        # skills/serpapi/.env, matching serpapi_cli.load_key and .gitignore.
+        candidates.append(_SCRIPT_DIR.parent.parent / "serpapi" / ".env")
         for cand in candidates:
             v = _key_from_env_file(cand, env_key)
             if v:
@@ -159,6 +161,7 @@ class KeyProvider:
 # ---------------------------------------------------------------------------
 # BackendSpec — declarative spec consumed by Registry
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class BackendSpec:
@@ -177,12 +180,18 @@ class BackendSpec:
 # Registry — deep Module
 # ---------------------------------------------------------------------------
 
-class SearchBackendRegistry:
-    """Single seam for all Web Search Backends.
 
-    Old path (_search_cli.search directly) keeps working; new path goes via
-    registry.search -> SearchResult[]. Deletion test: remove one adapter,
-    callers do not re-introduce flag/mapping complexity.
+class SearchBackendRegistry:
+    """Programmatic seam for all Web Search Backends.
+
+    The agent-facing CLI surface is `_search_cli` (exa_search.py /
+    tavily_search.py / serpapi_cli.py); this registry serves programmatic
+    callers with uniform SearchResult shapes (search / batch_search /
+    check, exercised by the registry tests). The shape-preserving
+    `search_raw` bridge was removed in ADR-0003 — zero callers repo-wide;
+    reintroduce it from git history only if the CLI ever migrates onto
+    this seam. Deletion test: remove one adapter, callers do not
+    re-introduce flag/mapping complexity.
     """
 
     def __init__(self) -> None:
@@ -222,7 +231,9 @@ class SearchBackendRegistry:
         return sorted(self._backends.keys())
 
     # -- key / proxy helpers ------------------------------------------------
-    def _resolve_backend(self, name: str, cli_key: str | None = None, no_proxy: bool = False) -> tuple[_search_cli.Backend, str]:
+    def _resolve_backend(
+        self, name: str, cli_key: str | None = None, no_proxy: bool = False
+    ) -> tuple[_search_cli.Backend, str]:
         spec = self.get(name)
         backend = spec.backend
         if no_proxy:
@@ -310,34 +321,6 @@ class SearchBackendRegistry:
         except Exception as exc:  # noqa: BLE001 — probe must never traceback
             return {"available": False, "error": str(exc)}
         return {"available": bool(ok)}
-
-    def search_raw(
-        self,
-        name: str,
-        query: str,
-        options: dict[str, Any] | None = None,
-        *,
-        cli_key: str | None = None,
-        no_proxy: bool = False,
-    ) -> dict[str, Any]:
-        """Search via Registry but return legacy raw dict (for thin-shim compat).
-
-        Uses unified KeyProvider and global --no-proxy, but preserves backend's
-        original output shape (category/num_results/autoprompt etc. for Exa).
-        """
-        backend, api_key = self._resolve_backend(name, cli_key, no_proxy)
-        opts = options or {}
-        client = backend.client_factory(api_key) if backend.sdk is not None else None
-        if client is None and backend.sdk is None:
-            raise RuntimeError(backend.missing_sdk_message or f"{name} SDK not installed")
-
-        def _call() -> dict[str, Any]:
-            return backend.search(client, query, opts)
-
-        raw = _search_cli.invoke(backend, _call)
-        if isinstance(raw, dict):
-            raw["query"] = query
-        return raw
 
 
 # Global singleton — search_backends registers Exa/Tavily on import
