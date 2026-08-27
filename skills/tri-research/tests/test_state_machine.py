@@ -12,25 +12,19 @@ from _test_helpers import make_valid_report
 SCRIPT = Path(__file__).parents[1] / "scripts" / "state_machine.py"
 
 
-class StateMachineTests(unittest.TestCase):
+class _CliHarness:
+    """Shared state-machine CLI helpers, mixed into the TestCases below."""
+
     def setUp(self) -> None:
-        import subprocess
-        self.subprocess = subprocess
         self.temp_dir = tempfile.TemporaryDirectory()
         self.state_dir = Path(self.temp_dir.name) / "state"
 
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    def run_cli(self, *args: str, ok: bool = True):
-        command = [
-            sys.executable,
-            str(SCRIPT),
-            "--state-dir",
-            str(self.state_dir),
-            *args,
-        ]
-        result = self.subprocess.run(command, capture_output=True, text=True)
+    def run_cli(self, *args: str, ok: bool = True) -> subprocess.CompletedProcess:
+        command = [sys.executable, str(SCRIPT), "--state-dir", str(self.state_dir), *args]
+        result = subprocess.run(command, capture_output=True, text=True)
         if ok and result.returncode != 0:
             self.fail(f"failed: {command}\nstdout={result.stdout}\nstderr={result.stderr}")
         if not ok and result.returncode == 0:
@@ -49,11 +43,23 @@ class StateMachineTests(unittest.TestCase):
         )
         self.run_cli("--session", session, "set_params", params)
 
-    def write_valid_report(self, name: str = "report.md", *, topic: str = "人工智能与劳动分配", source_count: int = 10) -> Path:
+    def write_valid_report(
+        self, name: str = "report.md", *, topic: str = "人工智能与劳动分配", source_count: int = 10
+    ) -> Path:
         report = Path(self.temp_dir.name) / name
         make_valid_report(report, topic=topic, source_count=source_count)
         return report
 
+    def drive_to_done(self, session: str) -> Path:
+        """start -> set_params -> done --report; returns the report path."""
+        self.run_cli("--session", session, "start")
+        self.set_params(session)
+        report = self.write_valid_report(f"{session}.md")
+        self.run_cli("--session", session, "done", "--report", str(report))
+        return report
+
+
+class StateMachineTests(_CliHarness, unittest.TestCase):
     def test_start_creates_session(self) -> None:
         result = self.run_cli("--session", "test-start", "start")
         self.assertIn("STATE:STARTED", result.stdout)
@@ -81,7 +87,9 @@ class StateMachineTests(unittest.TestCase):
     def test_set_params_rejects_invalid(self) -> None:
         self.run_cli("--session", "invalid-params", "start")
         result = self.run_cli(
-            "--session", "invalid-params", "set_params",
+            "--session",
+            "invalid-params",
+            "set_params",
             json.dumps({"topic": "测试"}, ensure_ascii=False),
             ok=False,
         )
@@ -91,7 +99,9 @@ class StateMachineTests(unittest.TestCase):
         self.run_cli("--session", "immutable", "start")
         self.set_params("immutable")
         result = self.run_cli(
-            "--session", "immutable", "set_params",
+            "--session",
+            "immutable",
+            "set_params",
             json.dumps({"topic": "changed", "min_sources": 10, "keywords_zh": ["x"], "keywords_en": ["y"]}),
             ok=False,
         )
@@ -114,9 +124,7 @@ class StateMachineTests(unittest.TestCase):
         self.set_params("validate")
         bad_report = Path(self.temp_dir.name) / "bad.md"
         bad_report.write_text("# 错误\n\n无内容\n", encoding="utf-8")
-        result = self.run_cli(
-            "--session", "validate", "done", "--report", str(bad_report), ok=False
-        )
+        result = self.run_cli("--session", "validate", "done", "--report", str(bad_report), ok=False)
         self.assertIn("validation failed", result.stderr)
         phase_output = self.run_cli("--session", "validate", "get_phase").stdout
         phase_value = [line for line in phase_output.splitlines() if not line.startswith("SESSION:")][0]
@@ -125,9 +133,7 @@ class StateMachineTests(unittest.TestCase):
     def test_done_requires_params(self) -> None:
         self.run_cli("--session", "no-params", "start")
         report = self.write_valid_report("no-params.md")
-        result = self.run_cli(
-            "--session", "no-params", "done", "--report", str(report), ok=False
-        )
+        result = self.run_cli("--session", "no-params", "done", "--report", str(report), ok=False)
         self.assertIn("not set", result.stderr)
 
     def test_done_rejects_duplicate(self) -> None:
@@ -135,29 +141,27 @@ class StateMachineTests(unittest.TestCase):
         self.set_params("double-done")
         report = self.write_valid_report("double-done.md")
         self.run_cli("--session", "double-done", "done", "--report", str(report))
-        result = self.run_cli(
-            "--session", "double-done", "done", "--report", str(report), ok=False
-        )
+        result = self.run_cli("--session", "double-done", "done", "--report", str(report), ok=False)
         self.assertIn("already completed", result.stderr)
 
     def test_done_rejects_wrong_topic(self) -> None:
         self.run_cli("--session", "wrong-topic", "start")
         self.set_params("wrong-topic")
         report = self.write_valid_report("wrong-topic.md", topic="完全不同的主题")
-        result = self.run_cli(
-            "--session", "wrong-topic", "done", "--report", str(report), ok=False
-        )
+        result = self.run_cli("--session", "wrong-topic", "done", "--report", str(report), ok=False)
         self.assertIn("主题", result.stderr)
 
     def test_sessions_isolated(self) -> None:
         self.run_cli("--session", "sess-a", "start")
         self.set_params("sess-a")
         self.run_cli("--session", "sess-b", "start")
+
         # get_phase now emits "SESSION:<id>" + phase value; extract the
         # phase value (the non-SESSION: line) for comparison.
         def _phase_for(session: str) -> str:
             out = self.run_cli("--session", session, "get_phase").stdout
             return [line for line in out.splitlines() if not line.startswith("SESSION:")][0]
+
         self.assertEqual(_phase_for("sess-a"), "STARTED")
         self.assertEqual(_phase_for("sess-b"), "STARTED")
 
@@ -172,7 +176,9 @@ class StateMachineTests(unittest.TestCase):
     def test_add_dimensions_extends_keywords(self) -> None:
         self.run_cli("--session", "extend-me", "start")
         self.set_params("extend-me")
-        ext = json.dumps({"keywords_zh": ["小米汽车", "蔚来"], "keywords_en": ["Xiaomi Auto", "NIO"]}, ensure_ascii=False)
+        ext = json.dumps(
+            {"keywords_zh": ["小米汽车", "蔚来"], "keywords_en": ["Xiaomi Auto", "NIO"]}, ensure_ascii=False
+        )
         self.add_dimensions("extend-me", ext)
         result = self.run_cli("--session", "extend-me", "get_params")
         lines = result.stdout.splitlines()
@@ -229,6 +235,44 @@ class StateMachineTests(unittest.TestCase):
     def test_rejects_path_traversal_session(self) -> None:
         result = self.run_cli("--session", "../escape", "start", ok=False)
         self.assertIn("session id must match", result.stderr)
+
+
+class ReportIntegrityCheckTests(_CliHarness, unittest.TestCase):
+    """`check` recomputes the DONE report hash instead of rubber-stamping it.
+
+    Regression for the INTEGRITY:OK fake loop (candidate 3): editing or
+    deleting the report after DONE must make `check` fail (exit 1), and the
+    two causes must be reported with distinct markers.
+    """
+
+    def test_check_ok_when_report_unchanged(self) -> None:
+        self.drive_to_done("intact")
+        result = self.run_cli("--session", "intact", "check")
+        lines = result.stdout.splitlines()
+        # Byte-exact DONE output contract: markers present, in order, unchanged.
+        self.assertEqual(
+            [ln.split(":", 1)[0] for ln in lines],
+            ["STATE", "SESSION", "FILE", "REPORT", "REPORT_SHA256", "MIN_SOURCES", "INTEGRITY"],
+        )
+        self.assertEqual(lines[0], "STATE:DONE")
+        self.assertEqual(lines[-1], "INTEGRITY:OK")
+        stored = json.loads(Path(lines[2].split(":", 1)[1]).read_text(encoding="utf-8"))
+        self.assertEqual(lines[4], f"REPORT_SHA256:{stored['report_validation']['sha256']}")
+        self.assertEqual(result.returncode, 0)
+
+    def test_check_detects_tampering(self) -> None:
+        report = self.drive_to_done("tampered")
+        report.write_bytes(report.read_bytes() + "\n偷改一段\n".encode("utf-8"))
+        result = self.run_cli("--session", "tampered", "check", ok=False)
+        self.assertIn("INTEGRITY:MISMATCH", result.stdout)
+        self.assertEqual(result.returncode, 1)
+
+    def test_check_detects_missing_report(self) -> None:
+        report = self.drive_to_done("gone")
+        report.unlink()
+        result = self.run_cli("--session", "gone", "check", ok=False)
+        self.assertIn("INTEGRITY:MISSING", result.stdout)
+        self.assertEqual(result.returncode, 1)
 
 
 if __name__ == "__main__":

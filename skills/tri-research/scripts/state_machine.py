@@ -26,9 +26,12 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
 from validate_report import (  # noqa: E402
+    ReportMissingError,
+    ReportTamperedError,
     ReportValidationError,
     require_complete_proof,
     validate_and_build_proof,
+    verify_proof_integrity,
 )
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -444,6 +447,31 @@ def emit(data: dict[str, Any], store: StateStore) -> None:
         print(f"MIN_SOURCES:{proof['min_sources']}")
 
 
+def _verify_integrity_line(data: dict[str, Any]) -> None:
+    """Print the INTEGRITY marker, recomputing the report hash for DONE.
+
+    A DONE session must still match the fingerprint stored at completion:
+    a changed report prints INTEGRITY:MISMATCH and a moved/deleted one
+    INTEGRITY:MISSING, both raised as StateError so the CLI exits 1 with an
+    ERROR: line instead of silently claiming OK. Non-DONE phases carry no
+    proof to verify (STARTED never has one; add_dimensions clears it), so
+    integrity stays vacuously OK there — the behaviour `check` predates on.
+    """
+    if data["phase"] != "DONE":
+        print("INTEGRITY:OK")
+        return
+    proof = data["report_validation"]  # emit() already asserted completeness
+    try:
+        verify_proof_integrity(proof)
+    except ReportMissingError as exc:
+        print("INTEGRITY:MISSING")
+        raise StateError(str(exc)) from exc
+    except ReportTamperedError as exc:
+        print("INTEGRITY:MISMATCH")
+        raise StateError(str(exc)) from exc
+    print("INTEGRITY:OK")
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, default=default_state_dir())
@@ -488,7 +516,7 @@ def run(args: argparse.Namespace) -> int:
 
     if args.command == "check":
         emit(data, store)
-        print("INTEGRITY:OK")
+        _verify_integrity_line(data)
         return 0
 
     if args.command == "get_phase":
@@ -534,6 +562,11 @@ def main() -> int:
     try:
         return run(args)
     except StateError as exc:
+        # Flush stdout first so merged-stream consumers (the Lead Agent's
+        # Bash, CI `2>&1`) see the STATE:/.../INTEGRITY: markers before the
+        # ERROR: line, which a line-by-line parser must be able to attribute
+        # to the INTEGRITY check rather than to command start-up.
+        sys.stdout.flush()
         print(f"ERROR:{exc}", file=sys.stderr)
         return 1
 

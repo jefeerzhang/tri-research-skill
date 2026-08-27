@@ -4,6 +4,7 @@ This pins the path-level proof lifecycle that used to be split between
 state_machine.py and validate_report.py: read report -> validate text ->
 build report_validation proof -> assert proof completeness.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -60,6 +61,53 @@ class ReportValidationProofTests(unittest.TestCase):
         with self.assertRaises(self.vr.ReportValidationError) as ctx:
             self.vr.require_complete_proof({"path": "/tmp/report.md"}, "s1")
         self.assertIn("incomplete", str(ctx.exception))
+
+
+class ProofIntegrityTests(unittest.TestCase):
+    """`verify_proof_integrity` recomputes the report hash from raw bytes.
+
+    Closes the INTEGRITY fake loop: DONE stores a fingerprint; re-reading
+    must detect post-DONE edits (tamper) or a moved/deleted file (missing),
+    distinguishing the two so callers can label them differently.
+    """
+
+    def setUp(self) -> None:
+        self.vr = load_module(SCRIPTS_DIR / "validate_report.py", "validate_report_integrity_test")
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.tmp_path = Path(self.tmp.name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _proof(self, report: Path) -> dict:
+        return self.vr.validate_and_build_proof(report, 10, expected_topic="人工智能与劳动分配")
+
+    def test_unchanged_report_verifies_clean(self) -> None:
+        report = self.tmp_path / "report.md"
+        make_valid_report(report)
+        proof = self._proof(report)
+        self.vr.verify_proof_integrity(proof)  # must not raise
+
+    def test_tampered_report_raises_tampered(self) -> None:
+        report = self.tmp_path / "report.md"
+        make_valid_report(report)
+        proof = self._proof(report)
+        report.write_bytes(report.read_bytes() + "\n偷偷改一段\n".encode("utf-8"))
+        with self.assertRaises(self.vr.ReportTamperedError):
+            self.vr.verify_proof_integrity(proof)
+
+    def test_deleted_report_raises_missing(self) -> None:
+        report = self.tmp_path / "report.md"
+        make_valid_report(report)
+        proof = self._proof(report)
+        report.unlink()
+        with self.assertRaises(self.vr.ReportMissingError):
+            self.vr.verify_proof_integrity(proof)
+
+    def test_integrity_errors_are_report_validation_errors(self) -> None:
+        # Callers catching ReportValidationError must keep working unchanged.
+        self.assertTrue(issubclass(self.vr.ReportTamperedError, self.vr.ReportValidationError))
+        self.assertTrue(issubclass(self.vr.ReportMissingError, self.vr.ReportValidationError))
 
 
 if __name__ == "__main__":

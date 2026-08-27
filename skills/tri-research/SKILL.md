@@ -195,6 +195,8 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 命令：`start` → `set_params` → `done --report`；`add_dimensions` 追加；`check` / `get_params` 查看。
 
+完整性复核：`DONE` 会话的 `check` 会按原始字节重算报告 SHA-256 并与 `done` 时记录的指纹比对——一致打 `INTEGRITY:OK`（退出码 0），报告被改打 `INTEGRITY:MISMATCH`、报告不可读（删除/移动）打 `INTEGRITY:MISSING`，后两者退出码 1；非 `DONE` 阶段无指纹可验，仍打 `INTEGRITY:OK`。报告被合法改动后需重跑 `validate_report.py` + `done` 才能恢复 `OK`。
+
 规则：状态只前进不后退；`start` 同 id 不可重复；`done` 必须通过报告验证器。
 
 ## 安全边界

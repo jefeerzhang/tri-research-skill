@@ -42,9 +42,7 @@ REQUIRED_SOURCE_BACKENDS = (
     "SerpApi",
     "WebSearch",
 )
-SOURCE_USAGE_ROW_RE = re.compile(
-    r"(?m)^\|?\s*搜索源使用\s*\|?\s*(.+?)\s*\|?\s*$"
-)
+SOURCE_USAGE_ROW_RE = re.compile(r"(?m)^\|?\s*搜索源使用\s*\|?\s*(.+?)\s*\|?\s*$")
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "gclid",
@@ -59,6 +57,14 @@ RESERVED_SUFFIXES = (".example", ".invalid", ".localhost", ".test")
 
 class ReportValidationError(RuntimeError):
     """Raised when report validation or proof lifecycle fails."""
+
+
+class ReportMissingError(ReportValidationError):
+    """A proof points at a report file that can no longer be read."""
+
+
+class ReportTamperedError(ReportValidationError):
+    """The report bytes changed after the DONE proof recorded its hash."""
 
 
 def normalize_topic(value: str) -> str:
@@ -104,8 +110,7 @@ def canonicalize_url(value: str) -> str | None:
     ):
         return None
     if port and not (
-        (parsed.scheme.lower() == "http" and port == 80)
-        or (parsed.scheme.lower() == "https" and port == 443)
+        (parsed.scheme.lower() == "http" and port == 80) or (parsed.scheme.lower() == "https" and port == 443)
     ):
         host = f"{host}:{port}"
     path = re.sub(r"/{2,}", "/", parsed.path or "/").rstrip("/") or "/"
@@ -113,8 +118,7 @@ def canonicalize_url(value: str) -> str | None:
         sorted(
             (key, value)
             for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-            if not key.lower().startswith("utm_")
-            and key.lower() not in TRACKING_QUERY_KEYS
+            if not key.lower().startswith("utm_") and key.lower() not in TRACKING_QUERY_KEYS
         ),
         doseq=True,
     )
@@ -171,9 +175,7 @@ def _language_entries(reference_entries: list[str]) -> tuple[int, int]:
     return chinese, english
 
 
-def validate(
-    text: str, min_sources: int, *, expected_topic: str | None = None
-) -> list[str]:
+def validate(text: str, min_sources: int, *, expected_topic: str | None = None) -> list[str]:
     text = text.lstrip("\ufeff")
     errors: list[str] = []
     required_headings = (
@@ -208,13 +210,9 @@ def validate(
             errors.append("执行情况缺少搜索源使用行")
         else:
             usage_cell = usage_match.group(1)
-            missing_backends = [
-                name for name in REQUIRED_SOURCE_BACKENDS if name not in usage_cell
-            ]
+            missing_backends = [name for name in REQUIRED_SOURCE_BACKENDS if name not in usage_cell]
             if missing_backends:
-                errors.append(
-                    "执行情况搜索源使用未报告: " + " / ".join(missing_backends)
-                )
+                errors.append("执行情况搜索源使用未报告: " + " / ".join(missing_backends))
 
     references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
     # 截止到下一个二级标题：## 参考文献 之后的章节（执行情况、附录等）
@@ -255,9 +253,7 @@ def validate(
     unique_urls = set(reference_urls.values())
     if len(unique_urls) < len(reference_urls):
         duplicate_numbers = sorted(
-            number
-            for number, url in reference_urls.items()
-            if list(reference_urls.values()).count(url) > 1
+            number for number, url in reference_urls.items() if list(reference_urls.values()).count(url) > 1
         )
         errors.append(f"参考文献 URL 重复: {duplicate_numbers}")
     if len(unique_urls) < min_sources:
@@ -348,8 +344,7 @@ def require_complete_proof(proof: Any, session_id: str) -> None:
     required = ("path", "sha256", "min_sources")
     if not isinstance(proof, dict):
         raise ReportValidationError(
-            f"phase=DONE but report_validation is missing for session "
-            f"{session_id!r} — state file is corrupt"
+            f"phase=DONE but report_validation is missing for session {session_id!r} — state file is corrupt"
         )
     missing = [key for key in required if key not in proof or proof[key] in (None, "")]
     if missing:
@@ -359,15 +354,40 @@ def require_complete_proof(proof: Any, session_id: str) -> None:
         )
 
 
+def verify_proof_integrity(proof: dict[str, Any]) -> None:
+    """Recompute the report's SHA-256 and compare it against the stored proof.
+
+    This is the verification half of the Report Validation lifecycle: DONE
+    records a fingerprint via :func:`validate_and_build_proof`; re-running
+    this catches any post-DONE edit to the report on disk. It reads raw
+    bytes with the same recipe as proof-building — a text-mode read would
+    mistranslate CRLF files and yield false mismatches (see fix 550874e).
+
+    Raises ReportMissingError when the file cannot be read and
+    ReportTamperedError when its current bytes no longer match the recorded
+    hash. Both subclass ReportValidationError so callers that already handle
+    that base type keep working unchanged.
+    """
+    raw_path = proof["path"]
+    if not isinstance(raw_path, str):
+        # require_complete_proof only rejects None/""; a hand-corrupted state
+        # could hold a non-string. Guard so we keep the module's never-
+        # traceback invariant instead of crashing inside Path().
+        raise ReportMissingError(f"report not readable: proof path is not a string: {raw_path!r}")
+    report_path = Path(raw_path).expanduser()
+    try:
+        report_bytes = report_path.read_bytes()
+    except OSError as exc:
+        raise ReportMissingError(f"report not readable: {report_path} ({exc})") from exc
+    if sha256_bytes(report_bytes) != proof["sha256"]:
+        raise ReportTamperedError(f"report changed after DONE: {report_path}")
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
-    parser.add_argument(
-        "--min-sources", type=source_threshold, default=MIN_REPORT_SOURCES
-    )
-    parser.add_argument(
-        "--topic", help="确认的研究主题（必须出现在标题中）"
-    )
+    parser.add_argument("--min-sources", type=source_threshold, default=MIN_REPORT_SOURCES)
+    parser.add_argument("--topic", help="确认的研究主题（必须出现在标题中）")
     return parser
 
 
@@ -391,4 +411,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

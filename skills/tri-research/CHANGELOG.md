@@ -6,6 +6,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ### Fixed
 
+- **`check` 的 `INTEGRITY:OK` 假闭环**：`check` 以前无论阶段、无论报告是否被改都直接打 `INTEGRITY:OK`（`require_complete_proof` 只校验收据字段非空，从不重算文件哈希），DONE 后偷改报告不会被发现——与 README / CHANGELOG 早已声称的「完成哈希可机器复核」不符。现在 `validate_report.verify_proof_integrity` 按与建据同样的**原始字节**算法（沿用 550874e 的 read_bytes 口径，避免 CRLF 误判）重算并与 DONE 时存的指纹比对：不一致打 `INTEGRITY:MISMATCH`、报告不可读（删/移）打 `INTEGRITY:MISSING`，两者均以 `StateError` 退出码 1（区分“被人改”与“换机器路径失效”）；`ReportTamperedError` / `ReportMissingError` 为 `ReportValidationError` 子类，现有捕获不变；非 DONE 阶段无收据可验，仍打 `INTEGRITY:OK`（`test_check_works` 契约不变）。回归测试：`tests/test_report_validation_proof.py`、`tests/test_state_machine.py::ReportIntegrityCheckTests`。
 - **Tavily `--depth` 参数静默丢失**：CLI flag 的 dest 是 `depth`，但 Tavily API 形参是 `search_depth`；`search_backends.py` 原样透传 dest，SDK 用 `**kwargs` 吞掉未知参数不报错，导致 `--depth advanced` 从未生效而输出元数据仍声称 `search_depth=advanced`。现映射为 `search_depth` 后再调用。回归测试：`tests/test_search_backends.py`。
 - **并发 `start` 偶发 traceback 崩溃**：`_atomic_write_text` 用固定临时名 `<path>.tmp`，两个进程并发 `start` 不同 session 时同写共享的 `active-session` 指针互相踩踏（Windows PermissionError / POSIX FileNotFoundError）；改成按进程 PID 唯一临时名后，Windows 下 MoveFileEx 对同一目标的并发替换仍可能瞬时 ACCESS_DENIED，再补短退避重试。压测 360 次并发 `start` 由 24/180 失败降到 0/360。回归测试：`tests/test_concurrency.py`、`tests/test_state_store.py`。
 

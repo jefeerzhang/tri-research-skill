@@ -37,5 +37,5 @@ _Avoid_: 必选/可选二分、优先级混称
 _Avoid_: 托管任务、wrapped command、managed handler 混称
 
 **Report Validation**:
-报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface。
+报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
