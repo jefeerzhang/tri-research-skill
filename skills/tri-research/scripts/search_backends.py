@@ -14,6 +14,7 @@ unchanged.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -86,9 +87,26 @@ class ExaBackend(_search_cli.Backend):
 
 
 def _exa_cmd_answer(args: Any) -> None:
-    client = EXA_BACKEND.client()
+    # Contract: extra commands share retry/timeout/circuit via invoke and respect --no-proxy
+    if getattr(args, "no_proxy", False):
+        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            os.environ.pop(_p, None)
+    # Use KeyProvider for .env support (unified with Registry)
     try:
-        resp = client.answer(args.query, text=True)
+        from _search_registry import KeyProvider  # noqa: E402
+
+        api_key = KeyProvider.resolve(None, EXA_BACKEND.env_key)
+    except ImportError:
+        api_key = os.environ.get(EXA_BACKEND.env_key)
+    if not api_key:
+        print(json.dumps({"error": f"{EXA_BACKEND.env_key} not set", "query": args.query}))
+        sys.exit(1)
+    if EXA_BACKEND.sdk is None:
+        print(json.dumps({"error": EXA_BACKEND.missing_sdk_message, "query": args.query}))
+        sys.exit(1)
+    client = EXA_BACKEND.client_factory(api_key)
+    try:
+        resp = _search_cli.invoke(EXA_BACKEND, lambda: client.answer(args.query, text=True))
     except Exception as exc:
         print(json.dumps({"error": str(exc), "query": args.query}))
         sys.exit(1)
@@ -108,9 +126,24 @@ def _exa_cmd_answer(args: Any) -> None:
 
 
 def _exa_cmd_contents(args: Any) -> None:
-    client = EXA_BACKEND.client()
+    if getattr(args, "no_proxy", False):
+        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            os.environ.pop(_p, None)
     try:
-        resp = client.get_contents(urls=[args.url])
+        from _search_registry import KeyProvider  # noqa: E402
+
+        api_key = KeyProvider.resolve(None, EXA_BACKEND.env_key)
+    except ImportError:
+        api_key = os.environ.get(EXA_BACKEND.env_key)
+    if not api_key:
+        print(json.dumps({"error": f"{EXA_BACKEND.env_key} not set", "url": args.url}))
+        sys.exit(1)
+    if EXA_BACKEND.sdk is None:
+        print(json.dumps({"error": EXA_BACKEND.missing_sdk_message, "url": args.url}))
+        sys.exit(1)
+    client = EXA_BACKEND.client_factory(api_key)
+    try:
+        resp = _search_cli.invoke(EXA_BACKEND, lambda: client.get_contents(urls=[args.url]))
     except Exception as exc:
         print(json.dumps({"error": str(exc), "url": args.url}))
         sys.exit(1)
@@ -202,9 +235,24 @@ class TavilyBackend(_search_cli.Backend):
 
 
 def _tavily_cmd_extract(args: Any) -> None:
-    client = TAVILY_BACKEND.client()
+    if getattr(args, "no_proxy", False):
+        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            os.environ.pop(_p, None)
     try:
-        resp = client.extract(urls=[args.url], extract_depth=args.depth)
+        from _search_registry import KeyProvider  # noqa: E402
+
+        api_key = KeyProvider.resolve(None, TAVILY_BACKEND.env_key)
+    except ImportError:
+        api_key = os.environ.get(TAVILY_BACKEND.env_key)
+    if not api_key:
+        print(json.dumps({"error": f"{TAVILY_BACKEND.env_key} not set", "url": args.url}))
+        sys.exit(1)
+    if TAVILY_BACKEND.sdk is None:
+        print(json.dumps({"error": TAVILY_BACKEND.missing_sdk_message, "url": args.url}))
+        sys.exit(1)
+    client = TAVILY_BACKEND.client_factory(api_key)
+    try:
+        resp = _search_cli.invoke(TAVILY_BACKEND, lambda: client.extract(urls=[args.url], extract_depth=args.depth))
     except Exception as exc:
         print(json.dumps({"error": str(exc), "url": args.url}))
         sys.exit(1)
