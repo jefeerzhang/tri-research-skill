@@ -4,5 +4,9 @@ __pycache__/
 .env
 skills/*/.env
 
+# Node 工具链（commitlint / husky / changelog）
+node_modules/
+npm-debug.log*
+
 # 临时文件（shell 调试 / 状态机临时目录）
 .tmp-*
