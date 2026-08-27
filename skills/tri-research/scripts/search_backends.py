@@ -10,12 +10,16 @@ both thin) instead of burying SerpApi-specific glue here.
 The per-backend CLI scripts (`exa_search.py`, `tavily_search.py`) remain
 thin entry points so existing callers, sub-agents and tests keep working
 unchanged.
+
+The extra commands here (`answer` / `contents` / `extract`) are declared
+**managed**: `_search_cli.run_managed_command` performs proxy clearing,
+key resolution (env + `.env`), the SDK-missing check, client build,
+retry/timeout/circuit and all JSON printing — bodies below only shape one
+SDK call into its output (see ADR-0002 for why SerpApi stays unmanaged).
 """
 
 from __future__ import annotations
 
-import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -90,30 +94,9 @@ class ExaBackend(_search_cli.Backend):
         }
 
 
-def _exa_cmd_answer(args: Any) -> None:
-    # Contract: extra commands share retry/timeout/circuit via invoke and respect --no-proxy
-    if getattr(args, "no_proxy", False):
-        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-            os.environ.pop(_p, None)
-    # Use KeyProvider for .env support (unified with Registry)
-    try:
-        from _search_registry import KeyProvider  # noqa: E402
-
-        api_key = KeyProvider.resolve(None, EXA_BACKEND.env_key)
-    except ImportError:
-        api_key = os.environ.get(EXA_BACKEND.env_key)
-    if not api_key:
-        print(json.dumps({"error": f"{EXA_BACKEND.env_key} not set", "query": args.query}))
-        sys.exit(1)
-    if EXA_BACKEND.sdk is None:
-        print(json.dumps({"error": EXA_BACKEND.missing_sdk_message, "query": args.query}))
-        sys.exit(1)
-    client = EXA_BACKEND.client_factory(api_key)
-    try:
-        resp = _search_cli.invoke(EXA_BACKEND, lambda: client.answer(args.query, text=True))
-    except Exception as exc:
-        print(json.dumps({"error": str(exc), "query": args.query}))
-        sys.exit(1)
+def _exa_answer(client: Any, args: Any) -> dict[str, Any]:
+    """Managed body: one SDK call + citation shaping; lifecycle is skeleton's."""
+    resp = client.answer(args.query, text=True)
     citations = []
     if hasattr(resp, "citations") and resp.citations:
         for cit in resp.citations:
@@ -124,50 +107,23 @@ def _exa_cmd_answer(args: Any) -> None:
                     "text": (cit.text or "")[:1000] if hasattr(cit, "text") and cit.text else "",
                 }
             )
-    print(
-        json.dumps(
-            {
-                "query": args.query,
-                "answer": resp.answer if hasattr(resp, "answer") else "",
-                "citations": citations,
-            },
-            ensure_ascii=False,
-        )
-    )
+    return {
+        "query": args.query,
+        "answer": resp.answer if hasattr(resp, "answer") else "",
+        "citations": citations,
+    }
 
 
-def _exa_cmd_contents(args: Any) -> None:
-    if getattr(args, "no_proxy", False):
-        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-            os.environ.pop(_p, None)
-    try:
-        from _search_registry import KeyProvider  # noqa: E402
-
-        api_key = KeyProvider.resolve(None, EXA_BACKEND.env_key)
-    except ImportError:
-        api_key = os.environ.get(EXA_BACKEND.env_key)
-    if not api_key:
-        print(json.dumps({"error": f"{EXA_BACKEND.env_key} not set", "url": args.url}))
-        sys.exit(1)
-    if EXA_BACKEND.sdk is None:
-        print(json.dumps({"error": EXA_BACKEND.missing_sdk_message, "url": args.url}))
-        sys.exit(1)
-    client = EXA_BACKEND.client_factory(api_key)
-    try:
-        resp = _search_cli.invoke(EXA_BACKEND, lambda: client.get_contents(urls=[args.url]))
-    except Exception as exc:
-        print(json.dumps({"error": str(exc), "url": args.url}))
-        sys.exit(1)
-    pages = []
-    for p in resp.results:
-        pages.append(
-            {
-                "url": p.url,
-                "title": p.title if hasattr(p, "title") else "",
-                "text": (p.text or "")[:5000] if hasattr(p, "text") and p.text else "",
-            }
-        )
-    print(json.dumps(pages, ensure_ascii=False))
+def _exa_contents(client: Any, args: Any) -> list[dict[str, Any]]:
+    resp = client.get_contents(urls=[args.url])
+    return [
+        {
+            "url": p.url,
+            "title": p.title if hasattr(p, "title") else "",
+            "text": (p.text or "")[:5000] if hasattr(p, "text") and p.text else "",
+        }
+        for p in resp.results
+    ]
 
 
 EXA_BACKEND = ExaBackend()
@@ -176,13 +132,17 @@ EXA_BACKEND.commands = [
         "answer",
         "Ask Exa a question with grounded answer",
         lambda p: p.add_argument("query", help="Question to answer"),
-        _exa_cmd_answer,
+        _exa_answer,
+        managed=True,
+        echo=lambda a: {"query": a.query},
     ),
     _search_cli.Command(
         "contents",
         "Extract content from a URL",
         lambda p: p.add_argument("url", help="URL to extract"),
-        _exa_cmd_contents,
+        _exa_contents,
+        managed=True,
+        echo=lambda a: {"url": a.url},
     ),
 ]
 
@@ -257,42 +217,21 @@ class TavilyBackend(_search_cli.Backend):
         }
 
 
-def _tavily_cmd_extract(args: Any) -> None:
-    if getattr(args, "no_proxy", False):
-        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-            os.environ.pop(_p, None)
-    try:
-        from _search_registry import KeyProvider  # noqa: E402
-
-        api_key = KeyProvider.resolve(None, TAVILY_BACKEND.env_key)
-    except ImportError:
-        api_key = os.environ.get(TAVILY_BACKEND.env_key)
-    if not api_key:
-        print(json.dumps({"error": f"{TAVILY_BACKEND.env_key} not set", "url": args.url}))
-        sys.exit(1)
-    if TAVILY_BACKEND.sdk is None:
-        print(json.dumps({"error": TAVILY_BACKEND.missing_sdk_message, "url": args.url}))
-        sys.exit(1)
-    client = TAVILY_BACKEND.client_factory(api_key)
-    try:
-        resp = _search_cli.invoke(TAVILY_BACKEND, lambda: client.extract(urls=[args.url], extract_depth=args.depth))
-    except Exception as exc:
-        print(json.dumps({"error": str(exc), "url": args.url}))
-        sys.exit(1)
-    pages = []
-    for p in resp.get("results", []):
-        pages.append(
-            {
-                "url": p.get("url", args.url),
-                "title": p.get("title", ""),
-                "content": (p.get("content") or "")[:20000],
-            }
-        )
-    if pages:
-        print(json.dumps(pages[0], ensure_ascii=False))
-    else:
-        print(json.dumps({"error": "no content extracted", "url": args.url}))
-        sys.exit(1)
+def _tavily_extract(client: Any, args: Any) -> dict[str, Any]:
+    resp = client.extract(urls=[args.url], extract_depth=args.depth)
+    pages = [
+        {
+            "url": p.get("url", args.url),
+            "title": p.get("title", ""),
+            "content": (p.get("content") or "")[:20000],
+        }
+        for p in resp.get("results", [])
+    ]
+    if not pages:
+        # CommandError is non-retryable; the skeleton turns it into the
+        # legacy {"error": "no content extracted", "url": ...} + exit 1.
+        raise _search_cli.CommandError("no content extracted")
+    return pages[0]
 
 
 def _tavily_add_extract_args(parser: Any) -> None:
@@ -302,7 +241,14 @@ def _tavily_add_extract_args(parser: Any) -> None:
 
 TAVILY_BACKEND = TavilyBackend()
 TAVILY_BACKEND.commands = [
-    _search_cli.Command("extract", "Extract content from a URL", _tavily_add_extract_args, _tavily_cmd_extract),
+    _search_cli.Command(
+        "extract",
+        "Extract content from a URL",
+        _tavily_add_extract_args,
+        _tavily_extract,
+        managed=True,
+        echo=lambda a: {"url": a.url},
+    ),
 ]
 
 try:

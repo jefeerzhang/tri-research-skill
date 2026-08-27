@@ -19,6 +19,14 @@ Transient failures (timeout, connection, 429, 5xx) are retried with
 backoff behind `search` / `batch_search`. Repeated exhausted failures
 open a per-backend circuit so later calls fail fast. `check` applies
 timeout but not retry. Missing SDK / missing key still fail immediately.
+
+Extra commands (`answer` / `contents` / `extract`) can be declared
+*managed* (see `Command.managed`): `run_managed_command` then owns their
+whole lifecycle — proxy clearing, key resolution, SDK-missing check,
+client build, `invoke`, error-JSON printing and exit codes — so each
+command body declares nothing but its SDK call and result shaping.
+Unmanaged commands keep the historical bare `(args)` contract, which is
+what backends with their own error discipline (SerpApi) rely on.
 """
 
 from __future__ import annotations
@@ -30,7 +38,7 @@ import re
 import sys
 import threading
 import time
-from typing import Any, Callable, Sequence, TypeVar
+from typing import Any, Callable, NoReturn, Sequence, TypeVar
 
 _T = TypeVar("_T")
 
@@ -43,6 +51,10 @@ def json_error(message: str) -> None:
 
 class CircuitOpenError(RuntimeError):
     """Raised when a backend circuit is open; not retryable, fail-fast."""
+
+
+class CommandError(RuntimeError):
+    """Domain failure raised by a managed command body; never retried."""
 
 
 class Flag:
@@ -86,21 +98,39 @@ class Flag:
 
 
 class Command:
-    """An extra backend-specific subcommand (e.g. Exa `answer`)."""
+    """A backend-specific subcommand (e.g. Exa `answer`).
 
-    __slots__ = ("name", "help", "add_args", "run")
+    Two execution contracts live here:
+
+    - Unmanaged (``managed=False``, the default): ``run(args)`` is called
+      with the bare namespace and owns everything itself. SerpApi's
+      entries stay on this contract deliberately (ADR-0002).
+    - Managed (``managed=True``): ``run(client, args)`` is invoked by
+      :func:`run_managed_command`, which resolves the key, checks the SDK,
+      builds the client, wraps the call in `invoke` and prints the result
+      (or the error JSON). ``echo`` supplies the identifying fields
+      (`{"query": ...}` / `{"url": ...}`) merged into every error payload
+      so the published error shape stays byte-identical.
+    """
+
+    __slots__ = ("name", "help", "add_args", "run", "managed", "echo")
 
     def __init__(
         self,
         name: str,
         help: str,
         add_args: Callable[[argparse.ArgumentParser], None],
-        run: Callable[[argparse.Namespace], None],
+        run: Callable[..., Any],
+        *,
+        managed: bool = False,
+        echo: Callable[[argparse.Namespace], dict[str, Any]] | None = None,
     ) -> None:
         self.name = name
         self.help = help
         self.add_args = add_args
         self.run = run
+        self.managed = managed
+        self.echo = echo
 
 
 class Backend:
@@ -113,17 +143,17 @@ class Backend:
 
     name: str = ""
     help: str = ""
-    sdk: Any = None                       # imported SDK module; None when missing
-    missing_sdk_message: str = ""         # JSON error when sdk is None
-    env_key: str = ""                     # API key environment variable
+    sdk: Any = None  # imported SDK module; None when missing
+    missing_sdk_message: str = ""  # JSON error when sdk is None
+    env_key: str = ""  # API key environment variable
     client_factory: Callable[[str], Any] = None
     # Immutable defaults: a class-level list shared across subclasses would
     # leak runtime appends (e.g. registering an extra command) to every
     # other backend. Subclasses may still assign their own sequence.
-    flags: Sequence[Flag] = ()            # flags attached to search/batch_search
-    global_flags: Sequence[Flag] = ()     # flags attached to the root parser
-    commands: Sequence[Command] = ()      # extra subcommands
-    results_key: str = "results"          # key of the result list in search() output
+    flags: Sequence[Flag] = ()  # flags attached to search/batch_search
+    global_flags: Sequence[Flag] = ()  # flags attached to the root parser
+    commands: Sequence[Command] = ()  # extra subcommands
+    results_key: str = "results"  # key of the result list in search() output
     search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
@@ -149,20 +179,14 @@ class Backend:
         """Run a trivial query; return True on success, raise on failure."""
         raise NotImplementedError
 
-    def search(
-        self, client: Any, query: str, options: dict[str, Any]
-    ) -> dict[str, Any]:
+    def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
         """Run one query; return the JSON-ready output dict (without 'query')."""
         raise NotImplementedError
 
 
 def search_options(backend: Backend, args: argparse.Namespace) -> dict[str, Any]:
     """Collect declared flags that were actually passed into a kwargs dict."""
-    return {
-        flag.dest: getattr(args, flag.dest)
-        for flag in backend.flags
-        if getattr(args, flag.dest) is not None
-    }
+    return {flag.dest: getattr(args, flag.dest) for flag in backend.flags if getattr(args, flag.dest) is not None}
 
 
 def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
@@ -225,7 +249,7 @@ def _http_status(exc: BaseException) -> int | None:
 
 
 def _is_retryable(exc: BaseException) -> bool:
-    if isinstance(exc, CircuitOpenError):
+    if isinstance(exc, (CircuitOpenError, CommandError)):
         return False
     if isinstance(exc, TimeoutError):
         return True
@@ -242,10 +266,7 @@ def _is_retryable(exc: BaseException) -> bool:
     if exit_code == 3:
         return True
     message = str(exc).lower()
-    return any(
-        token in message
-        for token in ("timeout", "timed out", "connection", "rate limit", "ssl")
-    )
+    return any(token in message for token in ("timeout", "timed out", "connection", "rate limit", "ssl"))
 
 
 def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
@@ -268,7 +289,7 @@ def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
                 if _is_retryable(exc):
                     _circuit_exhausted(backend)
                 raise
-            delay = retry_backoff * (2 ** attempt)
+            delay = retry_backoff * (2**attempt)
             if delay > 0:
                 time.sleep(delay)
             continue
@@ -341,6 +362,49 @@ def batch_search(backend: Backend, args: argparse.Namespace) -> None:
     print(json.dumps(all_results, ensure_ascii=False))
 
 
+def _emit_command_error(command: Command, args: argparse.Namespace, message: str) -> NoReturn:
+    """Print the legacy error shape ({"error": msg, **echo}) and exit 1.
+
+    Errors keep the historical default (ASCII-escaped) encoding while
+    success payloads are printed with ensure_ascii=False. Typed as
+    ``NoReturn`` because it always exits: callers rely on control never
+    falling through to a client build with a missing key or SDK.
+    """
+    payload: dict[str, Any] = {"error": message}
+    if command.echo is not None:
+        payload.update(command.echo(args))
+    print(json.dumps(payload))
+    sys.exit(1)
+
+
+def run_managed_command(backend: Backend, command: Command, args: argparse.Namespace) -> None:
+    """Skeleton-owned lifecycle for a managed extra command.
+
+    Order is load bearing: proxy -> key -> SDK -> client -> invoke. The
+    SDK check must precede ``client_factory``, otherwise a missing SDK
+    turns into a traceback instead of the documented JSON contract.
+    """
+    # Function-local import: `_search_registry` imports this module, so a
+    # top-level import would be circular. The registry is guaranteed
+    # importable here (search_backends imports it unconditionally at top).
+    from _search_registry import KeyProvider
+
+    _maybe_clear_proxy(args)
+    api_key = KeyProvider.resolve(None, backend.env_key)
+    if not api_key:
+        _emit_command_error(command, args, f"{backend.env_key} not set")
+    if backend.sdk is None:
+        _emit_command_error(command, args, backend.missing_sdk_message)
+    client = backend.client_factory(api_key)
+    try:
+        output = invoke(backend, lambda: command.run(client, args))
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except BaseException as exc:
+        _emit_command_error(command, args, str(exc))
+    print(json.dumps(output, ensure_ascii=False))
+
+
 def build_parser(backend: Backend) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=backend.help)
     for flag in backend.global_flags:
@@ -383,7 +447,10 @@ def run(backend: Backend, argv: list[str] | None = None) -> int:
     else:
         for command in backend.commands:
             if command.name == args.command:
-                command.run(args)
+                if command.managed:
+                    run_managed_command(backend, command, args)
+                else:
+                    command.run(args)
                 return 0
         parser.print_help()
         return 2

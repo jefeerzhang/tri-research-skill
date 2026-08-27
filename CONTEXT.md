@@ -32,6 +32,10 @@ _Avoid_: backend config 泛称
 Search Backend 的三档必要性分级，决定缺 key 时的编排行为：`required` 缺失则暂停并引导配置，`recommended` 缺失仅黄字提醒但允许匿名降级，`optional` 缺失静默跳过。
 _Avoid_: 必选/可选二分、优先级混称
 
+**Managed Command**:
+由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责密钥解析（经 `KeyProvider`，可读 `.env`）、SDK 缺失检查、client 构建、`invoke`（超时 / 重试 / 熔断）、错误 JSON 打印与退出码；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
+_Avoid_: 托管任务、wrapped command、managed handler 混称
+
 **Report Validation**:
 报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface。
 _Avoid_: report check 泛称

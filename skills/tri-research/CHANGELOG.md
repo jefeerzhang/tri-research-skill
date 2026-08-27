@@ -11,6 +11,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ### Changed
 
+- **extra 命令深化为 Managed Command**：`_search_cli.Command` 新增 `managed` / `echo` opt-in 开关与 `run_managed_command` 骨架，统一接管代理清理、密钥解析（读 `.env`）、缺 SDK 检查、client 构建、`invoke`（超时 / 重试 / 熔断）、错误 JSON 打印与退出码；Exa `answer` / `contents`、Tavily `extract` 三个命令体由每人手抄约 20 行 bootstrap 收敛为「一次 SDK 调用 + 结果整形」。命令表面、JSON 形状（错误默认转义、成功 `ensure_ascii=False`）与退出码保持不变；SerpApi 的 `doc` / `engines` / `export` 不拧开关，契约与代码零改动（决策见 `docs/adr/0002-extra命令深化为ManagedCommand并限定tri-research.md`，术语见 `CONTEXT.md`「Managed Command」）。删除 `search_backends.py` 中永不触发的 `except ImportError` 密钥回退死分支。测试：`tests/test_managed_command.py`（含防止 glue 回流到命令体的源码闸门）。
 - **AnySearch 接口同步到 v3.1.0**：上游 AnySearch 在 v3.1.0 将 CLI 迁到直接调 `https://api.anysearch.com` public HTTP（Python 走 `requests`，Node 走内置 `https`）。tri-research 主 SKILL / subagent SKILL / 能力边界表将版本标注由「3.0 版」改为「3.1 版（直接调 public HTTP）」，速查表补 `get_sub_domains --domains` 与 REST-native `--tag`/`--params`，subagent 命令示例同步更新。`runtime.conf` 作为预先探测的快速路径仍保留。
 
 ### Added
