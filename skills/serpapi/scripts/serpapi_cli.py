@@ -72,42 +72,16 @@ class SerpApiError(Exception):
         self.exit_code = exit_code
 
 
-def clear_proxy_vars() -> None:
-    """Drop proxy env vars for this process only (opt-in via --no-proxy)."""
-    for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-        os.environ.pop(_p, None)
-
-
-def _key_from_env_file(env_path: Path) -> str | None:
-    try:
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                key, sep, value = line.partition("=")
-                if sep and key.strip() == "SERPAPI_KEY":
-                    return value.strip().strip('"').strip("'")
-    except FileNotFoundError:
-        pass
-    return None
-
-
 def load_key(cli_key: str | None = None) -> str | None:
-    # Unified via _search_registry KeyProvider (cli > env > .env) so SerpApi
-    # shares the same .env priority as Exa/Tavily via REGISTRY.
-    try:
-        from _search_registry import KeyProvider  # noqa: E402 — deferred to avoid cycle
+    """Resolve via KeyProvider (cli > env > this skill's .env), like Exa/Tavily.
 
-        return KeyProvider.resolve(cli_key, "SERPAPI_KEY", Path(__file__).resolve().parents[1] / ".env")
-    except ImportError:
-        if cli_key:
-            return cli_key
-        env = os.environ.get("SERPAPI_KEY")
-        if env:
-            return env
-        serpapi_env = Path(__file__).resolve().parents[1] / ".env"
-        return _key_from_env_file(serpapi_env)
+    The historical ImportError fallback + local `_key_from_env_file` copy
+    are gone: unreachable (the top-level `_search_cli` import above shares
+    its directory with `_search_registry`), same rationale as ADR-0002.
+    """
+    from _search_registry import KeyProvider  # noqa: E402 — deferred like _backend_api_key
+
+    return KeyProvider.resolve(cli_key, "SERPAPI_KEY", Path(__file__).resolve().parents[1] / ".env")
 
 
 def build_tbs(since: str | None) -> str | None:
@@ -239,7 +213,7 @@ def _serpapi_print_human(data: dict[str, Any]) -> None:
 
 def _serpapi_cmd_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
-        clear_proxy_vars()
+        _search_cli.clear_proxy_vars()
     api_key = load_key(args.api_key)
     data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend)
     if args.json:
@@ -250,7 +224,7 @@ def _serpapi_cmd_search(backend: Any, args: Any) -> None:
 
 def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
-        clear_proxy_vars()
+        _search_cli.clear_proxy_vars()
     api_key = load_key(args.api_key)
     # Per-query value is always an object: {"results": [...]} on success,
     # {"error": "..."} on failure — consumers never need type-switching.
@@ -277,7 +251,7 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
 
 def _serpapi_cmd_export(args: Any) -> None:
     if getattr(args, "no_proxy", False):
-        clear_proxy_vars()
+        _search_cli.clear_proxy_vars()
     api_key = load_key(args.api_key)
     data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since)
     organic = data.get("organic_results", [])

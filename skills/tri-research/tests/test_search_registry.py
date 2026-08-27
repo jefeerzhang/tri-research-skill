@@ -17,7 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
-from _search_registry import KeyProvider, SearchBackendRegistry, SearchResult, clear_proxy_vars  # noqa: E402
+from _search_registry import KeyProvider, SearchBackendRegistry, SearchResult  # noqa: E402
 
 
 class FakeBackend(_search_cli.Backend):
@@ -273,7 +273,7 @@ class KeyProviderTests(unittest.TestCase):
     def test_no_proxy_clears_vars(self) -> None:
         os.environ["HTTP_PROXY"] = "http://proxy"
         os.environ["https_proxy"] = "http://proxy2"
-        clear_proxy_vars()
+        _search_cli.clear_proxy_vars()
         self.assertNotIn("HTTP_PROXY", os.environ)
         self.assertNotIn("https_proxy", os.environ)
 

@@ -122,11 +122,6 @@ def _key_from_env_file(env_path: Path, env_key: str) -> str | None:
     return None
 
 
-def clear_proxy_vars() -> None:
-    for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-        os.environ.pop(_p, None)
-
-
 class KeyProvider:
     """Resolve API key with priority cli > env > the caller-declared .env.
 
@@ -235,7 +230,7 @@ class SearchBackendRegistry:
         spec = self.get(name)
         backend = spec.backend
         if no_proxy:
-            clear_proxy_vars()
+            _search_cli.clear_proxy_vars()
         api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
         if not api_key:
             raise RuntimeError(f"{spec.env_key} not set")
@@ -307,7 +302,7 @@ class SearchBackendRegistry:
         if backend.sdk is None:
             return {"available": False, "error": backend.missing_sdk_message}
         if no_proxy:
-            clear_proxy_vars()
+            _search_cli.clear_proxy_vars()
         api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
         if not api_key:
             return {"available": False, "error": f"{spec.env_key} not set"}

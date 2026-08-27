@@ -338,10 +338,19 @@ def check(backend: Backend) -> None:
     print(json.dumps({"available": bool(ok)}))
 
 
+def clear_proxy_vars() -> None:
+    """Drop proxy env vars for this process only (opt-in via --no-proxy).
+
+    The single home of the proxy tuple: registry, backends and SerpApi all
+    delegate here (see tests/test_host_helpers.py consolidation gate).
+    """
+    for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+        os.environ.pop(_p, None)
+
+
 def _maybe_clear_proxy(args: argparse.Namespace) -> None:
     if getattr(args, "no_proxy", False):
-        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-            os.environ.pop(_p, None)
+        clear_proxy_vars()
 
 
 def search(backend: Backend, args: argparse.Namespace) -> None:

@@ -1,10 +1,17 @@
-"""Regression tests for serpapi_cli.py .env parsing.
+"""Regression tests for SerpApi .env parsing via KeyProvider.
 
 Bug 1: a .env line `SERPAPI_KEY` with no `=` crashes load_key with
 IndexError (split("=", 1)[1] on a single-element list).
 Bug 2: a line `SERPAPI_KEY_EXTRA=foo` matches startswith("SERPAPI_KEY")
 and its value is wrongly returned as THE key.
+
+Both bugs lived in serpapi_cli's local `_key_from_env_file`, which
+candidate 5 deleted: parsing now lives solely in
+`_search_registry._key_from_env_file` (consumed via KeyProvider by
+load_key). These tests pin the shared implementation from the consumer
+side, keeping the historical bug coverage alive.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -18,6 +25,10 @@ SPEC = importlib.util.spec_from_file_location("serpapi_cli", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
+
+# serpapi_cli bootstrapped tri-research/scripts onto sys.path above, so the
+# shared parser is importable here; serpapi's load_key delegates to it.
+import _search_registry  # noqa: E402
 
 
 class EnvFileKeyTests(unittest.TestCase):
@@ -34,22 +45,22 @@ class EnvFileKeyTests(unittest.TestCase):
 
     def test_line_without_equals_does_not_crash(self) -> None:
         env = self._write_env("SERPAPI_KEY\n")
-        self.assertIsNone(MODULE._key_from_env_file(env))
+        self.assertIsNone(_search_registry._key_from_env_file(env, "SERPAPI_KEY"))
 
     def test_prefixed_variable_is_not_matched(self) -> None:
         env = self._write_env("SERPAPI_KEY_EXTRA=not-the-key\n")
-        self.assertIsNone(MODULE._key_from_env_file(env))
+        self.assertIsNone(_search_registry._key_from_env_file(env, "SERPAPI_KEY"))
 
     def test_exact_key_is_read(self) -> None:
         env = self._write_env("SERPAPI_KEY=abc123\n")
-        self.assertEqual(MODULE._key_from_env_file(env), "abc123")
+        self.assertEqual(_search_registry._key_from_env_file(env, "SERPAPI_KEY"), "abc123")
 
     def test_quoted_value_is_unquoted(self) -> None:
         env = self._write_env('SERPAPI_KEY="quoted-value"\n')
-        self.assertEqual(MODULE._key_from_env_file(env), "quoted-value")
+        self.assertEqual(_search_registry._key_from_env_file(env, "SERPAPI_KEY"), "quoted-value")
 
     def test_missing_file_returns_none(self) -> None:
-        self.assertIsNone(MODULE._key_from_env_file(Path(self.tmp.name) / "nope.env"))
+        self.assertIsNone(_search_registry._key_from_env_file(Path(self.tmp.name) / "nope.env", "SERPAPI_KEY"))
 
 
 if __name__ == "__main__":
