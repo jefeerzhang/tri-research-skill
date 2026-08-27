@@ -47,6 +47,13 @@ jobs:
     defaults:
       run:
         shell: bash
+    # Windows runners default their console/pipe encoding to cp1252, which
+    # cannot encode the Chinese test names / report paths used throughout
+    # this suite — unittest would die with UnicodeEncodeError while merely
+    # printing. Force UTF-8 for both this process and spawned children.
+    env:
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
     strategy:
       fail-fast: false
       matrix:
