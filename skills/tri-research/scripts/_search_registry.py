@@ -128,7 +128,12 @@ def clear_proxy_vars() -> None:
 
 
 class KeyProvider:
-    """Resolve API key with priority cli > env > .env (per spec C1 grill)."""
+    """Resolve API key with priority cli > env > the caller-declared .env.
+
+    Per spec C1 grill; the .env location is handed in by the caller
+    (``Backend.env_file``) — layout knowledge lives with each backend,
+    not here (ADR-0004).
+    """
 
     @staticmethod
     def resolve(
@@ -141,18 +146,11 @@ class KeyProvider:
         env = os.environ.get(env_key)
         if env:
             return env
-        # Default .env is next to tri-research skill (for Exa/Tavily) or
-        # serpapi skill dir when env_file is provided (SerpApi legacy).
-        candidates: list[Path] = []
+        # The caller declares where its own .env lives (Backend.env_file);
+        # this module knows nothing about any skill's directory layout
+        # (ADR-0004).
         if env_file is not None:
-            candidates.append(env_file)
-        # tri-research .env
-        candidates.append(_SCRIPT_DIR.parent / ".env")
-        # serpapi .env (legacy, for SerpApi key) — sibling skill dir
-        # skills/serpapi/.env, matching serpapi_cli.load_key and .gitignore.
-        candidates.append(_SCRIPT_DIR.parent.parent / "serpapi" / ".env")
-        for cand in candidates:
-            v = _key_from_env_file(cand, env_key)
+            v = _key_from_env_file(env_file, env_key)
             if v:
                 return v
         return None
@@ -238,7 +236,7 @@ class SearchBackendRegistry:
         backend = spec.backend
         if no_proxy:
             clear_proxy_vars()
-        api_key = KeyProvider.resolve(cli_key, spec.env_key)
+        api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
         if not api_key:
             raise RuntimeError(f"{spec.env_key} not set")
         # Ensure backend sees the same key via env for its client() path, but
@@ -310,7 +308,7 @@ class SearchBackendRegistry:
             return {"available": False, "error": backend.missing_sdk_message}
         if no_proxy:
             clear_proxy_vars()
-        api_key = KeyProvider.resolve(cli_key, spec.env_key)
+        api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
         if not api_key:
             return {"available": False, "error": f"{spec.env_key} not set"}
         try:

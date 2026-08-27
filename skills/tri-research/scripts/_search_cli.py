@@ -38,6 +38,7 @@ import re
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, NoReturn, Sequence, TypeVar
 
 _T = TypeVar("_T")
@@ -49,17 +50,18 @@ def json_error(message: str) -> None:
     sys.exit(1)
 
 
-def _backend_api_key(env_key: str) -> str | None:
-    """Resolve a backend API key via KeyProvider (cli > env > .env).
+def _backend_api_key(backend: Backend) -> str | None:
+    """Resolve a backend API key via KeyProvider (cli > env > backend .env).
 
     Function-local import: `_search_registry` imports this module at top
     level, so a module-level import would be circular. Centralised here so
-    `client` / `check` / managed commands share one key seam — a `.env`
-    key now works for probe and search, not just the managed commands.
+    `client` / `check` / managed commands share one key seam. The `.env`
+    location is the backend's own declaration (`Backend.env_file`) — this
+    module and KeyProvider know no skill directory layouts (ADR-0004).
     """
     from _search_registry import KeyProvider
 
-    return KeyProvider.resolve(None, env_key)
+    return KeyProvider.resolve(None, backend.env_key, backend.env_file)
 
 
 class CircuitOpenError(RuntimeError):
@@ -167,6 +169,10 @@ class Backend:
     global_flags: Sequence[Flag] = ()  # flags attached to the root parser
     commands: Sequence[Command] = ()  # extra subcommands
     results_key: str = "results"  # key of the result list in search() output
+    # The backend's own .env location, declared by each backend; None means
+    # env-only. KeyProvider reads only what it is handed — no skill-layout
+    # knowledge anywhere (ADR-0004).
+    env_file: Path | None = None
     search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
@@ -183,7 +189,7 @@ class Backend:
         """Build the SDK client, honoring the wrapper's JSON-error contract."""
         if self.sdk is None:
             json_error(self.missing_sdk_message)
-        api_key = _backend_api_key(self.env_key)
+        api_key = _backend_api_key(self)
         if not api_key:
             json_error(f"{self.env_key} not set")
         return self.client_factory(api_key)
@@ -317,7 +323,7 @@ def check(backend: Backend) -> None:
     if backend.sdk is None:
         print(json.dumps({"available": False, "error": backend.missing_sdk_message}))
         return
-    api_key = _backend_api_key(backend.env_key)
+    api_key = _backend_api_key(backend)
     if not api_key:
         print(json.dumps({"available": False, "error": f"{backend.env_key} not set"}))
         return
@@ -398,7 +404,7 @@ def run_managed_command(backend: Backend, command: Command, args: argparse.Names
     turns into a traceback instead of the documented JSON contract.
     """
     _maybe_clear_proxy(args)
-    api_key = _backend_api_key(backend.env_key)
+    api_key = _backend_api_key(backend)
     if not api_key:
         _emit_command_error(command, args, f"{backend.env_key} not set")
     if backend.sdk is None:

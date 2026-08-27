@@ -26,6 +26,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
+from _test_helpers import load_module  # noqa: E402
 
 ENV_KEY = "FAKE_KEYPATH_KEY"
 
@@ -36,6 +37,7 @@ class _KeyBackend(_search_cli.Backend):
     sdk = object()
     missing_sdk_message = "fake-sdk not installed"
     env_key = ENV_KEY
+    env_file = None  # explicit: undeclared backend resolves env-only
     client_factory = staticmethod(lambda key: {"key": key})
     flags = ()
 
@@ -67,7 +69,7 @@ class BackendKeyResolutionTests(unittest.TestCase):
         with self._patch_resolve("k-from-envfile") as mocked:
             client = self.backend.client()
         self.assertEqual(client, {"key": "k-from-envfile"})
-        mocked.assert_called_once_with(None, ENV_KEY)
+        mocked.assert_called_once_with(None, ENV_KEY, self.backend.env_file)
 
     def test_client_missing_everywhere_keeps_error_shape(self) -> None:
         buf = io.StringIO()
@@ -91,31 +93,55 @@ class BackendKeyResolutionTests(unittest.TestCase):
         self.assertEqual(json.loads(buf.getvalue()), {"available": False, "error": f"{ENV_KEY} not set"})
 
 
-class KeyProviderSiblingEnvPathTests(unittest.TestCase):
-    """The serpapi legacy candidate must point at skills/serpapi/.env.
+class BackendEnvFileDeclarationTests(unittest.TestCase):
+    """Backends declare their own .env location (ADR-0004).
 
-    Regression: the candidate used one parent too many and landed on
-    <root>/serpapi/.env, so `check` never saw the documented .env location
-    while search (load_key) did — the probe lied for SerpApi too.
+    KeyProvider.resolve must not derive paths from any skill's directory
+    name: each backend carries `env_file`, and the resolver only reads
+    what it is handed. Replaces the pre-ADR sibling-path pin, which
+    hard-coded the tri-research → serpapi layout inside KeyProvider.
     """
 
-    def test_resolve_finds_sibling_skill_env_file(self) -> None:
-        import _search_registry as reg
-
+    def test_declared_env_file_is_honored_end_to_end(self) -> None:
+        # No mocks: a declared .env must feed client() when env is empty.
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            scripts = root / "skills" / "tri-research" / "scripts"
-            scripts.mkdir(parents=True)
-            serpapi_env = root / "skills" / "serpapi" / ".env"
-            serpapi_env.parent.mkdir(parents=True)
-            serpapi_env.write_text("SERPAPI_KEY=k-sibling\n", encoding="utf-8")
-            saved = os.environ.pop("SERPAPI_KEY", None)
+            env_file = Path(tmp) / ".env"
+            env_file.write_text(f"{ENV_KEY}=k-from-declared-env\n", encoding="utf-8")
+            backend = _KeyBackend()
+            backend.env_file = env_file
+            saved = os.environ.pop(ENV_KEY, None)
             try:
-                with mock.patch.object(reg, "_SCRIPT_DIR", scripts):
-                    self.assertEqual(reg.KeyProvider.resolve(None, "SERPAPI_KEY"), "k-sibling")
+                self.assertEqual(backend.client(), {"key": "k-from-declared-env"})
             finally:
                 if saved is not None:
-                    os.environ["SERPAPI_KEY"] = saved
+                    os.environ[ENV_KEY] = saved
+
+    def test_real_backends_declare_env_file(self) -> None:
+        """Directory ownership pinned: each backend points at its OWN skill dir.
+
+        A name-only assertion would let a parent-level regression (e.g.
+        serpapi drifting to skills/.env) pass silently — the exact
+        silent-.env-loss hazard ADR-0004 exists to kill.
+        """
+        backends = load_module(SCRIPT_DIR / "search_backends.py", "sb_envfile_test")
+        tri_env = SCRIPT_DIR.parent / ".env"  # skills/tri-research/.env
+        for backend in (backends.EXA_BACKEND, backends.TAVILY_BACKEND):
+            self.assertEqual(backend.env_file, tri_env)
+        serpapi = load_module(
+            Path(__file__).parents[2] / "serpapi" / "scripts" / "serpapi_cli.py",
+            "serpapi_envfile_test",
+        )
+        self.assertEqual(serpapi.SERPAPI_BACKEND.env_file, Path(__file__).parents[2] / "serpapi" / ".env")
+
+    def test_key_provider_resolve_knows_no_layout(self) -> None:
+        """Drift gate: the resolver must not derive paths from skill names."""
+        import inspect
+
+        import _search_registry as reg
+
+        source = inspect.getsource(reg.KeyProvider.resolve)
+        self.assertNotIn("serpapi", source.lower())
+        self.assertNotIn("_script_dir", source.lower())
 
 
 if __name__ == "__main__":

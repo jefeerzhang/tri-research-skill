@@ -9,7 +9,7 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags），分级见 `BackendRequirementLevel`。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置），分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:
@@ -21,7 +21,7 @@ Registry 对外暴露的饱和小接口，含 `title / url / snippet / content /
 _Avoid_: raw response、organic_results 直出
 
 **KeyProvider**:
-Seam 处的 Key 解析 Adapter，优先级 `cli --api_key > env > .env`，供所有 Search Backend 共用。
+Seam 处的 Key 解析 Adapter，优先级 `cli --api_key > env > .env`，供所有 Search Backend 共用；`.env` 位置由各后端经 `Backend.env_file` 申报，本模块不含任何技能目录布局知识。
 _Avoid_: key loader、env helper 混称
 
 **BackendSpec**:

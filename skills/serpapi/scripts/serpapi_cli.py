@@ -13,6 +13,7 @@ External command path (`python serpapi_cli.py search ...`) and JSON
 output shape are unchanged from 6.5.0; existing callers, sub-agents and
 tests keep working.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -39,11 +40,27 @@ SERPAPI_BASE_URL = "https://serpapi.com/search"
 
 SERPAPI_ENGINES = {
     "General": ["google", "bing", "baidu", "duckduckgo", "yahoo", "yandex", "naver", "brave"],
-    "Google vertical": ["google_scholar", "google_maps", "google_shopping", "google_news",
-                         "google_images", "google_videos", "google_jobs", "google_flights",
-                         "google_hotels", "google_finance", "google_patents", "google_play",
-                         "google_local", "google_trends", "google_ads", "google_lens",
-                         "google_events", "google_related_questions", "google_reverse_image"],
+    "Google vertical": [
+        "google_scholar",
+        "google_maps",
+        "google_shopping",
+        "google_news",
+        "google_images",
+        "google_videos",
+        "google_jobs",
+        "google_flights",
+        "google_hotels",
+        "google_finance",
+        "google_patents",
+        "google_play",
+        "google_local",
+        "google_trends",
+        "google_ads",
+        "google_lens",
+        "google_events",
+        "google_related_questions",
+        "google_reverse_image",
+    ],
     "Shopping": ["amazon", "walmart", "ebay", "home_depot", "apple_app_store"],
     "Social / Local": ["youtube", "instagram", "facebook", "yelp", "tripadvisor", "opentable"],
 }
@@ -148,8 +165,7 @@ def _serpapi_fetch(
         r = requests.get(SERPAPI_BASE_URL, params=params, timeout=timeout)
     except requests.exceptions.SSLError as e:
         raise SerpApiError(
-            f"SSL error: {e}\nIf behind a proxy, retry with --no-proxy "
-            f"(clears HTTP_PROXY/HTTPS_PROXY for this run).\n",
+            f"SSL error: {e}\nIf behind a proxy, retry with --no-proxy (clears HTTP_PROXY/HTTPS_PROXY for this run).\n",
             3,
         ) from e
     except requests.exceptions.RequestException as e:
@@ -176,9 +192,7 @@ def _serpapi_invoke_fetch(
     timeout = int(backend.call_timeout or 60)
     return _search_cli.invoke(
         backend,
-        lambda: _serpapi_fetch(
-            engine, query, hl, gl, num, api_key, since, timeout=timeout
-        ),
+        lambda: _serpapi_fetch(engine, query, hl, gl, num, api_key, since, timeout=timeout),
     )
 
 
@@ -189,9 +203,7 @@ def _serpapi_fetch_cli(
     try:
         if backend is None:
             return _serpapi_fetch(engine, query, hl, gl, num, api_key, since)
-        return _serpapi_invoke_fetch(
-            backend, engine, query, hl, gl, num, api_key, since
-        )
+        return _serpapi_invoke_fetch(backend, engine, query, hl, gl, num, api_key, since)
     except SerpApiError as exc:
         sys.stderr.write(str(exc) + "\n")
         sys.exit(exc.exit_code)
@@ -229,9 +241,7 @@ def _serpapi_cmd_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
         clear_proxy_vars()
     api_key = load_key(args.api_key)
-    data = _serpapi_fetch_cli(
-        args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend
-    )
+    data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend)
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -366,6 +376,9 @@ class SerpApiBackend(_search_cli.Backend):
     sdk = requests
     missing_sdk_message = "requests not installed"
     env_key = "SERPAPI_KEY"
+    # This skill's own .env, declared here so KeyProvider needs no layout
+    # knowledge (ADR-0004) — matches load_key's env_file below.
+    env_file = Path(__file__).resolve().parents[1] / ".env"
     client_factory = staticmethod(_serpapi_make_client)
     call_timeout = 60.0
     global_flags = [
@@ -397,7 +410,9 @@ SERPAPI_BACKEND = SerpApiBackend()
 SERPAPI_BACKEND.commands = [
     _search_cli.Command("doc", "Print full interface spec", lambda p: None, _serpapi_cmd_doc),
     _search_cli.Command("engines", "List supported engines", lambda p: None, _serpapi_cmd_engines),
-    _search_cli.Command("export", "Run a search and save as Markdown file", _serpapi_add_export_args, _serpapi_cmd_export),
+    _search_cli.Command(
+        "export", "Run a search and save as Markdown file", _serpapi_add_export_args, _serpapi_cmd_export
+    ),
 ]
 
 
