@@ -2,7 +2,7 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.6.0] - 2026-08-28
 
 ### Fixed
 

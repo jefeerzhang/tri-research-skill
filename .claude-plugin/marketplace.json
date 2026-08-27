@@ -7,7 +7,7 @@
   },
   "metadata": {
     "description": "多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 补强 + citations 可选复核）",
-    "version": "6.5.0"
+    "version": "6.6.0"
   },
   "plugins": [
     {

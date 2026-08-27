@@ -2,7 +2,7 @@
 
 > 把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。
 
-[![Version](https://img.shields.io/badge/version-6.5.0-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.6.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
