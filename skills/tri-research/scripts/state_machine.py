@@ -80,9 +80,7 @@ def session_lock(lock_path: Path) -> Iterator[None]:
                     break
                 except OSError:
                     if datetime.now().timestamp() > deadline:
-                        raise StateError(
-                            f"timed out waiting for state lock: {lock_path}"
-                        ) from None
+                        raise StateError(f"timed out waiting for state lock: {lock_path}") from None
                     _sleep(LOCK_POLL_SECONDS)
         else:  # pragma: no cover - exotic platforms
             deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
@@ -99,9 +97,7 @@ def session_lock(lock_path: Path) -> Iterator[None]:
                     held_by = "?"  # unreadable — treat as held by unknown
                 if not held_by:
                     try:
-                        fd = os.open(
-                            lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY
-                        )
+                        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
                         os.write(fd, (str(os.getpid()) + "\n").encode("utf-8"))
                         os.close(fd)
                         break
@@ -114,9 +110,7 @@ def session_lock(lock_path: Path) -> Iterator[None]:
                     except FileNotFoundError:
                         pass
                 if datetime.now().timestamp() > deadline:
-                    raise StateError(
-                        f"timed out waiting for state lock: {lock_path}"
-                    )
+                    raise StateError(f"timed out waiting for state lock: {lock_path}")
                 _sleep(LOCK_POLL_SECONDS)
         yield
     finally:
@@ -308,9 +302,7 @@ class StateStore:
                             existing.append(item)
             data["updated_at"] = now_iso()
             extend_phase = "EXTENDED" if was_done else data["phase"]
-            data["history"].append(
-                {"phase": extend_phase, "at": now_iso(), "extension": normalized}
-            )
+            data["history"].append({"phase": extend_phase, "at": now_iso(), "extension": normalized})
             if was_done:
                 # Stale report_validation is no longer valid after extension.
                 data.pop("report_validation", None)
@@ -342,9 +334,7 @@ class StateStore:
                 raise StateError("parameters not set; run set_params first")
             confirmed_min_sources = params["min_sources"]
             if min_sources is not None and min_sources != confirmed_min_sources:
-                raise StateError(
-                    f"--min-sources does not match confirmed min_sources ({confirmed_min_sources})"
-                )
+                raise StateError(f"--min-sources does not match confirmed min_sources ({confirmed_min_sources})")
             try:
                 proof = validate_and_build_proof(
                     report_path,
@@ -401,9 +391,35 @@ class StateStore:
 
     @staticmethod
     def _atomic_write_text(path: Path, content: str) -> None:
-        temp_path = path.with_suffix(path.suffix + ".tmp")
+        # The temp name must be unique per process. Two processes writing the
+        # same path concurrently (e.g. two `start` commands for DIFFERENT
+        # sessions both updating the shared `active-session` pointer — the
+        # per-session lock does not cover that file) used to collide on the
+        # deterministic `<path>.tmp`: one process replaced it while the other
+        # still had it open (PermissionError on Windows) or was about to
+        # replace it (FileNotFoundError on POSIX). A per-pid temp name keeps
+        # every writer's temp file private; os.replace onto the destination
+        # stays atomic.
+        temp_path = path.with_name(f"{path.name}.{os.getpid()}.tmp")
         temp_path.write_text(content, encoding="utf-8")
-        os.replace(temp_path, path)
+        # On Windows, MoveFileEx (which backs os.replace) transiently fails
+        # with ACCESS_DENIED when several processes replace the SAME target
+        # at the same moment, or when a reader (clear_active /
+        # resolve_session) holds the destination open without delete
+        # sharing. The window is milliseconds — retry briefly, then give up.
+        attempts = 10
+        for attempt in range(attempts):
+            try:
+                os.replace(temp_path, path)
+                return
+            except PermissionError:
+                if attempt + 1 >= attempts:
+                    try:
+                        temp_path.unlink()
+                    except OSError:
+                        pass
+                    raise StateError(f"could not write {path}: file is busy")
+                _sleep(0.05 * (attempt + 1))
 
 
 def emit(data: dict[str, Any], store: StateStore) -> None:
@@ -524,4 +540,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

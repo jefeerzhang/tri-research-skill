@@ -10,6 +10,7 @@ done) is serialized by a per-session lock taken for the whole command, so
 N racing processes each append exactly one history entry and no mutation
 is lost.
 """
+
 from __future__ import annotations
 
 import json
@@ -66,8 +67,17 @@ class ConcurrencyTests(unittest.TestCase):
 
             procs = [
                 subprocess.Popen(
-                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir),
-                     "--session", session, "done", "--report", str(report)],
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--state-dir",
+                        str(state_dir),
+                        "--session",
+                        session,
+                        "done",
+                        "--report",
+                        str(report),
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -113,8 +123,16 @@ class ConcurrencyTests(unittest.TestCase):
             ]
             procs = [
                 subprocess.Popen(
-                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir),
-                     "--session", session, "add_dimensions", extensions[i]],
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--state-dir",
+                        str(state_dir),
+                        "--session",
+                        session,
+                        "add_dimensions",
+                        extensions[i],
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -144,8 +162,7 @@ class ConcurrencyTests(unittest.TestCase):
 
             procs = [
                 subprocess.Popen(
-                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir),
-                     "--session", session, "start"],
+                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), "--session", session, "start"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -160,6 +177,47 @@ class ConcurrencyTests(unittest.TestCase):
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(state["phase"], "STARTED")
             self.assertEqual(len(state["history"]), 1)
+
+    def test_parallel_start_different_sessions_no_crash(self) -> None:
+        """Six processes racing `start` on DIFFERENT session ids must all
+        succeed. They write different state files (per-session locks never
+        interact) but share the `active-session` pointer — which used to be
+        written via a deterministic `<path>.tmp` temp file, so concurrent
+        writers collided (PermissionError on Windows / FileNotFoundError on
+        POSIX) and the CLI died with a traceback. The per-pid temp name
+        makes every writer's temp file private."""
+        for round_no in range(2):
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+                state_dir = Path(tmp) / "state"
+                procs = [
+                    subprocess.Popen(
+                        [
+                            sys.executable,
+                            str(SCRIPT),
+                            "--state-dir",
+                            str(state_dir),
+                            "--session",
+                            f"race-multi-{round_no}-{i}",
+                            "start",
+                        ],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    for i in range(6)
+                ]
+                results = [proc.communicate(timeout=60) for proc in procs]
+                for proc, (_, err) in zip(procs, results):
+                    self.assertEqual(
+                        proc.returncode,
+                        0,
+                        msg=f"start crashed (round {round_no}): {err}",
+                    )
+                    self.assertNotIn("Traceback", err)
+                # Every session state file exists and is valid JSON.
+                for i in range(6):
+                    state = json.loads((state_dir / f"race-multi-{round_no}-{i}.json").read_text(encoding="utf-8"))
+                    self.assertEqual(state["phase"], "STARTED")
 
 
 if __name__ == "__main__":

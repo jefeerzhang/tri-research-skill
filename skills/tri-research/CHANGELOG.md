@@ -7,6 +7,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Fixed
 
 - **Tavily `--depth` 参数静默丢失**：CLI flag 的 dest 是 `depth`，但 Tavily API 形参是 `search_depth`；`search_backends.py` 原样透传 dest，SDK 用 `**kwargs` 吞掉未知参数不报错，导致 `--depth advanced` 从未生效而输出元数据仍声称 `search_depth=advanced`。现映射为 `search_depth` 后再调用。回归测试：`tests/test_search_backends.py`。
+- **并发 `start` 偶发 traceback 崩溃**：`_atomic_write_text` 用固定临时名 `<path>.tmp`，两个进程并发 `start` 不同 session 时同写共享的 `active-session` 指针互相踩踏（Windows PermissionError / POSIX FileNotFoundError）；改成按进程 PID 唯一临时名后，Windows 下 MoveFileEx 对同一目标的并发替换仍可能瞬时 ACCESS_DENIED，再补短退避重试。压测 360 次并发 `start` 由 24/180 失败降到 0/360。回归测试：`tests/test_concurrency.py`、`tests/test_state_store.py`。
 
 ### Changed
 

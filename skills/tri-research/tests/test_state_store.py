@@ -5,6 +5,7 @@ without spawning subprocesses. They lock in the orchestration behavior
 that used to live in run(): lock-inside-method, phase guards, active
 pointer lifecycle, and validation.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -134,6 +135,33 @@ class StateStoreTests(unittest.TestCase):
             (self.state_dir / "active-session").read_text(encoding="utf-8").strip(),
             "s",
         )
+
+    def test_atomic_write_uses_process_unique_temp_name(self) -> None:
+        """Regression: the temp file for an atomic write must be per-process.
+
+        The old deterministic ``<path>.tmp`` collided when two processes
+        wrote the same path concurrently (two `start` commands for different
+        sessions both updating the shared active-session pointer): one
+        process replaced the temp file while the other still had it open
+        (PermissionError on Windows) or was about to replace it
+        (FileNotFoundError on POSIX).
+        """
+        import os
+        from unittest import mock
+
+        captured: list[str] = []
+        real_replace = os.replace
+
+        def spy_replace(src, dst):
+            captured.append(str(src))
+            return real_replace(src, dst)
+
+        target = self.state_dir / "active-session"
+        with mock.patch("os.replace", spy_replace):
+            self.store._atomic_write_text(target, "s1\n")
+        self.assertEqual(len(captured), 1)
+        self.assertIn(f".{os.getpid()}.tmp", captured[0])
+        self.assertEqual(target.read_text(encoding="utf-8"), "s1\n")
 
 
 if __name__ == "__main__":
