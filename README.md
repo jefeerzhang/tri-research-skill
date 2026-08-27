@@ -12,6 +12,12 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 ![tri-research 工作流总览](assets/tri-research-overview.png)
 
+**实测战果**——同一课题、同一天、同一会话，tri-research 全流程 vs 单一学术 API 直查（课题：气候风险与金融领域变革·中国实践）：
+
+![tri-research 与单 API 检索实测对比](assets/tri-vs-single-api.svg)
+
+<sub>▲ 49 条引用全部通过 <code>validate_report.py</code> 验收，每个数字可在 <a href="examples/DEEP_RESEARCH_气候风险与金融变革_2026-08-27.md">真实会话产物</a>中查证</sub>
+
 [快速开始](#快速开始) · [核心亮点](#核心亮点) · [什么时候用它](#什么时候用它) · [效果示例](#效果示例) · [工作流程](#工作流程) · [和同行有什么不同](#和同行有什么不同)
 
 ---
@@ -37,12 +43,12 @@ Tri Research 正是为解决这类问题而生。它适合文献综述、政策�
 
 Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**推荐流程**靠执行纪律约束，跳过不会让 `done` 失败。
 
-| 硬门禁（代码拦截 `DONE`） | 推荐流程（最佳实践，代码不审计） |
-|---------------------------|----------------------------------|
-| `start` / `set_params` / `done --report` | 研究意图澄清、`RESEARCH_CONTEXT.md` |
-| 七章结构、引用闭环、min_sources、合法唯一 URL | 质量门、Gap-Fill、多波次检索 |
-| 报告级中英证据、执行情况源使用行 | 来源内容核验、声明-来源匹配、红队 |
-| 参数冻结与报告 SHA-256 | 置信标签、大纲适配、综合子代理 |
+| 硬门禁（代码拦截 `DONE`）                     | 推荐流程（最佳实践，代码不审计）    |
+| --------------------------------------------- | ----------------------------------- |
+| `start` / `set_params` / `done --report`      | 研究意图澄清、`RESEARCH_CONTEXT.md` |
+| 七章结构、引用闭环、min_sources、合法唯一 URL | 质量门、Gap-Fill、多波次检索        |
+| 报告级中英证据、执行情况源使用行              | 来源内容核验、声明-来源匹配、红队   |
+| 参数冻结与报告 SHA-256                        | 置信标签、大纲适配、综合子代理      |
 
 ## 快速开始
 
@@ -89,11 +95,12 @@ export SERPAPI_KEY=<your-key>
 
 [examples/](examples/) 目录存放真实跑出来的报告产物，可用 `validate_report.py` 逐份验收：
 
-| 文件 | 说明 | 来源数 |
-|---|---|---|
-| `DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md` | 经济影响分析 | 12 条 |
-| `DEEP_RESEARCH_AI与收入分配_2026-07-22_sciverse.md` | SciVerse 学术路验证实 | 4 篇论文 |
-| `DEEP_RESEARCH_AI与收入分配_2026-07-22_strict.md` | 严验收模式 | 10+ 条 |
+| 文件                                                | 说明                                           | 来源数   |
+| --------------------------------------------------- | ---------------------------------------------- | -------- |
+| `DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md`    | 经济影响分析                                   | 12 条    |
+| `DEEP_RESEARCH_AI与收入分配_2026-07-22_sciverse.md` | SciVerse 学术路验证实                          | 4 篇论文 |
+| `DEEP_RESEARCH_AI与收入分配_2026-07-22_strict.md`   | 严验收模式                                     | 10+ 条   |
+| `DEEP_RESEARCH_气候风险与金融变革_2026-08-27.md`    | 气候金融实证 + 单 API 对比实验（见首屏对比图） | 49 条    |
 
 ```bash
 python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人工智能与劳动分配_2026-07-21.md --min-sources 12 --topic '人工智能与劳动分配'
@@ -113,14 +120,14 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 
 六个搜索后端（与 `skills/tri-research/SKILL.md` 源表一致）：
 
-| 源 | 调用者 | 用途 | 必要性 | 免费额度 | Key 申请 |
-|---|---|---|---|---|---|
-| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索 | **必选** | 匿名可用（低限额），免费 key 提额 | https://anysearch.com/console/api-keys |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（Python SDK） | **必选** | 注册送试用额度 | https://sciverse.space/docs#auth |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（不等于 Runtime WebSearch） | 可选 | 免费档（额度以官网为准） | https://app.tavily.com/home |
-| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（分类搜索） | 可选 | 注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10 | https://dashboard.exa.ai/api-keys |
-| **SerpApi** | Lead Agent | 中文 Google + Scholar | 可选 | 250 次/月免费 | https://serpapi.com/dashboard |
-| **Runtime WebSearch** | Lead Agent | 宿主内建补充（Bing / Brave / Google 等） | 可选 | 宿主提供 | 无需申请（宿主内置） |
+| 源                    | 调用者        | 用途                                           | 必要性   | 免费额度                                          | Key 申请                               |
+| --------------------- | ------------- | ---------------------------------------------- | -------- | ------------------------------------------------- | -------------------------------------- |
+| **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索                        | **必选** | 匿名可用（低限额），免费 key 提额                 | https://anysearch.com/console/api-keys |
+| **SciVerse**          | Lead + 子代理 | 学术论文语义检索（Python SDK）                 | **必选** | 注册送试用额度                                    | https://sciverse.space/docs#auth       |
+| **Tavily**            | Lead Agent    | 深度网页搜索与提取（不等于 Runtime WebSearch） | 可选     | 免费档（额度以官网为准）                          | https://app.tavily.com/home            |
+| **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（分类搜索）          | 可选     | 注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10 | https://dashboard.exa.ai/api-keys      |
+| **SerpApi**           | Lead Agent    | 中文 Google + Scholar                          | 可选     | 250 次/月免费                                     | https://serpapi.com/dashboard          |
+| **Runtime WebSearch** | Lead Agent    | 宿主内建补充（Bing / Brave / Google 等）       | 可选     | 宿主提供                                          | 无需申请（宿主内置）                   |
 
 **降级策略：** 必选源缺失时提示配置，可选源静默跳过，单源失败不阻断。
 
@@ -177,18 +184,18 @@ python scripts/state_machine.py --session <id> add_dimensions '{"keywords_zh":["
 
 ## 和同行有什么不同
 
-| 维度 | 常见做法 | tri-research 的做法 |
-|---|---|---|
-| **门禁体系** | Agent 自行宣称「已完成」 | 两步状态机 + `validate_report.py` 硬验收；质量门 / 核验等为推荐流程 |
-| **双语覆盖** | 只搜英文或随缘 | 流程要求中英双补；验收器做**报告级**中英证据检查 |
-| **来源可核验** | 参考文献格式不统一 | 单行格式含层级 + 来源 + URL，验证器检查 |
-| **来源真实性** | 格式合法即通过 | 硬门禁只验格式 / URL；**推荐** SciVerse / extract 核验（非代码强制） |
-| **置信标注** | 结论不标可信度 | 每条结论标 `[高]` / `[中]` / `[低]`，与来源层级联动 |
-| **质量门** | 无自动检查 | **推荐** 5 项自检并标红薄弱维度（用户可仍选择继续） |
-| **增量研究** | 重头跑一遍 | `add_dimensions` 追加，旧结果保留 |
-| **跨运行时** | 绑特定 runtime | CLI + Python SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw |
-| **结果确认闸门** | Agent 直接写报告 | **推荐**搜索完经用户确认再综合 |
-| **搜索后端** | 单一后端 | 六源并行（必选 + 可选分级） |
+| 维度             | 常见做法                 | tri-research 的做法                                                  |
+| ---------------- | ------------------------ | -------------------------------------------------------------------- |
+| **门禁体系**     | Agent 自行宣称「已完成」 | 两步状态机 + `validate_report.py` 硬验收；质量门 / 核验等为推荐流程  |
+| **双语覆盖**     | 只搜英文或随缘           | 流程要求中英双补；验收器做**报告级**中英证据检查                     |
+| **来源可核验**   | 参考文献格式不统一       | 单行格式含层级 + 来源 + URL，验证器检查                              |
+| **来源真实性**   | 格式合法即通过           | 硬门禁只验格式 / URL；**推荐** SciVerse / extract 核验（非代码强制） |
+| **置信标注**     | 结论不标可信度           | 每条结论标 `[高]` / `[中]` / `[低]`，与来源层级联动                  |
+| **质量门**       | 无自动检查               | **推荐** 5 项自检并标红薄弱维度（用户可仍选择继续）                  |
+| **增量研究**     | 重头跑一遍               | `add_dimensions` 追加，旧结果保留                                    |
+| **跨运行时**     | 绑特定 runtime           | CLI + Python SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw     |
+| **结果确认闸门** | Agent 直接写报告         | **推荐**搜索完经用户确认再综合                                       |
+| **搜索后端**     | 单一后端                 | 六源并行（必选 + 可选分级）                                          |
 
 ## 安全边界
 
