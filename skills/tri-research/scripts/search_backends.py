@@ -11,6 +11,7 @@ The per-backend CLI scripts (`exa_search.py`, `tavily_search.py`) remain
 thin entry points so existing callers, sub-agents and tests keep working
 unchanged.
 """
+
 from __future__ import annotations
 
 import json
@@ -43,12 +44,15 @@ except ImportError:
 # Exa
 # ---------------------------------------------------------------------------
 
+
 def _exa_normalize_result(result: Any) -> dict[str, Any]:
     return {
         "title": result.title,
         "url": result.url,
         "snippet": (result.text or "")[:500] if hasattr(result, "text") and result.text else "",
-        "published_date": str(result.published_date) if hasattr(result, "published_date") and result.published_date else "",
+        "published_date": str(result.published_date)
+        if hasattr(result, "published_date") and result.published_date
+        else "",
     }
 
 
@@ -113,16 +117,23 @@ def _exa_cmd_answer(args: Any) -> None:
     citations = []
     if hasattr(resp, "citations") and resp.citations:
         for cit in resp.citations:
-            citations.append({
-                "title": cit.title if hasattr(cit, "title") else "",
-                "url": cit.url if hasattr(cit, "url") else "",
-                "text": (cit.text or "")[:1000] if hasattr(cit, "text") and cit.text else "",
-            })
-    print(json.dumps({
-        "query": args.query,
-        "answer": resp.answer if hasattr(resp, "answer") else "",
-        "citations": citations,
-    }, ensure_ascii=False))
+            citations.append(
+                {
+                    "title": cit.title if hasattr(cit, "title") else "",
+                    "url": cit.url if hasattr(cit, "url") else "",
+                    "text": (cit.text or "")[:1000] if hasattr(cit, "text") and cit.text else "",
+                }
+            )
+    print(
+        json.dumps(
+            {
+                "query": args.query,
+                "answer": resp.answer if hasattr(resp, "answer") else "",
+                "citations": citations,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def _exa_cmd_contents(args: Any) -> None:
@@ -149,11 +160,13 @@ def _exa_cmd_contents(args: Any) -> None:
         sys.exit(1)
     pages = []
     for p in resp.results:
-        pages.append({
-            "url": p.url,
-            "title": p.title if hasattr(p, "title") else "",
-            "text": (p.text or "")[:5000] if hasattr(p, "text") and p.text else "",
-        })
+        pages.append(
+            {
+                "url": p.url,
+                "title": p.title if hasattr(p, "title") else "",
+                "text": (p.text or "")[:5000] if hasattr(p, "text") and p.text else "",
+            }
+        )
     print(json.dumps(pages, ensure_ascii=False))
 
 
@@ -185,6 +198,7 @@ except ValueError:
 # Tavily
 # ---------------------------------------------------------------------------
 
+
 def _tavily_normalize_result(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": result.get("title", ""),
@@ -211,7 +225,9 @@ class TavilyBackend(_search_cli.Backend):
     flags = [
         _search_cli.Flag("max_results", ("--max-results",), "Number of results (default: 5)", type=int, default=5),
         _search_cli.Flag("depth", ("--depth",), "Search depth", choices=["basic", "advanced"], default="basic"),
-        _search_cli.Flag("time_range", ("--time-range",), "Time range filter", choices=["day", "week", "month", "year"]),
+        _search_cli.Flag(
+            "time_range", ("--time-range",), "Time range filter", choices=["day", "week", "month", "year"]
+        ),
         _search_cli.Flag("include_domains", ("--include-domains",), "Comma-separated domains to include"),
         _search_cli.Flag("exclude_domains", ("--exclude-domains",), "Comma-separated domains to exclude"),
     ]
@@ -222,6 +238,13 @@ class TavilyBackend(_search_cli.Backend):
 
     def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
         kwargs: dict[str, Any] = {"query": query, **options}
+        # The CLI flag dest is "depth", but the Tavily API parameter is
+        # "search_depth". Forwarding the raw dest silently dropped --depth:
+        # the SDK accepts unknown **kwargs without forwarding them to the
+        # API, so `--depth advanced` never took effect while the output
+        # metadata still claimed search_depth=advanced.
+        if "depth" in kwargs:
+            kwargs["search_depth"] = kwargs.pop("depth")
         if options.get("include_domains"):
             kwargs["include_domains"] = options["include_domains"].split(",")
         if options.get("exclude_domains"):
@@ -258,11 +281,13 @@ def _tavily_cmd_extract(args: Any) -> None:
         sys.exit(1)
     pages = []
     for p in resp.get("results", []):
-        pages.append({
-            "url": p.get("url", args.url),
-            "title": p.get("title", ""),
-            "content": (p.get("content") or "")[:20000],
-        })
+        pages.append(
+            {
+                "url": p.get("url", args.url),
+                "title": p.get("title", ""),
+                "content": (p.get("content") or "")[:20000],
+            }
+        )
     if pages:
         print(json.dumps(pages[0], ensure_ascii=False))
     else:

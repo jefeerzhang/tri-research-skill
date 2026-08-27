@@ -4,6 +4,10 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tavily `--depth` 参数静默丢失**：CLI flag 的 dest 是 `depth`，但 Tavily API 形参是 `search_depth`；`search_backends.py` 原样透传 dest，SDK 用 `**kwargs` 吞掉未知参数不报错，导致 `--depth advanced` 从未生效而输出元数据仍声称 `search_depth=advanced`。现映射为 `search_depth` 后再调用。回归测试：`tests/test_search_backends.py`。
+
 ### Changed
 
 - **AnySearch 接口同步到 v3.1.0**：上游 AnySearch 在 v3.1.0 将 CLI 迁到直接调 `https://api.anysearch.com` public HTTP（Python 走 `requests`，Node 走内置 `https`）。tri-research 主 SKILL / subagent SKILL / 能力边界表将版本标注由「3.0 版」改为「3.1 版（直接调 public HTTP）」，速查表补 `get_sub_domains --domains` 与 REST-native `--tag`/`--params`，subagent 命令示例同步更新。`runtime.conf` 作为预先探测的快速路径仍保留。
