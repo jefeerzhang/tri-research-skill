@@ -20,7 +20,13 @@ SCRIPT = Path(__file__).parents[1] / "scripts" / "tavily_search.py"
 
 
 def _load_with_tavily_blocked():
-    saved = sys.modules.get("tavily", "ABSENT")
+    saved_tavily = sys.modules.get("tavily", "ABSENT")
+    saved_backends = sys.modules.get("search_backends")
+    saved_search_cli = sys.modules.get("_search_cli")
+    # Force re-import of search_backends so its `from tavily import TavilyClient`
+    # Try block sees the blocked sys.modules["tavily"].
+    for _k in ("search_backends", "_search_cli"):
+        sys.modules.pop(_k, None)
     sys.modules["tavily"] = None  # makes `from tavily import TavilyClient` raise ImportError
     try:
         spec = importlib.util.spec_from_file_location("tavily_search_blocked", SCRIPT)
@@ -28,10 +34,18 @@ def _load_with_tavily_blocked():
         spec.loader.exec_module(mod)
         return mod
     finally:
-        if saved == "ABSENT":
+        if saved_tavily == "ABSENT":
             sys.modules.pop("tavily", None)
         else:
-            sys.modules["tavily"] = saved
+            sys.modules["tavily"] = saved_tavily
+        # Restore original modules if they existed — next import will reload
+        # normally; do not leave the blocked variants in sys.modules.
+        for _k in ("search_backends", "_search_cli"):
+            sys.modules.pop(_k, None)
+        if saved_backends is not None:
+            sys.modules["search_backends"] = saved_backends
+        if saved_search_cli is not None:
+            sys.modules["_search_cli"] = saved_search_cli
 
 
 class TavilySearchImportTests(unittest.TestCase):
