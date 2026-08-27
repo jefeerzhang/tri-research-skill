@@ -298,7 +298,14 @@ def check(backend: Backend) -> None:
     print(json.dumps({"available": bool(ok)}))
 
 
+def _maybe_clear_proxy(args: argparse.Namespace) -> None:
+    if getattr(args, "no_proxy", False):
+        for _p in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            os.environ.pop(_p, None)
+
+
 def search(backend: Backend, args: argparse.Namespace) -> None:
+    _maybe_clear_proxy(args)
     if backend.search_handler is not None:
         backend.search_handler(backend, args)
         return
@@ -316,6 +323,7 @@ def search(backend: Backend, args: argparse.Namespace) -> None:
 
 
 def batch_search(backend: Backend, args: argparse.Namespace) -> None:
+    _maybe_clear_proxy(args)
     if backend.batch_search_handler is not None:
         backend.batch_search_handler(backend, args)
         return

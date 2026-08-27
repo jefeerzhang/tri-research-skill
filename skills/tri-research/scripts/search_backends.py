@@ -25,6 +25,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
+from _search_registry import REGISTRY, BackendSpec  # noqa: E402
 
 try:
     import exa_py
@@ -139,6 +140,13 @@ EXA_BACKEND.commands = [
     ),
 ]
 
+# Register with global Registry (expand step #7 keeps old path working; new
+# callers can use REGISTRY.search("exa", ...) for uniform SearchResult).
+try:
+    REGISTRY.register(BackendSpec(name="exa", backend=EXA_BACKEND, env_key="EXA_API_KEY"))
+except ValueError:
+    pass  # already registered (re-import in tests with sys.modules["tavily"] blocked)
+
 
 # ---------------------------------------------------------------------------
 # Tavily
@@ -223,3 +231,12 @@ TAVILY_BACKEND = TavilyBackend()
 TAVILY_BACKEND.commands = [
     _search_cli.Command("extract", "Extract content from a URL", _tavily_add_extract_args, _tavily_cmd_extract),
 ]
+
+try:
+    REGISTRY.register(BackendSpec(name="tavily", backend=TAVILY_BACKEND, env_key="TAVILY_API_KEY"))
+except ValueError:
+    pass
+
+# Expose global --no-proxy to Exa/Tavily via Registry (expand keeps old JSON shape)
+EXA_BACKEND.global_flags = REGISTRY.global_flags  # type: ignore[assignment]
+TAVILY_BACKEND.global_flags = REGISTRY.global_flags  # type: ignore[assignment]

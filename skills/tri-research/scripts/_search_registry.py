@@ -310,3 +310,35 @@ class SearchBackendRegistry:
         except Exception as exc:  # noqa: BLE001 — probe must never traceback
             return {"available": False, "error": str(exc)}
         return {"available": bool(ok)}
+
+    def search_raw(
+        self,
+        name: str,
+        query: str,
+        options: dict[str, Any] | None = None,
+        *,
+        cli_key: str | None = None,
+        no_proxy: bool = False,
+    ) -> dict[str, Any]:
+        """Search via Registry but return legacy raw dict (for thin-shim compat).
+
+        Uses unified KeyProvider and global --no-proxy, but preserves backend's
+        original output shape (category/num_results/autoprompt etc. for Exa).
+        """
+        backend, api_key = self._resolve_backend(name, cli_key, no_proxy)
+        opts = options or {}
+        client = backend.client_factory(api_key) if backend.sdk is not None else None
+        if client is None and backend.sdk is None:
+            raise RuntimeError(backend.missing_sdk_message or f"{name} SDK not installed")
+
+        def _call() -> dict[str, Any]:
+            return backend.search(client, query, opts)
+
+        raw = _search_cli.invoke(backend, _call)
+        if isinstance(raw, dict):
+            raw["query"] = query
+        return raw
+
+
+# Global singleton — search_backends registers Exa/Tavily on import
+REGISTRY = SearchBackendRegistry()
