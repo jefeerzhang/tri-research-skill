@@ -28,6 +28,18 @@ class RegistryWiringTests(unittest.TestCase):
         self.assertEqual(REGISTRY.get("exa").env_key, "EXA_API_KEY")
         self.assertEqual(REGISTRY.get("tavily").env_key, "TAVILY_API_KEY")
 
+    def test_serpapi_registered_via_cli_import(self) -> None:
+        # SerpApi lives in separate skill; import its CLI to trigger registration
+        import importlib.util
+
+        serpapi_cli = Path(__file__).resolve().parents[3] / "skills" / "serpapi" / "scripts" / "serpapi_cli.py"
+        spec = importlib.util.spec_from_file_location("serpapi_cli_wiring", serpapi_cli)
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[union-attr]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        backs = REGISTRY.list_backends()
+        self.assertIn("serpapi", backs)
+        self.assertEqual(REGISTRY.get("serpapi").env_key, "SERPAPI_KEY")
+
     def test_global_no_proxy_flag_present(self) -> None:
         for name in ("exa", "tavily"):
             spec = REGISTRY.get(name)

@@ -77,14 +77,20 @@ def _key_from_env_file(env_path: Path) -> str | None:
 
 
 def load_key(cli_key: str | None = None) -> str | None:
-    if cli_key:
-        return cli_key
-    env = os.environ.get("SERPAPI_KEY")
-    if env:
-        return env
-    # Try .env in the serpapi skill directory (next to .env.example).
-    serpapi_env = Path(__file__).resolve().parents[1] / ".env"
-    return _key_from_env_file(serpapi_env)
+    # Unified via _search_registry KeyProvider (cli > env > .env) so SerpApi
+    # shares the same .env priority as Exa/Tavily via REGISTRY.
+    try:
+        from _search_registry import KeyProvider  # noqa: E402 — deferred to avoid cycle
+
+        return KeyProvider.resolve(cli_key, "SERPAPI_KEY", Path(__file__).resolve().parents[1] / ".env")
+    except ImportError:
+        if cli_key:
+            return cli_key
+        env = os.environ.get("SERPAPI_KEY")
+        if env:
+            return env
+        serpapi_env = Path(__file__).resolve().parents[1] / ".env"
+        return _key_from_env_file(serpapi_env)
 
 
 def build_tbs(since: str | None) -> str | None:
@@ -397,6 +403,15 @@ SERPAPI_BACKEND.commands = [
 
 def main(argv: list[str] | None = None) -> int:
     return _search_cli.run(SERPAPI_BACKEND, argv)
+
+
+# Register with global Registry so new callers can use REGISTRY.search("serpapi", ...)
+try:
+    from _search_registry import REGISTRY, BackendSpec  # noqa: E402
+
+    REGISTRY.register(BackendSpec(name="serpapi", backend=SERPAPI_BACKEND, env_key="SERPAPI_KEY"))
+except (ImportError, ValueError):
+    pass
 
 
 if __name__ == "__main__":
