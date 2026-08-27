@@ -5,6 +5,7 @@ the exa-py package, EVERY subcommand — including `check`, whose whole
 purpose is to report availability — dies with an ImportError traceback
 instead of emitting the documented JSON `{"available": false}` contract.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -19,7 +20,12 @@ SCRIPT = Path(__file__).parents[1] / "scripts" / "exa_search.py"
 
 
 def _load_with_exa_py_blocked():
-    saved = sys.modules.get("exa_py", "ABSENT")
+    # Block BOTH modules: `exa_py` itself, and `search_backends` — the latter
+    # caches a real `exa_py` binding on first import, so a previously imported
+    # copy (e.g. on a dev machine where exa-py IS installed) would survive the
+    # exa_py block and make the probe report available=True.
+    saved_exa = sys.modules.get("exa_py", "ABSENT")
+    saved_backends = sys.modules.pop("search_backends", "ABSENT")
     sys.modules["exa_py"] = None  # makes `import exa_py` raise ImportError
     try:
         spec = importlib.util.spec_from_file_location("exa_search_blocked", SCRIPT)
@@ -27,10 +33,14 @@ def _load_with_exa_py_blocked():
         spec.loader.exec_module(mod)
         return mod
     finally:
-        if saved == "ABSENT":
+        if saved_exa == "ABSENT":
             sys.modules.pop("exa_py", None)
         else:
-            sys.modules["exa_py"] = saved
+            sys.modules["exa_py"] = saved_exa
+        if saved_backends == "ABSENT":
+            sys.modules.pop("search_backends", None)
+        else:
+            sys.modules["search_backends"] = saved_backends
 
 
 class ExaSearchImportTests(unittest.TestCase):
