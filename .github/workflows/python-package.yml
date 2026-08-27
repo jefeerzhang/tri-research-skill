@@ -67,11 +67,11 @@ jobs:
           python -m unittest discover -s skills/tri-research/tests -v
           python -m unittest discover -s skills/serpapi/tests -v
 
-      - name: Smoke: state_machine.sh wrapper
+      - name: "Smoke: state_machine.sh wrapper"
         run: |
           bash skills/tri-research/scripts/state_machine.sh --help
 
-      - name: Smoke: validate_report.py --help
+      - name: "Smoke: validate_report.py --help"
         run: |
           python skills/tri-research/scripts/validate_report.py --help
 
