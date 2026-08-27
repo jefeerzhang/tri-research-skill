@@ -8,10 +8,10 @@ version: "6.5.0"
 
 本 skill 把研究纪律分成两层。**只有硬门禁会被代码拦截**；推荐流程靠 Lead Agent 执行，跳过不会让 `state_machine.py done` 失败。
 
-| 层级 | 含义 | 由谁强制 |
-|------|------|----------|
-| **硬门禁** | 不满足则会话不能进入 `DONE` | `state_machine.py` + `validate_report.py` |
-| **推荐流程** | 提高证据质量的最佳实践 | Lead / 子代理按本文执行；**代码不审计是否做过** |
+| 层级         | 含义                        | 由谁强制                                        |
+| ------------ | --------------------------- | ----------------------------------------------- |
+| **硬门禁**   | 不满足则会话不能进入 `DONE` | `state_machine.py` + `validate_report.py`       |
+| **推荐流程** | 提高证据质量的最佳实践      | Lead / 子代理按本文执行；**代码不审计是否做过** |
 
 ### 硬门禁（代码强制）
 
@@ -44,6 +44,7 @@ version: "6.5.0"
 ## 触发条件
 
 用户提到以下任一条件即进入：
+
 - "深度研究""多元研究""文献综述""研究报告"等触发词
 - 要 10+ 来源的深度查询
 - 多实体/多视角对比分析
@@ -54,14 +55,14 @@ version: "6.5.0"
 
 六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）。安装与验证见「首次使用引导」：
 
-| 源 | 使用者 | 用途 | 必要性 |
-|----|--------|------|--------|
-| **AnySearch** | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP） | **必选** |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选 |
-| **SciVerse** | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP） | **必选** |
-| **Exa** | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK） | 可选 |
-| **SerpApi** | Lead Agent | 中文 Google/Scholar | 可选 |
-| **Runtime WebSearch** | Lead Agent | 通用补充（宿主内置抽象，**不**等于 Tavily） | 可选（无需配置，由宿主决定实现） |
+| 源                    | 使用者              | 用途                                                                            | 必要性                           |
+| --------------------- | ------------------- | ------------------------------------------------------------------------------- | -------------------------------- |
+| **AnySearch**         | Lead Agent + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）                 | **必选**                         |
+| **Tavily**            | Lead Agent          | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py` 调用） | 可选                             |
+| **SciVerse**          | Lead Agent + 子代理 | 学术论文（**Python SDK 必选**，禁止 MCP）                                       | **必选**                         |
+| **Exa**               | Lead Agent + 子代理 | Web 搜索 + 学术论文 + 公司信息 + 问答（Python SDK）                             | 可选                             |
+| **SerpApi**           | Lead Agent          | 中文 Google/Scholar                                                             | 可选                             |
+| **Runtime WebSearch** | Lead Agent          | 通用补充（宿主内置抽象，**不**等于 Tavily）                                     | 可选（无需配置，由宿主决定实现） |
 
 **降级策略**：必选源未配→提示+尝试匿名；全部失败→仅 AnySearch(匿名)+WebSearch；可选源不可用→静默跳过。AnySearch 和 SciVerse 是必选搜索源。
 
@@ -69,13 +70,13 @@ version: "6.5.0"
 
 研究开始前检测各源可用性并汇总。必选源没装好→逐个问要不要装；可选源没装→跳过不拦研究。无子代理时 Lead Agent 直接用所有可用源搜。
 
-| 源 | 安装 | 验证 |
-|----|------|------|
-| **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | 验证命令；失败可用匿名模式 |
-| **Tavily** | `pip install tavily-python` → `export TAVILY_API_KEY=<key>` | `python scripts/tavily_search.py check`；未配置则静默跳过 |
-| **SciVerse** | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` |
-| **Exa** | `pip install exa-py` → `export EXA_API_KEY=<key>` | `python scripts/exa_search.py check` |
-| **SerpApi** | 仅用户要求时设 `SERPAPI_KEY` | — |
+| 源            | 安装                                                         | 验证                                                             |
+| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | 验证命令；失败可用匿名模式                                       |
+| **Tavily**    | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        |
+| **SciVerse**  | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` |
+| **Exa**       | `pip install exa-py` → `export EXA_API_KEY=<key>`            | `python scripts/exa_search.py check`                             |
+| **SerpApi**   | 仅用户要求时设 `SERPAPI_KEY`                                 | —                                                                |
 
 ### 各工具调用速查（子代理通过 Bash 调用）
 
@@ -83,12 +84,12 @@ version: "6.5.0"
 
 **AnySearch**（必选，所有 Agent）：路径 `${ANYSEARCH_HOME}` → `~/.agents/skills/anysearch/` → `~/.claude/skills/anysearch/`。有 `runtime.conf` 直接用，否则按 Python→Node.js→PowerShell→Bash 顺序 fallback 探测。
 
-| 命令 | 用途 | 用法 |
-|------|------|------|
-| `search` | 单条搜索 | `<cmd> search "query" --max_results 5`；垂直领域也可用 REST-native `--tag`/`--params` |
-| `batch_search` | 多条并行（混合领域） | `<cmd> batch_search --query "q1" --query "q2" --max_results 5` |
-| `extract` | 提取 URL 全文（**禁止加 `--format`**） | `<cmd> extract "https://..."` |
-| `get_sub_domains` | 垂直领域子域发现 | `<cmd> get_sub_domains --domain finance`；支持 `--domains finance,health` |
+| 命令              | 用途                                   | 用法                                                                                  |
+| ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `search`          | 单条搜索                               | `<cmd> search "query" --max_results 5`；垂直领域也可用 REST-native `--tag`/`--params` |
+| `batch_search`    | 多条并行（混合领域）                   | `<cmd> batch_search --query "q1" --query "q2" --max_results 5`                        |
+| `extract`         | 提取 URL 全文（**禁止加 `--format`**） | `<cmd> extract "https://..."`                                                         |
+| `get_sub_domains` | 垂直领域子域发现                       | `<cmd> get_sub_domains --domain finance`；支持 `--domains finance,health`             |
 
 **Tavily**（可选，仅 Lead Agent）：`python scripts/tavily_search.py search|batch_search|extract ...`；不可用→静默跳过。
 
@@ -140,17 +141,17 @@ python scripts/state_machine.py --session <session-id> start
 python scripts/state_machine.py --session <session-id> set_params '{"topic":"主题","min_sources":10,"keywords_zh":["..."],"keywords_en":["..."]}'
 ```
 
-| 类型 | 是否派子代理 | 执行方式 |
-|------|----------------|----------|
-| 简单问题 | **不派** | Lead 直接搜全部维度 |
-| 单主题多维度 | **派 1 个** | Lead 做 Exa/SerpApi/Tavily/WebSearch；子代理做 AnySearch+SciVerse+Exa |
-| 多实体对比 | **派 2+ 个** | 每实体一子代理；Lead 补强 |
+| 类型         | 是否派子代理 | 执行方式                                                              |
+| ------------ | ------------ | --------------------------------------------------------------------- |
+| 简单问题     | **不派**     | Lead 直接搜全部维度                                                   |
+| 单主题多维度 | **派 1 个**  | Lead 做 Exa/SerpApi/Tavily/WebSearch；子代理做 AnySearch+SciVerse+Exa |
+| 多实体对比   | **派 2+ 个** | 每实体一子代理；Lead 补强                                             |
 
 ### 第四步：派发子代理（可选）
 
 并行派发；超时 8 分钟；任务描述须含目标、问题、工具说明、双语要求、约束。
 
-```
+```text
 研究目标：{goal} | 关键问题：1.{q1} 2.{q2}
 工具（bash）：AnySearch batch_search；SciVerse Python SDK；Exa scripts/exa_search.py
 约束：双语中英双补 | 工具上限 15 次 | 8 分钟 | 只返回结构化发现，不写终稿

@@ -1,69 +1,34 @@
 {
-  // Markdownlint configuration for tri-research-skill.
-  // Default rules are aggressively disabled because the project's historical
-  // markdown predates these checks. New contributors should fix violations in
-  // *new* markdown they add — that is the only path forward without rewriting
-  // every existing .md.
+  // markdownlint rule configuration (shared by markdownlint-cli2 and editors).
+  //
+  // Semantics: flat rule map — "default": false turns every rule OFF, then the
+  // rules below turn the ones we want back ON. This is the actual whitelist the
+  // project enforces; the rules chosen are the most likely to surface document
+  // corruption rather than style opinion.
+  //
+  // NOTE: cli2-only ignores (node_modules/.mimocode/examples) live in
+  // .markdownlint-cli2.jsonc — keep rule changes here in sync conceptually with
+  // the ignore list there.
   //
   // Add or remove rules at: https://github.com/DavidAnson/markdownlint
-  "default": true,
+  "default": false,
 
-  // Path-specific overrides — ROOT configs that should not drift:
-  "paths": "*.md",
+  // Headings
+  "MD018": true, // no-missing-space-atx (missing space after #)
+  "MD019": true, // no-multiple-space-atx (#  vs ##)
+  "MD022": true, // blanks-around-headings
+  "MD023": true, // heading-start-left
 
-  // Don't fail CI for style issues that don't break rendering. We want CI to
-  // catch structural regressions, not aesthetics.
-  "config": {
-    "default": false,
+  // Blocks
+  "MD027": true, // no-multiple-space-blockquote
+  "MD028": true, // no-blanks-blockquote
+  "MD031": true, // blanks-around-fences
+  "MD032": true, // blanks-around-lists
+  "MD040": true, // fenced-code-language (every ``` must have a language)
 
-    // Headings
-    "MD001": false,  // heading-increment (historical docs use H1 > H3)
-    "MD003": false,  // heading-style
-    "MD004": false,  // ul-style
-    "MD005": false,  // list-indent
-    "MD007": false,  // ul-indent
-
-    // Whitespace
-    "MD009": false,  // no-trailing-spaces
-    "MD010": false,  // no-hard-tabs
-
-    // Line length — disable to avoid blocking long Chinese paragraphs and URLs
-    "MD013": false,
-
-    // Duplicate / structural
-    "MD024": false,  // no-duplicate-headings (subsections reuse names)
-    "MD025": false,  // single-title (some docs use H1 multiple times)
-    "MD026": false,  // no-trailing-punctuation
-    "MD029": false,  // ol-prefix
-    "MD030": false,  // ul-bullet
-    "MD033": false,  // no-inline-html (README uses <summary> blocks)
-    "MD035": false,  // hr-style
-    "MD036": false,  // no-emphasis-as-heading
-    "MD041": false,  // first-line-heading
-    "MD046": false,  // code-block-style
-    "MD047": false,  // single-trailing-newline
-    "MD048": false,  // code-fence-style
-    "MD049": false,  // emphasis-style
-    "MD050": false,  // strong-style
-    "MD053": false,  // link-image-reference-definitions
-
-    // Active rules — these DO catch real problems:
-    "MD009": false,  // no-trailing-spaces (inactive to allow trailing 2-space line breaks in legacy .md)
-
-    // The rules below are the ones we DO want to enforce. They are the most
-    // likely to surface "document corruption" rather than "style opinion".
-    "MD018": true,   // no-missing-space-atx (missing space after #)
-    "MD019": true,   // no-multiple-space-atx (#  vs ##)
-    "MD022": true,   // blanks-around-headings (heading needs blank lines around)
-    "MD023": true,   // heading-start-left (heading must not be indented)
-    "MD027": true,   // no-multiple-space-blockquote
-    "MD028": true,   // no-blanks-blockquote
-    "MD031": true,   // blanks-around-fences (code blocks need blank lines)
-    "MD032": true,   // blanks-around-lists
-    "MD040": true,   // fenced-code-language (every ``` must have a language)
-    "MD042": true,   // no-empty-links ([text]() with no href)
-    "MD045": true,   // no-alt-text (image must have alt text)
-    "MD052": true,   // reference-links-images
-    "MD056": true    // table-column-count
-  }
+  // Links / images / tables
+  "MD042": true, // no-empty-links
+  "MD045": true, // no-alt-text
+  "MD052": true, // reference-links-images
+  "MD056": true  // table-column-count
 }

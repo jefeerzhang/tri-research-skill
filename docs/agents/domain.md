@@ -14,7 +14,7 @@ Engineering skills 探索 codebase 时，应如何消费这个 repo 的 domain d
 
 Single-context repo（大多数 repos）：
 
-```
+```text
 /
 ├── CONTEXT.md
 ├── docs/adr/
@@ -25,7 +25,7 @@ Single-context repo（大多数 repos）：
 
 Multi-context repo（根目录存在 `CONTEXT-MAP.md`）：
 
-```
+```text
 /
 ├── CONTEXT-MAP.md
 ├── docs/adr/                          ← system-wide decisions

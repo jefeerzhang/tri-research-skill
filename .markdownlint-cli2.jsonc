@@ -1,0 +1,15 @@
+{
+  // markdownlint-cli2-only settings (glob/ignore plumbing).
+  // Rule whitelist lives in .markdownlint.jsonc so editors share the same rules.
+  //
+  // - node_modules/** : vendored third-party markdown (root installs)
+  // - .mimocode/**    : vendored tooling workspace, not project docs
+  // - examples/**     : machine-generated research reports; the [N] citation
+  //                     syntax is the validate_report.py contract, not a
+  //                     markdown link — MD052 false-positives by design there.
+  "ignores": [
+    "node_modules/**",
+    ".mimocode/**",
+    "examples/**"
+  ]
+}

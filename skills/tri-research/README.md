@@ -10,69 +10,69 @@
 
 ## 从 v6.4.3 到 v6.5.0 的核心变化
 
-| 变更项 | v6.4.3 | v6.5.0 |
-|--------|--------|--------|
-| **搜索后端声明** | Exa / Tavily / SerpApi 声明散落各 CLI | 集中到 `search_backends.py`（Exa + Tavily 对称骨架）+ `serpapi_cli.py`（SerpApi 自包含，因 key/proxy/3 个 extra cmd 体量更大） |
-| **SerpApi CLI** | 独立实现（与共享骨架漂移） | 接入 `_search_cli`，`search`/`check`/`batch_search` 契约统一 |
-| **版本对账** | 硬编码版本断言，marketplace / citations 未覆盖 | frontmatter 单一真源动态对账，覆盖 7 处发布通道 |
+| 变更项           | v6.4.3                                         | v6.5.0                                                                                                                         |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **搜索后端声明** | Exa / Tavily / SerpApi 声明散落各 CLI          | 集中到 `search_backends.py`（Exa + Tavily 对称骨架）+ `serpapi_cli.py`（SerpApi 自包含，因 key/proxy/3 个 extra cmd 体量更大） |
+| **SerpApi CLI**  | 独立实现（与共享骨架漂移）                     | 接入 `_search_cli`，`search`/`check`/`batch_search` 契约统一                                                                   |
+| **版本对账**     | 硬编码版本断言，marketplace / citations 未覆盖 | frontmatter 单一真源动态对账，覆盖 7 处发布通道                                                                                |
 
 ## 从 v6.4.2 到 v6.4.3 的核心变化
 
-| 变更项 | v6.4.2 | v6.4.3 |
-|--------|--------|--------|
+| 变更项                    | v6.4.2                                    | v6.4.3                                                    |
+| ------------------------- | ----------------------------------------- | --------------------------------------------------------- |
 | **SciVerse Key 申请链接** | `sciverse.space/tokens`（控制台密钥路径） | `sciverse.space/docs#auth`（docs 统一鉴权章节，申请入口） |
 
 ## 从 v6.4.1 到 v6.4.2 的核心变化
 
-| 变更项 | v6.4.1 | v6.4.2 |
-|--------|--------|--------|
-| **免费额度表述** | Exa 行「$20 注册 + $10/月」易被读成付费 | 明确为注册送额度（$20 + 每月 $10） |
-| **Key 申请链接** | 文档未给申请入口 | 六源全部附上申请链接（源表新增列 + 快速开始注释） |
+| 变更项           | v6.4.1                                  | v6.4.2                                            |
+| ---------------- | --------------------------------------- | ------------------------------------------------- |
+| **免费额度表述** | Exa 行「$20 注册 + $10/月」易被读成付费 | 明确为注册送额度（$20 + 每月 $10）                |
+| **Key 申请链接** | 文档未给申请入口                        | 六源全部附上申请链接（源表新增列 + 快速开始注释） |
 
 ## 从 v6.4.0 到 v6.4.1 的核心变化
 
-| 变更项 | v6.4.0 | v6.4.1 |
-|--------|--------|--------|
-| **搜索 CLI 包装** | exa/tavily 两 wrapper 各 ~180 行重复代码，已漂移 | 抽共享 `_search_cli.py` 骨架（后端注册表），各减至 ~140 行 |
-| **serpapi 代理** | 导入即全局清 `HTTP_PROXY`/`HTTPS_PROXY`（机器特定） | opt-in `--no-proxy`（仅本次运行），分发包不含机器备注 |
+| 变更项            | v6.4.0                                              | v6.4.1                                                     |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| **搜索 CLI 包装** | exa/tavily 两 wrapper 各 ~180 行重复代码，已漂移    | 抽共享 `_search_cli.py` 骨架（后端注册表），各减至 ~140 行 |
+| **serpapi 代理**  | 导入即全局清 `HTTP_PROXY`/`HTTPS_PROXY`（机器特定） | opt-in `--no-proxy`（仅本次运行），分发包不含机器备注      |
 
 ## 从 v6.3.1 到 v6.4.0 的核心变化
 
-| 变更项 | v6.3.1 | v6.4.0 |
-|--------|--------|--------|
+| 变更项           | v6.3.1                                              | v6.4.0                                                 |
+| ---------------- | --------------------------------------------------- | ------------------------------------------------------ |
 | **英文证据门禁** | 任意 4+ 字母拉丁词即算「有英文来源」（`CCTV` 混过） | 条目级判定：≥3 个英文单词/条，报告级 ≥3 条真实英文条目 |
-| **并发安全** | 读-改-写无锁，双进程互相覆盖 history | 按会话跨进程锁（fcntl/msvcrt），变更全程持锁 |
+| **并发安全**     | 读-改-写无锁，双进程互相覆盖 history                | 按会话跨进程锁（fcntl/msvcrt），变更全程持锁           |
 
 ## 从 v6.3.0 到 v6.3.1 的核心变化
 
-| 变更项 | v6.3.0 | v6.3.1 |
-|--------|--------|--------|
-| **完成标准叙事** | 流程步骤与验收器边界易被读成同等强制 | 文首区分 **硬门禁**（代码）与 **推荐流程**（最佳实践） |
-| **双语/全源** | 易被理解为验收器逐维审计 | 明确：执行纪律 vs 报告级 `validate_report` |
-| **文档残留** | marketplace 6.0.0、测试数/旧 API 文案漂移 | 版本与 checklist 与实现对齐 |
+| 变更项           | v6.3.0                                    | v6.3.1                                                 |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------ |
+| **完成标准叙事** | 流程步骤与验收器边界易被读成同等强制      | 文首区分 **硬门禁**（代码）与 **推荐流程**（最佳实践） |
+| **双语/全源**    | 易被理解为验收器逐维审计                  | 明确：执行纪律 vs 报告级 `validate_report`             |
+| **文档残留**     | marketplace 6.0.0、测试数/旧 API 文案漂移 | 版本与 checklist 与实现对齐                            |
 
 ## 硬门禁（代码）vs 推荐流程（文档）
 
-| 硬门禁 | 推荐流程（不做也不阻断 DONE） |
-|--------|------------------------------|
-| `state_machine`：`STARTED` → `DONE`（+ `EXTENDED`） | 意图澄清、`RESEARCH_CONTEXT.md` |
-| `set_params` 冻结 topic / min_sources≥10 / 双语关键词 | 质量门五检、Gap-Fill、多波次 |
+| 硬门禁                                                       | 推荐流程（不做也不阻断 DONE）     |
+| ------------------------------------------------------------ | --------------------------------- |
+| `state_machine`：`STARTED` → `DONE`（+ `EXTENDED`）          | 意图澄清、`RESEARCH_CONTEXT.md`   |
+| `set_params` 冻结 topic / min_sources≥10 / 双语关键词        | 质量门五检、Gap-Fill、多波次      |
 | `validate_report`：七章、引用闭环、URL、报告级中英、源使用行 | 来源内容核验、声明-来源匹配、红队 |
-| 报告 SHA-256 写入 `report_validation` | 置信标签、大纲适配、综合子代理 |
-| | `citations` 软复核 |
+| 报告 SHA-256 写入 `report_validation`                        | 置信标签、大纲适配、综合子代理    |
+|                                                              | `citations` 软复核                |
 
 ## 能力边界
 
 六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
 
-| 渠道 | 调用者 | 作用 | 必要性 | Key 申请 |
-|------|--------|------|--------|----------|
-| **AnySearch** | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP） | **必选** | https://anysearch.com/console/api-keys |
-| **Tavily** | Lead Agent | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选 | https://app.tavily.com/home |
-| **SciVerse** | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP） | **必选** | https://sciverse.space/docs#auth |
-| **Exa** | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`） | 可选 | https://dashboard.exa.ai/api-keys |
-| **SerpApi** | Lead Agent | 中文 Google/Scholar 补强 | 可选 | https://serpapi.com/dashboard |
-| **Runtime WebSearch** | Lead Agent | 宿主内置抽象能力（实现不固定，**不等于** Tavily） | 可选 | 无需申请（宿主内置） |
+| 渠道                  | 调用者        | 作用                                                                       | 必要性   | Key 申请                               |
+| --------------------- | ------------- | -------------------------------------------------------------------------- | -------- | -------------------------------------- |
+| **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）            | **必选** | https://anysearch.com/console/api-keys |
+| **Tavily**            | Lead Agent    | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选     | https://app.tavily.com/home            |
+| **SciVerse**          | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP）                          | **必选** | https://sciverse.space/docs#auth       |
+| **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`）                  | 可选     | https://dashboard.exa.ai/api-keys      |
+| **SerpApi**           | Lead Agent    | 中文 Google/Scholar 补强                                                   | 可选     | https://serpapi.com/dashboard          |
+| **Runtime WebSearch** | Lead Agent    | 宿主内置抽象能力（实现不固定，**不等于** Tavily）                          | 可选     | 无需申请（宿主内置）                   |
 
 降级策略：必选源未配置 → 提示用户配置，同时尝试无 API 模式（AnySearch 支持匿名访问）。可选源不可用 → 静默跳过。
 
@@ -113,7 +113,8 @@
 7. **执行情况** — 含搜索源使用行（AnySearch/SciVerse/Exa/SerpApi/WebSearch）
 
 参考文献格式示例：
-```
+
+```text
 [1] 作者, "标题", 出处, 年份, 层级: 1, 来源: AnySearch, URL: https://...
 ```
 

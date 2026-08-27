@@ -27,7 +27,7 @@ version: "6.5.0"
 
 一份由 `tri-research` 主导代理产出的 Markdown 报告，路径形如：
 
-```
+```text
 ~/tri-research-reports/DEEP_RESEARCH_<TOPIC>_<YYYY-MM-DD>.md
 ```
 
@@ -62,10 +62,10 @@ version: "6.5.0"
 
 ## 与状态机验收的关系
 
-| 工具 | 角色 | 是否阻塞 DONE |
-|---|---|---|
-| `scripts/validate_report.py` | 硬门禁，集成在 `state_machine.py done` 步骤里 | 是 |
-| `citations` Skill | 软复核，给主导代理一份人话清单 | 否 |
+| 工具                         | 角色                                          | 是否阻塞 DONE |
+| ---------------------------- | --------------------------------------------- | ------------- |
+| `scripts/validate_report.py` | 硬门禁，集成在 `state_machine.py done` 步骤里 | 是            |
+| `citations` Skill            | 软复核，给主导代理一份人话清单                | 否            |
 
 结论一致时无歧义；不一致时以 `validate_report.py` 为准。
 

@@ -5,72 +5,87 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+
 - **AnySearch 接口同步到 v3.1.0**：上游 AnySearch 在 v3.1.0 将 CLI 迁到直接调 `https://api.anysearch.com` public HTTP（Python 走 `requests`，Node 走内置 `https`）。tri-research 主 SKILL / subagent SKILL / 能力边界表将版本标注由「3.0 版」改为「3.1 版（直接调 public HTTP）」，速查表补 `get_sub_domains --domains` 与 REST-native `--tag`/`--params`，subagent 命令示例同步更新。`runtime.conf` 作为预先探测的快速路径仍保留。
 
 ### Added
+
 - **金样例回归测试**：`tests/test_golden_examples.py` 钉住 `examples/` 下 4 份示例报告过当前 `validate_report.py`，每份按各自承诺的 `min_sources` 契约验收（DID 样例 18，其余 10）+ H1 主题检查；并强制 GOLDEN 契约表与磁盘文件一一对应（新增样例不登记就红），防止「验收器规则收紧、样例悄悄不再合法」的漂移。
 - **搜索 CLI 超时 / 重试 / 熔断**：`_search_cli.invoke` 给 `search` / `batch_search` 加上瞬时失败重试（超时、连接、429、5xx）、单次调用超时与按后端熔断；`check` 只超时不重试。JSON 形状与退出码不变。SerpApi `search` / `batch_search` 走同一策略。配置错误（缺 SDK / 缺 key / 4xx）立即失败。测试：`tests/test_search_cli_resilience.py`。
 
 ## [6.5.0] - 2026-08-24
 
 ### Changed
+
 - **搜索后端统一到单一 module**：新增 `scripts/search_backends.py`，Exa / Tavily / SerpApi 三个 Backend 声明集中在一处；`exa_search.py`、`tavily_search.py`、`serpapi_cli.py` 收敛为薄 CLI 入口，外部命令路径与输出契约保持不变。
 - **SerpApi 接入共享搜索 skeleton**：`search` / `check` / `batch_search` 复用 `_search_cli`，`doc` / `engines` / `export` 保留为 extra commands；`--no-proxy`、`--json`、`--api_key` 等 SerpApi 特性保持原语义。
 - **测试 fixture 去重**：`tests/_test_helpers.py` 提供共享 `make_valid_report` 与 `load_module`，现有状态机 / 并发 / 验收测试改为复用。
 
 ### Added
+
 - **跨文件版本对账动态化**：`tests/test_skill_contract.py` 的版本断言从硬编码字符串改为以 tri-research `SKILL.md` frontmatter 为单一真源动态对账，新覆盖 `.claude-plugin/marketplace.json`、`citations/SKILL.md` 与 CHANGELOG 最新发布条目（6.3.1 时 marketplace.json 曾漂移到 6.0.0 未被测试捕获）；发版不再需改测试。
 
 ## [6.4.3] - 2026-08-13
 
 ### Fixed
+
 - **SciVerse API key 申请链接更正**：`https://sciverse.space/tokens` 为控制台密钥路径，申请入口应为 `https://sciverse.space/docs#auth`（docs「统一鉴权」章节）。根 README 源表 + 快速开始注释、skill README 能力边界表、6.4.2 的 CHANGELOG 条目中的链接一并更正。
 
 ## [6.4.2] - 2026-08-13
 
 ### Changed
+
 - **六源表免费额度表述消除歧义**：Exa 一行由「$20 注册 + $10/月」改为「注册送 $20 免费额度（约 2800 次）+ 免费档每月 $10」——原表述易被读成注册费/月费，实际为注册即送额度；AnySearch / Tavily / SciVerse 行的额度描述同步明确。
 - **各源 API key 申请链接入文档**：根 README 搜索源表新增「Key 申请」列，快速开始安装注释附带链接；skill README 能力边界表同步。链接（已核实）：AnySearch `anysearch.com/console/api-keys`、Tavily `app.tavily.com/home`、SciVerse `sciverse.space/docs#auth`、Exa `dashboard.exa.ai/api-keys`、SerpApi `serpapi.com/dashboard`、Runtime WebSearch 无需申请。
 
 ## [6.4.1] - 2026-08-13
 
 ### Changed
+
 - **搜索 CLI 包装去重**：`exa_search.py` 与 `tavily_search.py` 近重复（各 ~180 行，错误消息与 `check` 行为已漂移），抽取共享骨架 `scripts/_search_cli.py`（`Backend` 注册表 + 统一 `check`/`search`/`batch_search` 命令、JSON 错误契约与 argparse 布局），两文件各减至 ~140 行。CLI 表面不变：子命令与标志、JSON 输出形状、SDK 缺失时 `check` 打印 `{"available": false}` 等契约由既有回归测试钉住；顺带修复 Exa `check` 探针失败曾 traceback（现统一打印 JSON）。
 - **serpapi 移除机器特定自动清代理**：`serpapi_cli.py` 不再在导入时全局清除 `HTTP_PROXY`/`HTTPS_PROXY`（会污染同进程其他工具），改为 opt-in `--no-proxy`（子命令前，仅本次运行清除）；`SKILL.md` / `README.md` 的「本机代理坑」备注移除。
 
 ### Fixed
+
 - `tavily_search.py batch_search` 此前缺少 `--include-domains` / `--exclude-domains` 标志（与 `search` 漂移）；共享骨架按标志注册表统一挂到两个子命令后补齐。
 
 ### Added
+
 - 新增 `scripts/_search_cli.py`（搜索 CLI 共享骨架，后端注册表）。
 
 ## [6.4.0] - 2026-08-13
 
 ### Fixed
+
 - **英文证据检查不再被孤立拉丁词放行**：`validate_report.py` 报告级双语检查从 ANY 式（条目里任意 4+ 字母英文词即算「有英文来源」）改为**条目级判定**——一条参考文献必须在作者/标题段出现 ≥2 个汉字或 ≥3 个英文单词（`Author1` 这类数字后缀不计词）才计入对应语言。真实报告（min_sources ≥ 10）需 ≥3 条真实英文条目（按比例缩放）。修复纯中文报告仅凭 `CCTV` 等孤立词混过英文门禁的漏洞。
 - **并发读-改-写丢失更新**：`set_params` / `add_dimensions` / `done` 此前无跨进程锁，两个进程同时对同一会话执行变更会互相覆盖 history 与 updated_at（原子写只防撕裂读，不防丢失更新）。新增按会话的跨进程文件锁（POSIX `fcntl` / Windows `msvcrt`，均不可用时降级为锁文件轮询），整个变更命令全程持锁。
 
 ### Added
+
 - 并发回归测试 `tests/test_concurrency.py`：并行 `done` 只能有一个胜者且其余显式失败；并行 `add_dimensions` 两个扩展都不丢失。
 - 报告级英文门槛测试：孤立拉丁词不计证据、恰好 3 条真实英文条目通过、2 条被拒。
 
 ## [6.3.1] - 2026-08-09
 
 ### Changed
+
 - **收缩文档承诺（硬门禁 vs 推荐流程）**：在 `SKILL.md` 文首明确两层纪律——仅 `state_machine.py` + `validate_report.py` 为代码硬门禁；质量门、来源核验、Gap-Fill、红队、置信标签、大纲适配、综合子代理、声明-来源匹配、多波次等标为**推荐流程**（跳过不阻断 `DONE`）。
 - **双语/全源覆盖措辞**：搜索执行规范改为「流程要求」+「强制范围说明」——验收器只做**报告级**中英证据检查，不逐维度/逐源/逐 query 审计。
 - 根 README / skill README / marketplace / test-prompts / citations 与 6.3.1 叙事对齐；去掉已删除 API（`record_dispatch` 等）与旧章节名（`TL;DR`）残留。
 - 测试计数文案改为与当前 unittest 发现数一致（75）；对比表「5 搜索源」改为六源。
 
 ### Fixed
+
 - `.claude-plugin/marketplace.json` 版本从 6.0.0 对齐到 6.3.1；research-subagent 插件描述补 Exa。
 
 ## [6.3.0] - 2026-07-29
 
 ### Fixed
+
 - **文档六源表对齐**：skill README / 根 README / `runtime-adapters.md` / 合约测试与 `SKILL.md` 统一为六源（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）；Tavily 仅 Lead Agent；参考文献 `来源:` 字段含 Tavily
 
 ### Added
+
 - **大纲适配（借鉴 deep-research Phase 3.5）**：第七步综合时对比计划结构 vs 实际证据，调整幅度 ≤50%（超出时须在执行情况标注原因），证据驱动不凭空添加。调整记录写入执行情况。
 - **多波次检索（借鉴 deep-research Wave 设计）**：第二步检索计划标注波次：Wave 1 广覆盖 → 质量门判定 → Wave 2 精准补漏 → Wave 3（deep 模式）。
 - **综合子代理（借鉴 deep-research Synthesis Agent）**：第七步 deep 模式（来源 >20 条）可选派 Synthesis 子代理预写各维度摘要，Lead Agent 整合进报告。仅预写维度摘要，不代写最终报告。
@@ -78,11 +93,13 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **声明-来源匹配核验（借鉴 deep-research Phase 3.1）**：第六步增加二级核验，选 5-10 条核心结论检查引用来源是否实际支撑声明，判定 SUPPORTED/PARTIAL/UNSUPPORTED 三级。
 
 ### Changed
+
 - SKILL.md 因新增功能增至 383 行（合约上限 450 行）
 
 ## [6.2.0] - 2026-07-29
 
 ### Added
+
 - **研究上下文预加载**：研究开始前自动查找 `RESEARCH_CONTEXT.md`（项目根目录或 `~` 下），加载后预填研究偏好（默认受众、深度、时间窗口、术语表），减少每次研究的重复澄清。研究完成后可选择保存本次偏好供下次复用。
 - **研究意图澄清（新第一步）**：在源检测前增加 5 维度澄清步骤（目标/受众/深度/时间/语言），只问计划推不出来的维度，最多 3 个问题，用户一句话回复。与 `RESEARCH_CONTEXT.md` 联动，已有答案的维度自动跳过。
 - **来源内容核验（新第六步）**：结果确认后、撰写报告前增加内容级核验步骤。学术来源全部用 SciVerse SDK 按 DOI/标题核验存在性与元数据；网页来源抽查 5-10 条用 `extract` 确认内容支撑。判定三级：✅ 通过（条目加 `核验: ✅`）/ ⚠️ 部分匹配（按数据库实际修正）/ ❌ 未找到（不得进入参考文献，支撑结论降级或删除）。核验记录写入执行情况（核验 N / 通过 N / 修正 N / 剔除 N）。默认 Lead Agent 直接核验，来源 > 25 条可派核验子代理（含任务模板）。**铁律：严禁凭训练记忆补全查不到的文献信息**。解决 `validate_report.py` 只查格式、查不出编造文献的漏洞。
@@ -93,6 +110,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **矛盾保留规则**：去重合并时发现子代理结论相反，**禁止静默二选一**——两个结论都保留写入「主要矛盾与冲突点」，正文中引用双方来源说明分歧，有第三方佐证的结论置信度提升。
 
 ### Changed
+
 - **SKILL.md 压缩**：从 621 行压缩至 377 行（减少 39%），所有实质性规则和逻辑不变。压缩手段：5 个工具调用子节合并为统一速查表，交互式引导合并为安装表，子代理模板去重复说明，质量门去掉冗余示例输出，Gap-Fill/核验模板精简，红队+去重+矛盾规则压缩为要点，报告模板精简，增量研究压缩为流程链。
 - 流程从 5 步扩展为 7 步 + 1 补漏子步骤：研究意图澄清 → 源检测 → 初始化 → 子代理派发 → 结果确认+质量门 → 来源核验+Gap-Fill → 红队批判+综合撰写
 - 执行情况表格新增「来源核验」统计行和「思考程度」行
@@ -101,11 +119,13 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ## [6.1.0] - 2026-07-23
 
 ### Changed
+
 - **Tavily 调用方式从 MCP 改为 Python SDK**：主代理统一通过 `scripts/tavily_search.py` 调用 `tavily-python` SDK，与子代理的 `exa_search.py` 风格对齐；不再依赖 `mcp__tavily__*` 工具。
 
 ## [6.0.0] - 2026-07-22
 
 ### Added
+
 - **交互式引导流程**：首次使用时逐个源检测 + 配置引导（AnySearch → SciVerse → SerpApi），用户可跳过任意源
 - **首次使用引导输出**：研究开始前输出 `搜索源状态：AnySearch ✅/❌ | SciVerse ✅/❌ | SerpApi ✅/❌ | WebSearch ✅`
 - **参考文献单行格式**：与 validate_report.py 正则对齐，必须含 `层级:` `来源:` `URL:` 三个关键字
@@ -114,6 +134,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **SciVerse 改为 Python SDK 必选路径**（**禁止 MCP 通道**）：v6.0.0 起 SciVerse **只走** `pip install sciverse` + `from sciverse import AgentToolsClient` + `SCIVERSE_API_TOKEN` 环境变量。**MCP 通道（`mcp__sciverse__semantic_search` 等）已弃用**——Proma 协作子会话实测不继承父会话 MCP 工具，是不可靠通道。`~/.claude/mcp.json` 里**不应**再包含 `sciverse` 段；`sciverse-mcp-server` npm 包**不再需要安装**。
 
 ### Fixed
+
 - **报告范式修正**：从"列信息"（X 报告称…Y 报告称…）改为"凝练总结"（多源合起来说明什么洞察）
 - **子代理任务描述模板压缩**：去掉 MCP 引用，数据源改为 Python SDK，8 条 requirements 合并为单段
 - **脚本精简**：state_machine.py 从 374 行精简为两步门禁（STARTED → DONE），代码量减半
@@ -124,6 +145,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - 版本号统一到 `6.0.0`：SKILL.md frontmatter、tri-research README、CHANGELOG、test-prompts.json、root README 徽章全部对齐。
 
 ### Changed
+
 - **SKILL.md 全中文重写**：从英文改为中文（frontmatter 除外），行数从 500+ 精简到 393 行
 - **README 重写**：新增 v5.8.0 → v6.0.0 变更对照表，精简文档结构
 - **引用规则精简**：从 8 条 requirements 精简为 5 条，明确"单行、三必须字段、写完跑验证"
@@ -132,6 +154,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **SciVerse 调用方式变更**：从"MCP / Node CLI fallback"改为"Python SDK 必选"。v3 报告 `examples/DEEP_RESEARCH_AI与收入分配_2026-07-22_sciverse.md` 是 SDK 路径的实证——拿到 4 篇真实学术论文（2 个真实 DOI）。
 
 ### Verified
+
 - 端到端测试完成：会话 `ai-creative-destruction-20260722`，主题"AI是创造性破坏吗"
 - 3 个子代理并行搜索，26 篇引用（中 10 / 英 16），validate_report.py 验收通过
 - 13 项合约测试全部通过（SKILL.md 393 行 ≤ 400 行限制）
@@ -139,12 +162,14 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ## [5.8.0] - 2026-07-20
 
 ### Added
+
 - 会话在 S1 冻结 `topic`、双语关键词与 `min_sources`，最终报告必须匹配确认主题和门槛。
 - `record_dispatch` / `record_result` 子代理账本，记录运行时 task id、任务摘要、终态、结果路径与 SHA-256。
 - Lead Agent 与 research-subagent 共享外部不可信内容边界：来源仅作证据，禁止服从网页命令、自动安装、读取凭据或改变代理计划。
 - 根 MIT `LICENSE`、skills.sh 徽章、真实回放截图和确定性单技能安装命令。
 
 ### Fixed
+
 - S1 不再允许缺少参数；S2/S3 不再允许没有代理证据的空状态推进。
 - 移除 `--force` 会话覆盖入口，保留完成历史；`DONE` 后 `check` 会复核代理结果与报告哈希。
 - URL 唯一性按无 query/fragment 的规范形式计数；双语覆盖取自参考文献条目，渠道状态只检查对应章节。
@@ -152,12 +177,14 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - Runtime WebSearch 不再宣称始终可用，登录墙和付费墙不再被视为渲染绕过目标。
 
 ### Changed
+
 - 主 Skill 和 research-subagent 版本统一为 5.8.0。
 - 运行时适配细节下沉到 `references/runtime-adapters.md`，主 `SKILL.md` 保持在 500 行以内。
 
 ## [5.7.0] - 2026-07-20
 
 ### Fixed
+
 - `advance DONE` 现在必须接收真实报告路径并在状态转换前调用报告验收器。
 - 验收失败时会保持 `S3`，不再写入伪造的 `REPORT_VALIDATED` 事件。
 - 验收成功后记录报告路径、SHA-256、最小来源门槛和验收时间，形成可审计完成证据。
@@ -166,33 +193,39 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - 公共文档移除本机绝对路径和本仓库已废弃的 `.claude` 技能路径，统一使用 conda 环境与 `TRI_RESEARCH_HOME`。
 
 ### Added
+
 - 增加缺报告、无效报告、低来源门槛和重复 URL 的反例测试，并校验验收证据哈希。
 
 ## [5.6.0] - 2026-07-20
 
 ### Fixed
+
 - 子代理必须本地预检后端，避免把主进程可用状态错误外推为凭据已继承。
 - 并行源调用改为 failure-isolated / `allSettled` 语义，单源失败不再丢弃其他源的成功输出。
 - 凭据、配置或配额失败按来源熔断，本子代理立即跳过该源剩余查询，不重试、不重新派发。
 
 ### Verified
+
 - 3 个子代理一次性派发并全部返回，无子代理派生、无重复派发、无空循环或死循环。
 - 每个子代理 2 个 OODA 循环后收束，完成时间约 2–5 分钟。
 
 ## [5.5.0] - 2026-07-20
 
 ### Fixed
+
 - SciVerse 不再依赖宿主必须暴露 MCP；未暴露时自动使用官方 skill 的 Node.js CLI。
 - 可用性探测改为验证 CLI 退出码、`biz_code: 0` 和 `hits`，避免“Token 已配置但后端不可达”的假阳性。
 - 子代理必须保留 SciVerse 返回的 `doc_id`、题名与原文片段，确保学术证据可复现。
 
 ### Added
+
 - 官方安装命令 `npx skills add https://sciverse.space` 与 `SCIVERSE_API_TOKEN` 配置说明。
 - 中英文语义检索实测通过，MCP 缺失时 CLI fallback 可用。
 
 ## [5.4.0] - 2026-07-20
 
 ### Fixed
+
 - 将 Bash 专用状态机改为跨平台 Python 实现；`state_machine.sh` 仅保留兼容转发。
 - 使用显式 `--session` 隔离并发研究，移除“读取最近状态文件”造成的串会话风险。
 - 将运行状态目录从 `TRI_RESEARCH_HOME` 分离为 `TRI_RESEARCH_STATE_DIR`，不再污染技能安装目录。
@@ -202,6 +235,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - 工具预检改为轻量真实查询，区分 `available`、`unavailable`、`quota_exhausted`。
 
 ### Added
+
 - 6 个状态机自动化测试，以及技能版本、引用、路径和测试主题的契约检查。
 - “人工智能与劳动分配”端到端测试用例，要求中英双补和带引用 Markdown 报告。
 - `validate_report.py` 报告验收器，检查章节、引用闭环、来源元数据、双语覆盖与渠道状态。
@@ -209,6 +243,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ## [5.3.0] - 2026-07-20
 
 ### Changed
+
 - **"四源"→"多元"重命名**：技能定位从固定四源升级为可扩展的多元搜索架构，呼应未来可继续增加搜索源。
   - frontmatter `description` 改为 "multiple search backends ... (extensible)"；`triggers` 移除 `四源研究/三源研究/三源搜索`，新增 `多元研究/多源研究`。
   - SKILL.md 正文："four search backends"→"multiple search backends (currently ... extensible)"；"四源/三源"指代统一改为"多元/其余源/三个源"。
@@ -216,23 +251,27 @@ All notable changes to the Tri Research Skill will be documented in this file.
   - 历史版本记录（v4/v5 的"三源"）保留为事实数据，不回改。
 
 ### Added
+
 - **全局双语纪律段**：从 SerpApi 段与子代理段抽离出统一的"全局双语纪律（所有源、所有代理通用）"，明确中英双补是贯穿所有源、父子代理的统一硬约束，消除约束分散导致的维护漂移。
 
 ## [5.2.0] - 2026-07-20
 
 ### Added
+
 - **中英双语强制约束（四源一致）**：子代理三源检索与父代理 SerpApi 补强，均须中英双补，不得只抓中文。
   - 子代理搜索源约束段新增"无论用哪源，检索与抓取必须中英双补……只抓单语种视为流程缺陷"。
   - SerpApi 调用约束段新增第 3 条：补强必须中英双补（中文轮 `hl=zh-cn`+`gl=cn`、英文轮 `hl=en`+`gl=us`），两轮结果都并入综述并标注"中英双补"。
   - Example Task Description 模板新增 `Language coverage REQUIRED` 段。
 
 ### Changed
+
 - SKILL.md frontmatter `version` 同步至 5.2.0（此前漏更至 5.1.0）。
 - README 搜索工具依赖表补 SerpApi 行，与"四源"首屏钩子一致。
 
 ## [5.1.0] - 2026-07-20
 
 ### Added
+
 - **四源并行搜索架构**：在原有三源（AnySearch + Tavily + SciVerse）基础上，新增 **SerpApi** 作为第四源，强化中文 Google / Google Scholar / 100+ 垂直 SERP 的精准抓取。
 - **SerpApi 调用约束段**：明确第四源仅由主导代理集中调用（不派发给子代理，规避子代理 env/代理坑），在合成报告前集中补强。
 - **配额静默降级**：SerpApi 免费档 250 次/月；默认参与四源，配额耗尽或密钥缺失时捕获 `error` 字段后静默降级到其余三源，报告照常生成并在末尾注明，不中断不报错。
@@ -240,12 +279,14 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **测试 prompt 扩充**：test-prompts.json 新增 `serpapi-fourth-source` 与 `serpapi-quota-degrade` 两个用例，覆盖第四源集成与配额降级。
 
 ### Changed
+
 - frontmatter `description` 与 `triggers` 更新为"四源"；README 首屏、降级表、可用性流程图同步四源表述。
 - "39来源/67%互补率"历史数据保留于 v5.0.0 记录，四源实际覆盖以运行时检测为准。
 
 ## [5.0.0] - 2026-07-20
 
 ### Added
+
 - **三源并行搜索架构**：AnySearch + Tavily + SciVerse 三个搜索后端并行工作
 - **框架无关抽象接口**：SEARCH/FETCH/RENDER/DISPATCH 抽象层，适配任意 Agent 框架
 - **前置依赖声明**：frontmatter 中的 `dependencies` 字段，明确三个搜索工具的安装方式和降级策略
@@ -261,10 +302,12 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **来源溯源**：每个来源标注由哪个搜索工具发现（Found by）
 
 ### Changed
+
 - 重命名：`deep-research` → `tri-research`
 - 路径硬编码改为环境变量 `${ANYSEARCH_SKILL_DIR}`
 
 ### 实测数据（v5）
+
 - 来源总数：39（v1 为 24，提升 63%）
 - Tier 1 来源：25
 - 2024-2025 文献：15
@@ -275,30 +318,36 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ## [4.0.0] - 2026-07-20
 
 ### Added
+
 - AnySearch CLI 工具集成
 - 三源搜索（AnySearch + Tavily + SciVerse）
 
 ### Issues
+
 - 无时间约束，1 个子代理超时被中止
 
 ## [3.0.0] - 2026-07-20
 
 ### Changed
+
 - 搜索工具从 web_search 替换为 Tavily + SciVerse
 
 ### Added
+
 - SciVerse 学术论文搜索
 - Tavily 深度搜索模式
 
 ## [2.0.0] - 2026-07-20
 
 ### Changed
+
 - 框架无关化重构：工具名改为抽象接口（SEARCH/FETCH/RENDER/DISPATCH）
 - 功能不变，仅改变技能文件写法
 
 ## [1.0.0] - 2026-07-20
 
 ### Initial
+
 - 从 GitHub 仓库 `simple_claude_deep_research_agent` 克隆
 - 使用 web_search + web_fetch + Playwright 作为搜索工具
 - 三种查询类型：直接查询、广度优先、深度优先
