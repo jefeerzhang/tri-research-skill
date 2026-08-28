@@ -24,7 +24,12 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
+from _common import (  # noqa: E402
+    MIN_REPORT_SOURCES,
+    StateError,
+    now_iso,
+    source_threshold,
+)
 from validate_report import (  # noqa: E402
     ReportMissingError,
     ReportTamperedError,
@@ -151,10 +156,6 @@ def _pid_alive(pid: int) -> bool:  # pragma: no cover - exotic platforms only
     return True
 
 
-class StateError(RuntimeError):
-    pass
-
-
 def default_state_dir() -> Path:
     configured = os.environ.get("TRI_RESEARCH_STATE_DIR")
     if configured:
@@ -257,10 +258,19 @@ class StateStore:
             path = self.state_path(session_id)
             if path.exists():
                 raise StateError(f"session already exists: {session_id}")
+            # Same guard for a stale ledger: someone who "reset" a session
+            # by deleting the state JSON must not silently inherit the old
+            # evidence — those URLs would pass the done audit as if they
+            # had been seen by THIS session.
+            evidence_candidate = self.state_dir / f"{session_id}.evidence.jsonl"
+            if evidence_candidate.exists():
+                raise StateError(
+                    f"evidence ledger already exists for session {session_id} (delete it or use another session id)"
+                )
             timestamp = now_iso()
             data = {
                 "session_id": session_id,
-                "schema_version": 3,
+                "schema_version": 4,
                 "phase": "STARTED",
                 "params": None,
                 "created_at": timestamp,
@@ -346,6 +356,22 @@ class StateStore:
                 )
             except ReportValidationError as exc:
                 raise StateError(str(exc)) from exc
+            # Evidence Audit hard gate: every reference URL in the report
+            # must trace to the session's evidence ledger. Imported lazily:
+            # evidence.py imports this module at load time, so a top-level
+            # import would be circular. Runs while the write lock is held
+            # but only reads the ledger — no new locking of its own.
+            from evidence import audit_report, format_untraced, ledger_fingerprint
+
+            untraced, total = audit_report(self, session_id, report_path)
+            if untraced:
+                raise StateError(
+                    f"evidence audit failed: {len(untraced)}/{total} reference URL(s) untraced: "
+                    f"{format_untraced(untraced)}"
+                )
+            # Ledger snapshot fingerprint: part of the proof, so `check`
+            # can catch post-DONE ledger edits (e.g. backdated rows).
+            proof.update(ledger_fingerprint(self, session_id))
             timestamp = proof["validated_at"]
             data["phase"] = "DONE"
             data["updated_at"] = timestamp
@@ -447,7 +473,7 @@ def emit(data: dict[str, Any], store: StateStore) -> None:
         print(f"MIN_SOURCES:{proof['min_sources']}")
 
 
-def _verify_integrity_line(data: dict[str, Any]) -> None:
+def _verify_integrity_line(data: dict[str, Any], store: StateStore) -> None:
     """Print the INTEGRITY marker, recomputing the report hash for DONE.
 
     A DONE session must still match the fingerprint stored at completion:
@@ -456,6 +482,10 @@ def _verify_integrity_line(data: dict[str, Any]) -> None:
     ERROR: line instead of silently claiming OK. Non-DONE phases carry no
     proof to verify (STARTED never has one; add_dimensions clears it), so
     integrity stays vacuously OK there — the behaviour `check` predates on.
+
+    The same contract covers the evidence ledger fingerprint half of the
+    proof: appending a backdated row or deleting the ledger after DONE is
+    reported with the same MISMATCH / MISSING markers.
     """
     if data["phase"] != "DONE":
         print("INTEGRITY:OK")
@@ -467,6 +497,22 @@ def _verify_integrity_line(data: dict[str, Any]) -> None:
         print("INTEGRITY:MISSING")
         raise StateError(str(exc)) from exc
     except ReportTamperedError as exc:
+        print("INTEGRITY:MISMATCH")
+        raise StateError(str(exc)) from exc
+    # Ledger fingerprint half (lazy import: evidence.py imports this module).
+    from evidence import (
+        LedgerMissingError,
+        LedgerTamperedError,
+        evidence_path,
+        verify_ledger_integrity,
+    )
+
+    try:
+        verify_ledger_integrity(proof, evidence_path(store, data["session_id"]))
+    except LedgerMissingError as exc:
+        print("INTEGRITY:MISSING")
+        raise StateError(str(exc)) from exc
+    except LedgerTamperedError as exc:
         print("INTEGRITY:MISMATCH")
         raise StateError(str(exc)) from exc
     print("INTEGRITY:OK")
@@ -516,7 +562,7 @@ def run(args: argparse.Namespace) -> int:
 
     if args.command == "check":
         emit(data, store)
-        _verify_integrity_line(data)
+        _verify_integrity_line(data, store)
         return 0
 
     if args.command == "get_phase":

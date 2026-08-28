@@ -20,7 +20,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report
+from _test_helpers import make_valid_report, register_report_evidence
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -64,6 +64,8 @@ class ConcurrencyTests(unittest.TestCase):
             )
             setp = run_cli(state_dir, "--session", session, "set_params", params)
             self.assertEqual(setp.returncode, 0, msg=setp.stderr)
+            # done's Evidence Audit gate needs the report URLs in the ledger.
+            register_report_evidence(state_dir, session, report)
 
             procs = [
                 subprocess.Popen(

@@ -49,8 +49,21 @@ class ReportValidationProofTests(unittest.TestCase):
         self.assertIn("validation failed", str(ctx.exception))
 
     def test_require_complete_proof_accepts_full_proof(self) -> None:
-        proof = {"path": "/tmp/report.md", "sha256": "abc", "min_sources": 10}
+        proof = {
+            "path": "/tmp/report.md",
+            "sha256": "abc",
+            "min_sources": 10,
+            "evidence_lines": 10,
+            "evidence_sha256": "def",
+        }
         self.vr.require_complete_proof(proof, "s1")
+
+    def test_require_complete_proof_rejects_proof_without_ledger_fingerprint(self) -> None:
+        # Schema v4: the ledger snapshot fingerprint is mandatory — a proof
+        # from before the Evidence Ledger (or a hand-edited state) is corrupt.
+        with self.assertRaises(self.vr.ReportValidationError) as ctx:
+            self.vr.require_complete_proof({"path": "/tmp/report.md", "sha256": "abc", "min_sources": 10}, "s1")
+        self.assertIn("evidence", str(ctx.exception))
 
     def test_require_complete_proof_rejects_missing_proof(self) -> None:
         with self.assertRaises(self.vr.ReportValidationError) as ctx:

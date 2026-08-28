@@ -36,6 +36,18 @@ _Avoid_: 必选/可选二分、优先级混称
 由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责密钥解析（经 `KeyProvider`，可读 `.env`）、SDK 缺失检查、client 构建、`invoke`（超时 / 重试 / 熔断）、错误 JSON 打印与退出码；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
 _Avoid_: 托管任务、wrapped command、managed handler 混称
 
+**Evidence Ledger**:
+会话级 append-only 证据流水账，记录研究会话中每波搜索见过的 URL 及其出处（backend / query），与会话状态文件并列存放、以 `session_id` 标识；只追加不修改，是 Evidence Audit 的对账依据。
+_Avoid_: 搜索日志、引用缓存、结果收藏混称
+
+**Evidence Record**:
+Evidence Ledger 的单条记录，只可能是两种 kind 之一：`seen`（搜索事件：backend / query / url / title / ts）与 `user_provided`（用户提供的资料：url / note / ts）；写入不去重——同一 URL 被多条 query 搜到就记多行。
+_Avoid_: 引用记录、采纳标记（adopted）混称
+
+**Evidence Audit**:
+报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。
+_Avoid_: 引用校验、格式验收混称（那是 Report Validation）
+
 **Report Validation**:
 报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称

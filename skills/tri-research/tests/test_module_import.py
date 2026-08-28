@@ -12,6 +12,7 @@ direct script execution but NOT for:
 These tests pin the contract: state_machine.py must be loadable as a module
 from any cwd, without the caller having to add scripts/ to sys.path.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -24,7 +25,7 @@ import types
 import unittest
 from pathlib import Path
 
-from _test_helpers import example_report
+from _test_helpers import example_report, register_report_evidence
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -104,14 +105,18 @@ class ModuleImportTests(unittest.TestCase):
             # start
             self.assertEqual(mod.run(make_args("start")), 0)
             # set_params
-            params = json.dumps({
-                "topic": "人工智能与劳动分配",
-                "min_sources": 12,
-                "keywords_zh": ["人工智能", "劳动分配"],
-                "keywords_en": ["artificial intelligence", "labor allocation"],
-            }, ensure_ascii=False)
+            params = json.dumps(
+                {
+                    "topic": "人工智能与劳动分配",
+                    "min_sources": 12,
+                    "keywords_zh": ["人工智能", "劳动分配"],
+                    "keywords_en": ["artificial intelligence", "labor allocation"],
+                },
+                ensure_ascii=False,
+            )
             self.assertEqual(mod.run(make_args("set_params", params_json=params)), 0)
             # done
+            register_report_evidence(store.state_dir, session, SAMPLE)
             self.assertEqual(
                 mod.run(make_args("done", report=SAMPLE, min_sources=12)),
                 0,

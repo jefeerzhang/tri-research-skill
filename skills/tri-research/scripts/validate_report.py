@@ -341,7 +341,7 @@ def require_complete_proof(proof: Any, session_id: str) -> None:
     Raises ReportValidationError — never KeyError — so callers can translate
     it to a CLI-friendly error without a traceback.
     """
-    required = ("path", "sha256", "min_sources")
+    required = ("path", "sha256", "min_sources", "evidence_lines", "evidence_sha256")
     if not isinstance(proof, dict):
         raise ReportValidationError(
             f"phase=DONE but report_validation is missing for session {session_id!r} — state file is corrupt"

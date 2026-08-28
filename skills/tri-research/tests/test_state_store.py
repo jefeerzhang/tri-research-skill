@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import load_module, make_valid_report
+from _test_helpers import load_module, make_valid_report, register_report_evidence
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
@@ -81,6 +81,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.set_params("s", _params())
         report = Path(self.tmp.name) / "report.md"
         make_valid_report(report)
+        register_report_evidence(self.state_dir, "s", report)
         self.store.complete("s", report)
         with self.assertRaises(self.sm.StateError) as ctx:
             self.store.set_params("s", _params(topic="changed"))
@@ -105,6 +106,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.set_params("s", _params())
         report = Path(self.tmp.name) / "report.md"
         make_valid_report(report)
+        register_report_evidence(self.state_dir, "s", report)
         data = self.store.complete("s", report)
         self.assertEqual(data["phase"], "DONE")
         self.assertIn("report_validation", data)
@@ -125,6 +127,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.set_params("s", _params())
         report = Path(self.tmp.name) / "report.md"
         make_valid_report(report)
+        register_report_evidence(self.state_dir, "s", report)
         self.store.complete("s", report)
 
         data = self.store.extend("s", {"keywords_zh": ["小米汽车"]})

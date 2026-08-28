@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report
+from _test_helpers import make_valid_report, register_report_evidence
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "state_machine.py"
 
@@ -50,11 +50,16 @@ class _CliHarness:
         make_valid_report(report, topic=topic, source_count=source_count)
         return report
 
+    def register_evidence(self, session: str, report: Path) -> None:
+        """Simulate a Lead that registered its search results before done."""
+        register_report_evidence(self.state_dir, session, report)
+
     def drive_to_done(self, session: str) -> Path:
-        """start -> set_params -> done --report; returns the report path."""
+        """start -> set_params -> (register evidence) -> done --report."""
         self.run_cli("--session", session, "start")
         self.set_params(session)
         report = self.write_valid_report(f"{session}.md")
+        self.register_evidence(session, report)
         self.run_cli("--session", session, "done", "--report", str(report))
         return report
 
@@ -111,6 +116,7 @@ class StateMachineTests(_CliHarness, unittest.TestCase):
         self.run_cli("--session", "full", "start")
         self.set_params("full")
         report = self.write_valid_report()
+        self.register_evidence("full", report)
         result = self.run_cli("--session", "full", "done", "--report", str(report))
         self.assertIn("STATE:DONE", result.stdout)
         self.assertIn("REPORT:", result.stdout)
@@ -140,6 +146,7 @@ class StateMachineTests(_CliHarness, unittest.TestCase):
         self.run_cli("--session", "double-done", "start")
         self.set_params("double-done")
         report = self.write_valid_report("double-done.md")
+        self.register_evidence("double-done", report)
         self.run_cli("--session", "double-done", "done", "--report", str(report))
         result = self.run_cli("--session", "double-done", "done", "--report", str(report), ok=False)
         self.assertIn("already completed", result.stderr)
@@ -208,6 +215,7 @@ class StateMachineTests(_CliHarness, unittest.TestCase):
         self.run_cli("--session", "ext-after-done", "start")
         self.set_params("ext-after-done")
         report = self.write_valid_report("ext-after-done.md")
+        self.register_evidence("ext-after-done", report)
         self.run_cli("--session", "ext-after-done", "done", "--report", str(report))
         # Now extend
         ext = json.dumps({"keywords_zh": ["追加维度"]}, ensure_ascii=False)

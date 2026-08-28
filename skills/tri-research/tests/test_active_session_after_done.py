@@ -10,6 +10,7 @@ Contract: after `done` transitions a session to DONE, the active-session
 pointer must NOT point at it. The pointer is the "what would a brand-new
 caller operate on" — pointing at a done session violates that semantic.
 """
+
 from __future__ import annotations
 
 import sys
@@ -17,7 +18,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import example_report
+from _test_helpers import example_report, register_report_evidence
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -34,10 +35,11 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
 
             def run(*args: str, ok: bool = True):
                 import subprocess
+
                 proc = subprocess.run(
-                    [sys.executable, str(SCRIPT),
-                     "--state-dir", str(state_dir), *args],
-                    capture_output=True, text=True,
+                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), *args],
+                    capture_output=True,
+                    text=True,
                 )
                 if ok and proc.returncode != 0:
                     self.fail(f"command failed: {args}\nstdout={proc.stdout}\nstderr={proc.stderr}")
@@ -47,13 +49,20 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
 
             # Set up: start, set params, run done on the sample report.
             import json
-            params = json.dumps({
-                "topic": "人工智能与劳动分配", "min_sources": 10,
-                "keywords_zh": ["人工智能"], "keywords_en": ["ai"],
-            }, ensure_ascii=False)
+
+            params = json.dumps(
+                {
+                    "topic": "人工智能与劳动分配",
+                    "min_sources": 10,
+                    "keywords_zh": ["人工智能"],
+                    "keywords_en": ["ai"],
+                },
+                ensure_ascii=False,
+            )
             run("--session", session, "start")
             run("--session", session, "set_params", params)
             sample = example_report()
+            register_report_evidence(state_dir, session, sample)
             run("--session", session, "done", "--report", str(sample))
 
             # Contract: after DONE, the active-session pointer must not
@@ -66,7 +75,8 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
             if active_file.exists():
                 content = active_file.read_text(encoding="utf-8").strip()
                 self.assertNotEqual(
-                    content, session,
+                    content,
+                    session,
                     msg=(
                         f"active-session still points at done session {session!r}; "
                         f"the pointer must be cleared or point at a new active session "
@@ -83,10 +93,11 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
 
             def run(*args: str, ok: bool = True):
                 import subprocess
+
                 proc = subprocess.run(
-                    [sys.executable, str(SCRIPT),
-                     "--state-dir", str(state_dir), *args],
-                    capture_output=True, text=True,
+                    [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), *args],
+                    capture_output=True,
+                    text=True,
                 )
                 if ok and proc.returncode != 0:
                     self.fail(f"command failed: {args}\nstdout={proc.stdout}\nstderr={proc.stderr}")
@@ -95,10 +106,16 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
                 return proc
 
             import json
-            params = json.dumps({
-                "topic": "人工智能与劳动分配", "min_sources": 10,
-                "keywords_zh": ["人工智能"], "keywords_en": ["ai"],
-            }, ensure_ascii=False)
+
+            params = json.dumps(
+                {
+                    "topic": "人工智能与劳动分配",
+                    "min_sources": 10,
+                    "keywords_zh": ["人工智能"],
+                    "keywords_en": ["ai"],
+                },
+                ensure_ascii=False,
+            )
 
             run("--session", "sess-A", "start")
             run("--session", "sess-A", "set_params", params)
@@ -107,6 +124,7 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
 
             # Restore A as the active session while completing B explicitly.
             (state_dir / "active-session").write_text("sess-A\n", encoding="utf-8")
+            register_report_evidence(state_dir, "sess-B", sample)
             run("--session", "sess-B", "done", "--report", str(sample))
 
             active_file = state_dir / "active-session"

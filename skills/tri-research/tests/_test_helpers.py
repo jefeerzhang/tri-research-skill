@@ -1,7 +1,50 @@
 """Shared test fixtures for tri-research scripts."""
+
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+
+def report_reference_urls(report_path: Path) -> list[str]:
+    """Raw reference URLs from a report's 参考文献 section, in order, deduped."""
+    text = Path(report_path).read_text(encoding="utf-8")
+    refs = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
+    next_section = re.search(r"(?m)^## ", refs)
+    if next_section:
+        refs = refs[: next_section.start()]
+    urls: list[str] = []
+    for match in re.finditer(r"https?://\S+", refs):
+        # Same trailing-punctuation strip as validate_report._strip_url_punctuation.
+        url = match.group(0).rstrip(".,;:。，；：）》」』”’\"'")
+        if url not in urls:
+            urls.append(url)
+    return urls
+
+
+def register_report_evidence(state_dir: Path, session: str, report_path: Path, *, backend: str = "test") -> None:
+    """Register every reference URL of `report` as seen evidence (test seam).
+
+    `done` runs the Evidence Audit hard gate: report references must trace
+    to the session's evidence ledger. Tests that drive a session to a
+    successful done use this to simulate a Lead that registered its search
+    results. In-process (no subprocess) so StateStore-level tests can use it.
+    """
+    evidence = load_module(
+        Path(__file__).resolve().parents[1] / "scripts" / "evidence.py",
+        "evidence_test_helper",
+    )
+    records = [
+        {
+            "kind": "seen",
+            "ts": "2026-01-01T00:00+00:00",
+            "backend": backend,
+            "query": "test query",
+            "url": url,
+        }
+        for url in report_reference_urls(report_path)
+    ]
+    evidence.append_records(evidence.StateStore(Path(state_dir)), session, records)
 
 
 def make_valid_report(
