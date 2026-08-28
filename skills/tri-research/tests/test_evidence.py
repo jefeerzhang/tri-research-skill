@@ -51,7 +51,9 @@ class EvidenceCliHarness:
         return [json.loads(line) for line in lines]
 
     def ledger_path(self, session: str) -> Path:
-        return self.state_dir / f"{session}.evidence.jsonl"
+        # StateStore resolves its state_dir (CI temp dirs can be 8.3 short
+        # paths like RUNNER~1), so compare against the resolved form too.
+        return (self.state_dir / f"{session}.evidence.jsonl").resolve()
 
     def drive_to_done(self, session: str) -> Path:
         """start -> set_params -> (register evidence) -> done --report."""
