@@ -235,6 +235,24 @@ def format_untraced(untraced: list[tuple[int, str]]) -> str:
     return "; ".join(f"[{number}] {url}" for number, url in untraced)
 
 
+def _print_summary(records: list[dict[str, Any]]) -> None:
+    """Per-backend counts for the 执行情况「搜索源使用」row.
+
+    ``queries`` counts DISTINCT (backend, query) pairs — the closest
+    machine-verifiable proxy for "how many searches this backend ran";
+    ``urls`` counts registered records (repeats across queries included).
+    Backends absent from the ledger are the caller's job to report as 0.
+    """
+    queries: dict[str, set[str]] = {}
+    url_counts: dict[str, int] = {}
+    for record in records:
+        backend = str(record.get("backend") or record["kind"])
+        queries.setdefault(backend, set()).add(str(record.get("query", "")))
+        url_counts[backend] = url_counts.get(backend, 0) + 1
+    for backend in sorted(queries):
+        print(f"SUMMARY:{backend} queries={len(queries[backend])} urls={url_counts[backend]}")
+
+
 def ledger_fingerprint(store: StateStore, session_id: str) -> dict[str, Any]:
     """Snapshot fingerprint of the ledger, stored in the DONE proof.
 
@@ -291,6 +309,9 @@ def create_parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser("list", help="Print ledger records (JSON lines)")
     list_parser.add_argument("--kind", choices=RECORD_KINDS, help="Filter by record kind")
+    list_parser.add_argument(
+        "--summary", action="store_true", help="Per-backend query/URL counts (for the 搜索源使用 row)"
+    )
 
     audit_parser = subparsers.add_parser("audit", help="Trace report references against the ledger")
     audit_parser.add_argument("--report", type=Path, required=True)
@@ -316,6 +337,9 @@ def run(args: argparse.Namespace) -> int:
         store.load(session_id)  # unknown session is an error, not an empty ledger
         print(f"SESSION:{session_id}")
         records = load_records(evidence_path(store, session_id))
+        if args.summary:
+            _print_summary(records)
+            return 0
         for record in records:
             if args.kind is None or record["kind"] == args.kind:
                 print(json.dumps(record, ensure_ascii=False))

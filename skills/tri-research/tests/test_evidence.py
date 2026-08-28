@@ -203,6 +203,38 @@ class EvidenceListTests(EvidenceCliHarness, unittest.TestCase):
         self.start_session("no-ledger")
         self.assertEqual(self.list_records("no-ledger"), [])
 
+    def test_summary_counts_queries_and_urls_per_backend(self) -> None:
+        self.start_session("summary")
+        self.run_cli(
+            "--session",
+            "summary",
+            "add",
+            "--backend",
+            "exa",
+            "--query",
+            "q1",
+            "--url",
+            "https://a.cn/1",
+            "--url",
+            "https://a.cn/2",
+        )
+        self.run_cli("--session", "summary", "add", "--backend", "exa", "--query", "q2", "--url", "https://a.cn/3")
+        self.run_cli("--session", "summary", "add", "--user-provided", "--url", "https://gov.cn/r.pdf")
+        result = self.run_cli("--session", "summary", "list", "--summary")
+        lines = [line for line in result.stdout.splitlines() if line.startswith("SUMMARY:")]
+        self.assertEqual(
+            lines,
+            [
+                "SUMMARY:exa queries=2 urls=3",
+                "SUMMARY:user_provided queries=1 urls=1",
+            ],
+        )
+
+    def test_summary_empty_ledger_prints_nothing(self) -> None:
+        self.start_session("summary-empty")
+        result = self.run_cli("--session", "summary-empty", "list", "--summary")
+        self.assertEqual([line for line in result.stdout.splitlines() if line.startswith("SUMMARY:")], [])
+
 
 class EvidenceDurabilityTests(EvidenceCliHarness, unittest.TestCase):
     def test_concurrent_adds_do_not_lose_rows(self) -> None:

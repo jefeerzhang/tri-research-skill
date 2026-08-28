@@ -28,6 +28,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 - **中英双语强制覆盖**：每个研究维度都要求中文 + 英文证据，验收器会做报告级双语检查，杜绝「只搜英文」的偷懒
 - **六源并行检索**：AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch，按必选与可选分级，单个源失败不阻断研究
 - **来源可核验**：每条参考文献带层级、来源与唯一 URL，格式统一；学术来源支持按 DOI 逐条核对
+- **引用溯源台账**：每波搜索的 URL 及其出处（源 + query）记入会话级 append-only 台账；`done` 硬门禁逐条对账，报告里的每条引用都必须能回答「在哪次搜索见过」
 - **增量研究**：研究完成后可追加新维度，只检索增量部分，旧结果原样保留
 - **跨运行时**：基于 Python CLI + SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw
 
@@ -43,12 +44,12 @@ Tri Research 正是为解决这类问题而生。它适合文献综述、政策�
 
 Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**推荐流程**靠执行纪律约束，跳过不会让 `done` 失败。
 
-| 硬门禁（代码拦截 `DONE`）                     | 推荐流程（最佳实践，代码不审计）    |
-| --------------------------------------------- | ----------------------------------- |
-| `start` / `set_params` / `done --report`      | 研究意图澄清、`RESEARCH_CONTEXT.md` |
-| 七章结构、引用闭环、min_sources、合法唯一 URL | 质量门、Gap-Fill、多波次检索        |
-| 报告级中英证据、执行情况源使用行              | 来源内容核验、声明-来源匹配、红队   |
-| 参数冻结与报告 SHA-256                        | 置信标签、大纲适配、综合子代理      |
+| 硬门禁（代码拦截 `DONE`）                                       | 推荐流程（最佳实践，代码不审计）    |
+| --------------------------------------------------------------- | ----------------------------------- |
+| `start` / `set_params` / `done --report`                        | 研究意图澄清、`RESEARCH_CONTEXT.md` |
+| 七章结构、引用闭环、min_sources、合法唯一 URL、**引用溯源对账** | 质量门、Gap-Fill、多波次检索        |
+| 报告级中英证据、执行情况源使用行                                | 来源内容核验、声明-来源匹配、红队   |
+| 参数冻结与报告 SHA-256 + 台账指纹                               | 置信标签、大纲适配、综合子代理      |
 
 ## 快速开始
 
@@ -171,7 +172,19 @@ python scripts/state_machine.py --session <id> check
 python scripts/state_machine.py --session <id> get_params
 ```
 
-状态只前进不后退，`done` 必经报告验证器（章节完整、来源数达标、URL 唯一、报告级中英证据）。核验 / 红队 / 置信标签不在此强制。
+状态只前进不后退，`done` 必经报告验证器（章节完整、来源数达标、URL 唯一、报告级中英证据）与 Evidence Audit（参考文献每条 URL 必须已登记进会话台账）。核验 / 红队 / 置信标签不在此强制。
+
+### 引用溯源台账
+
+每波搜索后由 Lead 登记（用户手动资料用 `--user-provided`）：
+
+```bash
+python scripts/evidence.py --session <id> add --backend exa --query "AI 就业" --url <u1> --url <u2>
+python scripts/evidence.py --session <id> list --summary                        # 按源汇总，写「搜索源使用」行照抄
+python scripts/evidence.py --session <id> audit --report <report.md>            # 手动预对账
+```
+
+台账 append-only；`done` 硬门禁逐条对账，`check` 的 `INTEGRITY` 同时覆盖报告与台账指纹。
 
 ### 增量研究
 
@@ -221,6 +234,7 @@ tri-research-skill/
 |   |   |   |-- state_machine.py   # 两步状态机
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
 |   |   |   |-- validate_report.py # 报告验收器
+|   |   |   |-- evidence.py        # 引用溯源台账（add / list / audit）
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
 |   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
 |   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / SerpApi）

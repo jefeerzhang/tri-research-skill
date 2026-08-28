@@ -2,6 +2,22 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Evidence Ledger 引用溯源（候选 2）**：每会话一个 append-only 台账 `{session_id}.evidence.jsonl`（新 CLI `scripts/evidence.py`），Lead 统一登记每波搜索见过的 URL 及出处（`seen`：backend/query/url/title/ts）与用户手动资料（`user_provided`）；`add` 支持批量、写入不去重、末行截断容错、复用现有 `session_lock`，DONE 后封账（`add_dimensions` 重开）。
+- **Evidence Audit 硬门禁**：`done` 在报告验证通过后逐条对账——报告每条引用 URL 经与 `validate_report` 同一套归一化（`canonicalize_url`）后必须在台账命中（`user_provided` 同等资格），untraced → `StateError` 并全量打印 `[编号] URL` 明细；台账缺失不做特例，等价全部 untraced。无豁免开关：合法例外的唯一正道是登记 `user_provided` 行。
+- **台账指纹进 INTEGRITY**：DONE proof 新增 `evidence_lines` + `evidence_sha256`（原始字节，与报告指纹同配方），`check` 的 INTEGRITY 同时验报告与台账——DONE 后补行 / 篡改打 `INTEGRITY:MISMATCH`、删台账打 `INTEGRITY:MISSING`；`require_complete_proof` 强制新字段；`schema_version` 3→4。
+- **`evidence.py list --summary`**：按 backend 输出 `queries=`（去重 query 对）与 `urls=` 计数，供「执行情况·搜索源使用」行照抄（该行本身仍不做机器对账，纯增量后续可纳入 audit）。
+- **金样例不变**：`examples/` 四份报告均可过验收（验收器规则未收紧，台账是新增的独立依据）。
+
+### Changed
+
+- **StateError 下沉 `_common.py`**：state_machine 以 `__main__` 与模块名双加载时曾产生两个不相等的 `StateError` 类，`done` 遇损坏台账会裸 traceback 破坏 `ERROR:` 行契约；现在 evidence 抛出与 CLI 捕获的是同一类（回归测试钉住）。
+- **`start` 拒绝同名残留台账**：删 state JSON「重置」会话后重开同名 id，不再静默继承旧证据（否则旧 URL 会作为本会话的「见过」通过审计）。
+- **行为收窄（schema v3 → v4）**：升级前已 DONE 的会话（proof 无台账指纹）`check` 显式报 corrupt——`add_dimensions` 后重跑 `done` 重建 proof 即可恢复。
+
 ## [6.6.0] - 2026-08-28
 
 ### Fixed
