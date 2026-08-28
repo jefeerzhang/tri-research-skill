@@ -10,6 +10,8 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **Evidence Audit 硬门禁**：`done` 在报告验证通过后逐条对账——报告每条引用 URL 经与 `validate_report` 同一套归一化（`canonicalize_url`）后必须在台账命中（`user_provided` 同等资格），untraced → `StateError` 并全量打印 `[编号] URL` 明细；台账缺失不做特例，等价全部 untraced。无豁免开关：合法例外的唯一正道是登记 `user_provided` 行。
 - **台账指纹进 INTEGRITY**：DONE proof 新增 `evidence_lines` + `evidence_sha256`（原始字节，与报告指纹同配方），`check` 的 INTEGRITY 同时验报告与台账——DONE 后补行 / 篡改打 `INTEGRITY:MISMATCH`、删台账打 `INTEGRITY:MISSING`；`require_complete_proof` 强制新字段；`schema_version` 3→4。
 - **`evidence.py list --summary`**：按 backend 输出 `queries=`（去重 query 对）与 `urls=` 计数，供「执行情况·搜索源使用」行照抄（该行本身仍不做机器对账，纯增量后续可纳入 audit）。
+- **Report Shell 报告可分享外壳**：新增 `scripts/render_report.py`（标准库手写迷你渲染器，零 Python 依赖），把验收报告渲成章纸风格单文件 HTML（零外链 / 零 JS / 零构建，单栏杂志式 65ch 衬线暖白，版式借鉴 cailun 造纸三律）；正文 `[N]` 与参考文献双向锚点跳转、置信标签色块、层级徽标、执行情况表格；契约外语法降级为转义纯文本（不丢字）；非报告输入显式报错。纯派生展示物：验收体系（proof / INTEGRITY）零感知。
+- **Provenance Note 出处小注**：`render_report.py --session <id>` 时每条参考文献下方渲染出处（backend · query），读 Evidence Ledger、复用 Evidence Audit 的同一套 URL 归一化匹配；未命中如实标「台账未见」。展示层如实呈现，不是审计。
 - **金样例不变**：`examples/` 四份报告均可过验收（验收器规则未收紧，台账是新增的独立依据）。
 
 ### Changed

@@ -199,6 +199,17 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 整波检索失败时：**优雅降级**（用已有来源缩减报告并在执行情况注明）；零来源则停止并告知用户。
 
+### 渲染可分享外壳（推荐，不阻塞）
+
+`done` 之后**推荐**把报告渲成章纸风格单文件 HTML 交付用户。外壳（Report Shell）是纯派生展示物：验收体系不感知它，不渲染无损，随时可重新生成。
+
+```bash
+python scripts/render_report.py <报告路径>                          # 输出同名 .html
+python scripts/render_report.py <报告路径> --session <session-id>   # 附台账出处小注
+```
+
+带 `--session` 时每条参考文献下方渲染 Provenance Note：出处（backend · query）来自 Evidence Ledger，未命中的条目如实标「台账未见」。**展示层如实呈现，不是审计**——对账是 Evidence Audit 的事。
+
 ## 状态管理
 
 脚本：`${TRI_RESEARCH_HOME}/scripts/state_machine.py`（Unix 可用 `state_machine.sh`）；状态目录：`${TRI_RESEARCH_STATE_DIR}` 或系统临时目录。

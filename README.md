@@ -29,6 +29,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 - **六源并行检索**：AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch，按必选与可选分级，单个源失败不阻断研究
 - **来源可核验**：每条参考文献带层级、来源与唯一 URL，格式统一；学术来源支持按 DOI 逐条核对
 - **引用溯源台账**：每波搜索的 URL 及其出处（源 + query）记入会话级 append-only 台账；`done` 硬门禁逐条对账，报告里的每条引用都必须能回答「在哪次搜索见过」
+- **可分享外壳**：验收报告一键渲成章纸风格单文件 HTML（零外链零 JS，断网可开），引用可点击跳转、置信标签与层级徽标可视化，还能附台账出处——读者能看到每条引用「是哪次搜索捡来的」
 - **增量研究**：研究完成后可追加新维度，只检索增量部分，旧结果原样保留
 - **跨运行时**：基于 Python CLI + SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw
 
@@ -235,6 +236,7 @@ tri-research-skill/
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
 |   |   |   |-- validate_report.py # 报告验收器
 |   |   |   |-- evidence.py        # 引用溯源台账（add / list / audit）
+|   |   |   |-- render_report.py  # 报告可分享外壳（章纸风格单文件 HTML）
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
 |   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
 |   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / SerpApi）

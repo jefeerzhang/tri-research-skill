@@ -48,6 +48,14 @@ _Avoid_: 引用记录、采纳标记（adopted）混称
 报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。
 _Avoid_: 引用校验、格式验收混称（那是 Report Validation）
 
+**Report Shell**:
+由验收通过的 Markdown 报告派生的单文件 HTML 展示物（章纸版式：零外链 / 零 JS / 零构建，单栏杂志式）；只抄录报告内容不编字，可随时重新生成或删除；验收体系（proof / INTEGRITY）不感知它。
+_Avoid_: 第二验收产物、报告副本、「导出」混称
+
+**Provenance Note**:
+报告外壳里每条参考文献下方的来源标注，内容来自 Evidence Ledger 的命中记录（backend · query）；未命中的条目如实标「台账未见」。展示层语义，不是审计——对账是 Evidence Audit 的事。
+_Avoid_: 引用核验、Evidence Audit 混称
+
 **Report Validation**:
 报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
