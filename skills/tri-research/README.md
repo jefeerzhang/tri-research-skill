@@ -70,7 +70,6 @@
 | `validate_report`：七章、引用闭环、URL、报告级中英、源使用行     | 来源内容核验、声明-来源匹配、红队        |
 | `evidence.py audit`：引用 URL 逐条溯源台账；台账指纹进 INTEGRITY | （来源真实性仍靠推荐流程抽查）           |
 | 报告 SHA-256 写入 `report_validation`                            | 置信标签、大纲适配、综合子代理           |
-|                                                                  | 渲染可分享外壳（章纸 HTML，done 后推荐） |
 |                                                                  | `citations` 软复核                       |
 
 ## 能力边界
@@ -170,7 +169,6 @@ tri-research/
 │   ├── state_machine.sh
 │   ├── validate_report.py
 │   ├── evidence.py                # 引用溯源台账（add / list / audit）
-│   ├── render_report.py           # 报告可分享外壳（章纸风格单文件 HTML）
 │   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口
 │   └── exa_search.py              # Exa 搜索 CLI 薄入口
 ├── references/

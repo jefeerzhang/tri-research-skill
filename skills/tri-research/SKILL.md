@@ -199,17 +199,6 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 整波检索失败时：**优雅降级**（用已有来源缩减报告并在执行情况注明）；零来源则停止并告知用户。
 
-### 渲染可分享外壳（推荐，不阻塞）
-
-`done` 之后**推荐**把报告渲成章纸风格单文件 HTML 交付用户。外壳（Report Shell）是纯派生展示物：验收体系不感知它，不渲染无损，随时可重新生成。
-
-```bash
-python scripts/render_report.py <报告路径>                          # 输出同名 .html
-python scripts/render_report.py <报告路径> --session <session-id>   # 附台账出处小注
-```
-
-带 `--session` 时每条参考文献下方渲染 Provenance Note：出处（backend · query）来自 Evidence Ledger，未命中的条目如实标「台账未见」。**展示层如实呈现，不是审计**——对账是 Evidence Audit 的事。
-
 ### 嵌入机制图/结构图（推荐，不阻塞）
 
 机制/概念/架构类研究，若关系结构用图表达更清楚，可在**撰写阶段**可选调用 `drawio-skill` 生成一张图并嵌进报告 md。图是纯派生展示物：**md 是唯一真源**，验证器不要求、也不审计它，不渲染无损，随时可重新生成。
@@ -227,8 +216,6 @@ python scripts/render_report.py <报告路径> --session <session-id>   # 附台
 4. **定稿后删除中间产物** `.drawio` / `.png` / `*.drawio.png`，最终只保留 md——图已内嵌，删掉外部文件无坏链、无外部依赖（日后要改图需重画，图源一并删除）
 
 **防编造软规则**：图只能表达正文已出现的结论与关系，**不得**新增节点、数字、或正反证据之外的联想链接；正文结论与图不一致反而是缺陷。规则属推荐层，无代码强制。
-
-**已知限制**：`render_report.py`（HTML 报告外壳）会把内嵌 data-URI 行转义成纯文本（不渲染成图），请以 md 为图的正展示处；如需外壳也显示图片，需另行扩渲染器（本次不含）。
 
 **done 之后补图**：md 已变，须重跑 `validate_report.py` + `done` 以恢复 `INTEGRITY: OK`（与「报告被改后需重验」一致）。
 
