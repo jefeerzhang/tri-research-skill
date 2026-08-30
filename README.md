@@ -18,7 +18,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 <sub>▲ 49 条引用全部通过 <code>validate_report.py</code> 验收，每个数字可在 <a href="examples/DEEP_RESEARCH_气候风险与金融变革_2026-08-27.md">真实会话产物</a>中查证</sub>
 
-[快速开始](#快速开始) · [核心亮点](#核心亮点) · [什么时候用它](#什么时候用它) · [效果示例](#效果示例) · [工作流程](#工作流程) · [和同行有什么不同](#和同行有什么不同)
+[快速开始](#快速开始) · [核心亮点](#核心亮点) · [运行架构](#运行架构) · [什么时候用它](#什么时候用它) · [效果示例](#效果示例) · [工作流程](#工作流程) · [和同行有什么不同](#和同行有什么不同)
 
 ---
 
@@ -32,6 +32,14 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 - **增量研究**：研究完成后可追加新维度，只检索增量部分，旧结果原样保留
 - **LaTeX/PDF 交付**：报告一键渲成书样 PDF（自动跳过 drawio 框架图），md 仍为唯一真源
 - **跨运行时**：基于 Python CLI + SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw
+
+## 运行架构
+
+![tri-research 运行架构图](assets/tri-research-runtime-architecture.png)
+
+运行时组件与硬门禁链路：Lead Agent 编排两步状态机（STARTED → DONE），检索层经共享 CLI 骨架接六源并行，`done` 必须同时通过 `validate_report.py` 报告校验与证据台账 URL 溯源对账，才能交付并渲染 PDF。
+
+交互式版本（节点搜索、上下游路径追踪、PNG/SVG 导出）见 [assets/tri-research-architecture.html](assets/tri-research-architecture.html)；图的 typed JSON 规格在同目录 `tri-research-architecture.json`，由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验（9/9 项检查）。
 
 ## 什么时候用它
 
