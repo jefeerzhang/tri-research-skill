@@ -28,7 +28,7 @@ version: "6.6.0"
 
 ### 推荐流程（非硬门禁）
 
-下列能力**提高质量，但不写入验收器**：研究意图澄清、`RESEARCH_CONTEXT.md`、质量门自检、来源内容核验、Gap-Fill、红队自批判、置信标签、大纲适配、综合子代理、声明-来源匹配、多波次补搜。交付前可选用 `citations` skill 做人话复核，**不阻塞 DONE**。
+下列能力**提高质量，但不写入验收器**：研究意图澄清、`RESEARCH_CONTEXT.md`、质量门自检、来源内容核验、Gap-Fill、红队自批判、置信标签、大纲适配、综合子代理、声明-来源匹配、多波次补搜、机制图/结构图嵌入（`drawio-skill`，可选）。交付前可选用 `citations` skill 做人话复核，**不阻塞 DONE**。
 
 ---
 
@@ -209,6 +209,28 @@ python scripts/render_report.py <报告路径> --session <session-id>   # 附台
 ```
 
 带 `--session` 时每条参考文献下方渲染 Provenance Note：出处（backend · query）来自 Evidence Ledger，未命中的条目如实标「台账未见」。**展示层如实呈现，不是审计**——对账是 Evidence Audit 的事。
+
+### 嵌入机制图/结构图（推荐，不阻塞）
+
+机制/概念/架构类研究，若关系结构用图表达更清楚，可在**撰写阶段**可选调用 `drawio-skill` 生成一张图并嵌进报告 md。图是纯派生展示物：**md 是唯一真源**，验证器不要求、也不审计它，不渲染无损，随时可重新生成。
+
+**何时用 / 不用**：
+
+- **用**：驱动→机制→结果这类因果链、多要素关系、流程/架构结构，图能一眼讲清。
+- **不用**：纯文献观点对比、事实问答、结论清单——图没有信息增量，不要为了有图而画。
+
+**怎么做**（Lead 按 drawio-skill 现有工作流执行）：
+
+1. 调 `drawio-skill`（如 `C:\Users\jefeer\.dsh\skills\drawio-skill`）生成 `.drawio`，用 `scripts/validate.py` 校验、draw.io CLI 导出 PNG
+2. 把 PNG 转 base64 data-URI 内嵌进 md，使报告**单文件自包含**（无外部 PNG）：`python -c "import base64,pathlib;print('data:image/png;base64,'+base64.b64encode(pathlib.Path('<图名>.png').read_bytes()).decode())"`，把输出粘贴进 `![图题](<data-URI>)`
+3. 图放在 `## 概述` 顶部或机制描述处，正文配一句文字指回（如「机制见图」）
+4. **定稿后删除中间产物** `.drawio` / `.png` / `*.drawio.png`，最终只保留 md——图已内嵌，删掉外部文件无坏链、无外部依赖（日后要改图需重画，图源一并删除）
+
+**防编造软规则**：图只能表达正文已出现的结论与关系，**不得**新增节点、数字、或正反证据之外的联想链接；正文结论与图不一致反而是缺陷。规则属推荐层，无代码强制。
+
+**已知限制**：`render_report.py`（HTML 报告外壳）会把内嵌 data-URI 行转义成纯文本（不渲染成图），请以 md 为图的正展示处；如需外壳也显示图片，需另行扩渲染器（本次不含）。
+
+**done 之后补图**：md 已变，须重跑 `validate_report.py` + `done` 以恢复 `INTEGRITY: OK`（与「报告被改后需重验」一致）。
 
 ## 状态管理
 
