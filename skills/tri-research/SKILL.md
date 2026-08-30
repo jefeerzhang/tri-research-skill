@@ -232,7 +232,27 @@ python scripts/render_tex.py <报告路径> --fonts-dir <字体目录> # 指定�
 python scripts/render_tex.py <报告路径> --no-compile          # 只生成 .tex，不编译
 ```
 
-检测到 xelatex 时自动编译 PDF（探测 `TRI_RESEARCH_XELATEX` / `XELATEX` → TinyTeX 路径 → PATH）；找不到则只产出 `.tex` 并提示。`.tex` 属中间产物，可删除——交付以 md + pdf 为准。
+检测到 xelatex 时自动编译 PDF（探测 `TRI_RESEARCH_XELATEX` / `XELATEX` → TinyTeX 路径 → PATH）；找不到则只产出 `.tex` 并提示（TinyTeX 安装见下文「TinyTeX 安装引导」）。`.tex` 属中间产物，可删除——交付以 md + pdf 为准。
+
+### TinyTeX 安装引导（PDF 编译引擎）
+
+`render_tex.py` 自动编译 PDF 需要 `xelatex`。**TinyTeX** 是基于 TeX Live 的轻量发行版（约百 MB、无需管理员、装进用户目录），只装用得到的宏包；未装也能用（只产 `.tex`），装了才直接出 PDF。
+
+| 平台 | 安装 | 默认安装位置 | 验证 |
+|------|------|--------------|------|
+| Windows | 下载 [install-bin-windows.bat](https://tinytex.yihui.org/install-bin-windows.bat) 双击运行（需 PowerShell）；或 Chocolatey / Scoop | `%APPDATA%/TinyTeX`（即 `C:\Users\<你>\AppData\Roaming\TinyTeX`） | `xelatex --version` |
+| macOS  | `curl -sL "https://tinytex.yihui.org/install-bin-unix.sh" | sh` | `~/Library/TinyTeX` | `xelatex --version` |
+| Linux  | `wget -qO- "https://tinytex.yihui.org/install-bin-unix.sh" | sh` | `$HOME/.TinyTeX` | `xelatex --version` |
+| R（全平台） | `install.packages('tinytex'); tinytex::install_tinytex()` | 同上 | `tinytex::xelatex()` |
+
+**脚本自动探测**：`render_tex.py` 依次找 `TRI_RESEARCH_XELATEX` / `XELATEX` 环境变量 → Windows `%APPDATA%\TinyTeX\bin\windows\xelatex.exe` → `PATH`。Windows 用默认安装即可被自动找到；xelatex 在别处就设环境变量：
+
+```bash
+# PowerShell
+$env:TRI_RESEARCH_XELATEX = "C:\Users\<你>\AppData\Roaming\TinyTeX\bin\windows\xelatex.exe"
+```
+
+**缺宏包**：模板用到 `fontspec` / `xeCJK` / `booktabs` / `longtable` / `array` / `enumitem` / `hyperref` / `geometry` / `setspace` / `fancyhdr` / `xcolor` / `graphicx`。精简版缺包时 `tlmgr install <包名>` 补装（`tlmgr search --global --file "/<文件名>"` 可查归属包）。
 
 ## 状态管理
 
