@@ -2,7 +2,7 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.7.0] - 2026-08-30
 
 ### Added
 
@@ -10,15 +10,18 @@ All notable changes to the Tri Research Skill will be documented in this file.
 - **Evidence Audit 硬门禁**：`done` 在报告验证通过后逐条对账——报告每条引用 URL 经与 `validate_report` 同一套归一化（`canonicalize_url`）后必须在台账命中（`user_provided` 同等资格），untraced → `StateError` 并全量打印 `[编号] URL` 明细；台账缺失不做特例，等价全部 untraced。无豁免开关：合法例外的唯一正道是登记 `user_provided` 行。
 - **台账指纹进 INTEGRITY**：DONE proof 新增 `evidence_lines` + `evidence_sha256`（原始字节，与报告指纹同配方），`check` 的 INTEGRITY 同时验报告与台账——DONE 后补行 / 篡改打 `INTEGRITY:MISMATCH`、删台账打 `INTEGRITY:MISSING`；`require_complete_proof` 强制新字段；`schema_version` 3→4。
 - **`evidence.py list --summary`**：按 backend 输出 `queries=`（去重 query 对）与 `urls=` 计数，供「执行情况·搜索源使用」行照抄（该行本身仍不做机器对账，纯增量后续可纳入 audit）。
-- **Report Shell 报告可分享外壳**：新增 `scripts/render_report.py`（标准库手写迷你渲染器，零 Python 依赖），把验收报告渲成章纸风格单文件 HTML（零外链 / 零 JS / 零构建，单栏杂志式 65ch 衬线暖白，版式借鉴 cailun 造纸三律）；正文 `[N]` 与参考文献双向锚点跳转、置信标签色块、层级徽标、执行情况表格；契约外语法降级为转义纯文本（不丢字）；非报告输入显式报错。纯派生展示物：验收体系（proof / INTEGRITY）零感知。
-- **Provenance Note 出处小注**：`render_report.py --session <id>` 时每条参考文献下方渲染出处（backend · query），读 Evidence Ledger、复用 Evidence Audit 的同一套 URL 归一化匹配；未命中如实标「台账未见」。展示层如实呈现，不是审计。
+- **报告 LaTeX/PDF 渲染器**：新增 `scripts/render_tex.py`（内置 XeLaTeX + xeCJK 书样模板，5×8 英寸、思源/系统 CJK 字体可配、回退 Noto CJK，自包含），把验收报告渲成书样 PDF。检测到 xelatex 自动编译（`TRI_RESEARCH_XELATEX`/`XELATEX` → TinyTeX 路径 → PATH），否则只产出 `.tex`；渲染时**自动跳过 drawio 框架图**（`![...]` 及 `*图：…*` 说明一并略去）。
+- **TinyTeX 安装引导**：SKILL.md 新增轻量 LaTeX 引擎（PDF 编译）安装说明——Windows/macOS/Linux/R 四种安装方式、默认安装位置、`xelatex --version` 验证、脚本自动探测路径与 `tlmgr install` 缺包处理。
+- **机制图/结构图嵌入（推荐）**：撰写阶段可用 `drawio-skill` 生成机制/结构图，以 base64 data-URI 内嵌进报告 md，使报告单文件自包含、无外部 PNG；中间产物（`.drawio`/`.png`）定稿后删除。
 - **金样例不变**：`examples/` 四份报告均可过验收（验收器规则未收紧，台账是新增的独立依据）。
 
 ### Changed
 
+- **移除 HTML 报告外壳**：删除 `scripts/render_report.py` 及其测试、ADR-0006，并从 SKILL.md / CONTEXT.md / README / report-format.md 清除引用；交付以报告 md + 书样 PDF 为准，md 仍是唯一真源（HTML 外壳属 Unreleased，从未进过发布通道）。
 - **StateError 下沉 `_common.py`**：state_machine 以 `__main__` 与模块名双加载时曾产生两个不相等的 `StateError` 类，`done` 遇损坏台账会裸 traceback 破坏 `ERROR:` 行契约；现在 evidence 抛出与 CLI 捕获的是同一类（回归测试钉住）。
 - **`start` 拒绝同名残留台账**：删 state JSON「重置」会话后重开同名 id，不再静默继承旧证据（否则旧 URL 会作为本会话的「见过」通过审计）。
 - **行为收窄（schema v3 → v4）**：升级前已 DONE 的会话（proof 无台账指纹）`check` 显式报 corrupt——`add_dimensions` 后重跑 `done` 重建 proof 即可恢复。
+- **报告格式与流程文档**：`report-format.md` 新增「机制图（可选）」「PDF 伴随产物（可选）」；README（根 + skill）补 `render_tex.py` 脚本树、LaTeX/PDF 交付亮点与 v6.6.0→v6.7.0 变化表。
 
 ## [6.6.0] - 2026-08-28
 

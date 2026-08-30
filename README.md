@@ -2,7 +2,7 @@
 
 > 把一次容易失控的多代理检索，变成有范围、有证据、能复核的研究流程。
 
-[![Version](https://img.shields.io/badge/version-6.6.0-blue)](skills/tri-research/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-6.7.0-blue)](skills/tri-research/CHANGELOG.md)
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-tri--research-blueviolet)](skills/tri-research/SKILL.md)
 [![CI](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml/badge.svg)](https://github.com/jefeerzhang/tri-research-skill/actions/workflows/python-package.yml)
 [![skills.sh](https://skills.sh/b/jefeerzhang/tri-research-skill)](https://www.skills.sh/jefeerzhang/tri-research-skill/tri-research)
@@ -51,6 +51,7 @@ Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**�
 | 七章结构、引用闭环、min_sources、合法唯一 URL、**引用溯源对账** | 质量门、Gap-Fill、多波次检索        |
 | 报告级中英证据、执行情况源使用行                                | 来源内容核验、声明-来源匹配、红队   |
 | 参数冻结与报告 SHA-256 + 台账指纹                               | 置信标签、大纲适配、综合子代理      |
+|                                                                | 机制图嵌入（drawio）· 渲染 LaTeX/PDF |
 
 ## 快速开始
 

@@ -1,7 +1,7 @@
 ---
 name: tri-research
 description: "多元深度研究：通过并行子代理和多搜索后端进行带引用的深度研究。适用于多源研究、文献综述、对比分析和研究报告。"
-version: "6.6.0"
+version: "6.7.0"
 ---
 
 ## 硬门禁与推荐流程
@@ -241,8 +241,8 @@ python scripts/render_tex.py <报告路径> --no-compile          # 只生成 .t
 | 平台 | 安装 | 默认安装位置 | 验证 |
 |------|------|--------------|------|
 | Windows | 下载 [install-bin-windows.bat](https://tinytex.yihui.org/install-bin-windows.bat) 双击运行（需 PowerShell）；或 Chocolatey / Scoop | `%APPDATA%/TinyTeX`（即 `C:\Users\<你>\AppData\Roaming\TinyTeX`） | `xelatex --version` |
-| macOS  | `curl -sL "https://tinytex.yihui.org/install-bin-unix.sh" | sh` | `~/Library/TinyTeX` | `xelatex --version` |
-| Linux  | `wget -qO- "https://tinytex.yihui.org/install-bin-unix.sh" | sh` | `$HOME/.TinyTeX` | `xelatex --version` |
+| macOS  | `curl -sL "https://tinytex.yihui.org/install-bin-unix.sh" \| sh` | `~/Library/TinyTeX` | `xelatex --version` |
+| Linux  | `wget -qO- "https://tinytex.yihui.org/install-bin-unix.sh" \| sh` | `$HOME/.TinyTeX` | `xelatex --version` |
 | R（全平台） | `install.packages('tinytex'); tinytex::install_tinytex()` | 同上 | `tinytex::xelatex()` |
 
 **脚本自动探测**：`render_tex.py` 依次找 `TRI_RESEARCH_XELATEX` / `XELATEX` 环境变量 → Windows `%APPDATA%\TinyTeX\bin\windows\xelatex.exe` → `PATH`。Windows 用默认安装即可被自动找到；xelatex 在别处就设环境变量：
