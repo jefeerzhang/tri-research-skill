@@ -30,6 +30,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 - **来源可核验**：每条参考文献带层级、来源与唯一 URL，格式统一；学术来源支持按 DOI 逐条核对
 - **引用溯源台账**：每波搜索的 URL 及其出处（源 + query）记入会话级 append-only 台账；`done` 硬门禁逐条对账，报告里的每条引用都必须能回答「在哪次搜索见过」
 - **增量研究**：研究完成后可追加新维度，只检索增量部分，旧结果原样保留
+- **LaTeX/PDF 交付**：报告一键渲成书样 PDF（自动跳过 drawio 框架图），md 仍为唯一真源
 - **跨运行时**：基于 Python CLI + SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw
 
 ## 什么时候用它
@@ -235,6 +236,7 @@ tri-research-skill/
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
 |   |   |   |-- validate_report.py # 报告验收器
 |   |   |   |-- evidence.py        # 引用溯源台账（add / list / audit）
+|   |   |   |-- render_tex.py      # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
 |   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
 |   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / SerpApi）

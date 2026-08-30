@@ -169,6 +169,7 @@ tri-research/
 │   ├── state_machine.sh
 │   ├── validate_report.py
 │   ├── evidence.py                # 引用溯源台账（add / list / audit）
+│   ├── render_tex.py              # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 │   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口
 │   └── exa_search.py              # Exa 搜索 CLI 薄入口
 ├── references/

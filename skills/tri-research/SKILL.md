@@ -219,6 +219,21 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 **done 之后补图**：md 已变，须重跑 `validate_report.py` + `done` 以恢复 `INTEGRITY: OK`（与「报告被改后需重验」一致）。
 
+### 渲染 LaTeX/PDF（推荐，不阻塞）
+
+`done` 之后**推荐**用 `scripts/render_tex.py` 把报告渲成书样单文件 PDF 交付。PDF 是派生产物：**md 是唯一真源**，验证器不感知它，不渲染无损，随时可重新生成。
+
+- **drawio 框架图排除**：渲染时自动跳过报告里的机制图（`![...]` 图片行及其 `*图：...*` 说明），因此 PDF 不含中间产物 drawio 框架图。
+- **内置书样模板**：XeLaTeX + xeCJK（5×8 英寸，思源/系统 CJK 字体可配、回退 Noto CJK），自包含、不依赖外部模板仓库。
+
+```bash
+python scripts/render_tex.py <报告路径>                        # 生成同名 .tex 并自动编译 .pdf
+python scripts/render_tex.py <报告路径> --fonts-dir <字体目录> # 指定思源字体目录（含 SourceHanSerifCN-Regular.otf 等）
+python scripts/render_tex.py <报告路径> --no-compile          # 只生成 .tex，不编译
+```
+
+检测到 xelatex 时自动编译 PDF（探测 `TRI_RESEARCH_XELATEX` / `XELATEX` → TinyTeX 路径 → PATH）；找不到则只产出 `.tex` 并提示。`.tex` 属中间产物，可删除——交付以 md + pdf 为准。
+
 ## 状态管理
 
 脚本：`${TRI_RESEARCH_HOME}/scripts/state_machine.py`（Unix 可用 `state_machine.sh`）；状态目录：`${TRI_RESEARCH_STATE_DIR}` 或系统临时目录。
