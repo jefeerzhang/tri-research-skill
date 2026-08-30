@@ -158,15 +158,16 @@ class KeyProvider:
 
 @dataclass(frozen=True)
 class BackendSpec:
+    """Declarative spec consumed by Registry.
+
+    Tuning knobs live on the Backend instance itself (call_timeout /
+    max_attempts / retry_backoff / circuit_threshold / circuit_cooldown);
+    tests and callers set them via setattr — no override surface here.
+    """
+
     name: str
     backend: _search_cli.Backend
     env_key: str
-    # Optional overrides; None means use backend's own defaults
-    call_timeout: float | None = None
-    max_attempts: int | None = None
-    retry_backoff: float | None = None
-    circuit_threshold: int | None = None
-    circuit_cooldown: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -199,19 +200,6 @@ class SearchBackendRegistry:
         key = spec.name.lower()
         if key in self._backends:
             raise ValueError(f"backend already registered: {spec.name}")
-        # Apply per-backend overrides to the underlying Backend instance so
-        # _search_cli.invoke reads the correct tuning without extra branching.
-        b = spec.backend
-        if spec.call_timeout is not None:
-            b.call_timeout = spec.call_timeout
-        if spec.max_attempts is not None:
-            b.max_attempts = spec.max_attempts
-        if spec.retry_backoff is not None:
-            b.retry_backoff = spec.retry_backoff
-        if spec.circuit_threshold is not None:
-            b.circuit_threshold = spec.circuit_threshold
-        if spec.circuit_cooldown is not None:
-            b.circuit_cooldown = spec.circuit_cooldown
         self._backends[key] = spec
 
     def get(self, name: str) -> BackendSpec:

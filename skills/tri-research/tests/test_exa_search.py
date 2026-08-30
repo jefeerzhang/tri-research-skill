@@ -52,7 +52,7 @@ class ExaSearchImportTests(unittest.TestCase):
         mod = _load_with_exa_py_blocked()
         buf = io.StringIO()
         with redirect_stdout(buf):
-            mod.cmd_check()
+            mod.main(["check"])
         out = json.loads(buf.getvalue())
         self.assertFalse(out["available"])
 

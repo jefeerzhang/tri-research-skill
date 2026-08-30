@@ -19,11 +19,6 @@ from search_backends import TAVILY_BACKEND  # noqa: E402
 backend = TAVILY_BACKEND
 
 
-def cmd_check() -> None:
-    """Availability probe (no-arg entry kept for the regression tests)."""
-    _search_cli.check(backend)
-
-
 def main(argv: list[str] | None = None) -> int:
     return _search_cli.run(backend, argv)
 
