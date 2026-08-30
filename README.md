@@ -18,7 +18,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 <sub>▲ 49 条引用全部通过 <code>validate_report.py</code> 验收，每个数字可在 <a href="examples/DEEP_RESEARCH_气候风险与金融变革_2026-08-27.md">真实会话产物</a>中查证</sub>
 
-[快速开始](#快速开始) · [核心亮点](#核心亮点) · [运行架构](#运行架构) · [什么时候用它](#什么时候用它) · [效果示例](#效果示例) · [工作流程](#工作流程) · [和同行有什么不同](#和同行有什么不同)
+[快速开始](#快速开始) · [核心亮点](#核心亮点) · [运行架构](#运行架构) · [什么时候用它](#什么时候用它) · [效果示例](#效果示例) · [状态机](#状态机) · [和同行有什么不同](#和同行有什么不同)
 
 ---
 
@@ -142,35 +142,6 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 | **Runtime WebSearch** | Lead Agent    | 通用补充（宿主内置抽象，**不**等于 Tavily）    | 可选 (`optional`)                                      | 宿主提供                                          | 无需申请（宿主内置）                   |
 
 **降级策略：** `required`（Exa / SciVerse）缺失时在源检测阶段暂停并引导配置；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名降级；`optional` 源静默跳过，单源失败不阻断。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
-
-## 工作流程
-
-```mermaid
-flowchart TD
-    U["用户给出研究问题"] --> CT["研究上下文预加载<br/>加载 RESEARCH_CONTEXT.md"]
-    CT --> CL["研究意图澄清<br/>目标/受众/深度/时间/语言"]
-    CL --> P["源检测 + 研究拆解<br/>报告渠道状态"]
-    P --> SM0["state_machine.py start"]
-    SM0 --> SM1["set_params 冻结主题、关键词、min_sources"]
-    SM1 --> D["派发 1-6 个子代理并行搜索<br/>AnySearch · SciVerse · Exa"]
-    D --> Q["子代理独立预检 + 中英双补"]
-    Q --> F{"来源失败？"}
-    F -- "是" --> CB["来源级熔断<br/>不重试不重新派发"]
-    F -- "否" --> R["保留结果"]
-    CB --> R
-    R --> C["结果确认 + 质量门<br/>5 项自动检查，标红薄弱维度"]
-    C -- "继续" --> V["来源内容核验<br/>SciVerse SDK 按 DOI 验证"]
-    C -- "补搜" --> GF["Gap-Fill 精准补漏子代理"]
-    GF --> V
-    V --> VX{"核验剔除后<br/>来源够？"}
-    VX -- "否" --> GF
-    VX -- "是" --> CR["红队自批判<br/>内部审查，不写入正文"]
-    CR --> S["主导综合 + 撰写报告<br/>矛盾保留 + 置信标签"]
-    S --> VT{"报告验收？<br/>validate_report.py"}
-    VT -- "否" --> FIX["只修正报告/引用<br/>禁止返回搜索"]
-    FIX --> VT
-    VT -- "是" --> SM2["state_machine.py done<br/>记录 SHA-256"]
-```
 
 ## 状态机
 
