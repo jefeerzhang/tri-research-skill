@@ -240,7 +240,7 @@ def _circuit_allow(backend: Backend) -> None:
     opened_at = backend._circuit_opened_at
     if opened_at is None:
         return
-    cooldown = getattr(backend, "circuit_cooldown", 60.0)
+    cooldown = backend.circuit_cooldown
     if time.monotonic() - opened_at >= cooldown:
         return
     name = backend.name or "backend"
@@ -254,7 +254,7 @@ def _circuit_success(backend: Backend) -> None:
 
 def _circuit_exhausted(backend: Backend) -> None:
     backend._circuit_failures += 1
-    threshold = getattr(backend, "circuit_threshold", 5)
+    threshold = backend.circuit_threshold
     if backend._circuit_failures >= threshold:
         backend._circuit_opened_at = time.monotonic()
 
@@ -290,9 +290,9 @@ def _is_retryable(exc: BaseException) -> bool:
 
 def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
     """Run ``fn`` with timeout, retry, and circuit. Public for SerpApi handlers."""
-    max_attempts = getattr(backend, "max_attempts", 3)
-    retry_backoff = getattr(backend, "retry_backoff", 0.5)
-    call_timeout = getattr(backend, "call_timeout", 30.0)
+    max_attempts = backend.max_attempts
+    retry_backoff = backend.retry_backoff
+    call_timeout = backend.call_timeout
     last_error: BaseException | None = None
     for attempt in range(max_attempts):
         _circuit_allow(backend)
@@ -330,7 +330,7 @@ def check(backend: Backend) -> None:
     try:
         ok = _run_with_timeout(
             lambda: backend.probe(backend.client_factory(api_key)),
-            getattr(backend, "call_timeout", 30.0),
+            backend.call_timeout,
         )
     except Exception as exc:
         print(json.dumps({"available": False, "error": str(exc)}))
