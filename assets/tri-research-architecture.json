@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "tri-research 运行架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "tri-research-architecture.html",
+    "viewBox": [1200, 555]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "用户", "sublabel": "研究主题请求", "pos": [40, 282], "size": [112, 60] },
+    { "id": "lead", "type": "backend", "label": "Lead Agent", "sublabel": "主代理 · Bash 编排 CLI", "pos": [220, 272], "size": [150, 66], "tag": "主控" },
+    { "id": "state_machine", "type": "backend", "label": "状态机", "sublabel": "state_machine.py", "pos": [220, 122], "size": [150, 62] },
+    { "id": "state_dir", "type": "database", "label": "会话状态目录", "sublabel": "session JSON + active 指针", "pos": [470, 42], "size": [160, 60] },
+    { "id": "validator", "type": "security", "label": "报告硬门禁", "sublabel": "validate_report.py", "pos": [470, 142], "size": [160, 66] },
+    { "id": "renderer", "type": "backend", "label": "render_tex.py", "sublabel": "XeLaTeX → PDF 交付", "pos": [740, 142], "size": [150, 62] },
+    { "id": "search_cli", "type": "backend", "label": "搜索 CLI 骨架", "sublabel": "_search_cli.py · 重试/熔断", "pos": [470, 272], "size": [160, 62] },
+    { "id": "subagent", "type": "backend", "label": "research-subagent", "sublabel": "检索子代理", "pos": [470, 372], "size": [160, 62] },
+    { "id": "evidence", "type": "database", "label": "证据台账", "sublabel": "evidence.py · append-only", "pos": [40, 412], "size": [150, 60] },
+    { "id": "exa_tavily", "type": "external", "label": "Exa · Tavily", "sublabel": "官方 SDK", "pos": [1000, 232], "size": [150, 60] },
+    { "id": "serpapi", "type": "external", "label": "SerpApi", "sublabel": "Google 等 100+ 引擎", "pos": [1000, 362], "size": [150, 60] },
+    { "id": "anysearch", "type": "external", "label": "AnySearch · SciVerse", "sublabel": "宿主 MCP 能力", "pos": [1000, 482], "size": [160, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "tri-research 技能包（本地 Python CLI）", "wraps": ["lead", "state_machine", "state_dir", "validator", "renderer", "search_cli", "subagent", "evidence"], "pad": 10 },
+    { "kind": "security-group", "label": "DONE 硬门禁", "wraps": ["state_machine", "state_dir", "validator"], "pad": 14 }
+  ],
+  "connections": [
+    { "from": "user", "to": "lead", "label": "研究主题 / min_sources", "variant": "emphasis", "labelDy": 54 },
+    { "from": "lead", "to": "state_machine", "label": "start · set_params · done" },
+    { "from": "state_machine", "to": "state_dir", "label": "原子写 + 文件锁", "labelAt": [420, 96] },
+    { "from": "state_machine", "to": "validator", "label": "done：报告校验", "variant": "security", "labelAt": [410, 180] },
+    { "from": "state_machine", "to": "evidence", "label": "done：URL 溯源对账", "variant": "security", "fromSide": "left", "toSide": "left", "via": [[15, 153], [15, 442]], "labelAt": [110, 153] },
+    { "from": "validator", "to": "state_dir", "label": "DONE proof + SHA-256 指纹" },
+    { "from": "validator", "to": "renderer", "label": "验收通过 → 渲染交付" },
+    { "from": "lead", "to": "search_cli", "label": "tavily_search.py" },
+    { "from": "lead", "to": "subagent", "label": "委派检索任务", "variant": "dashed", "fromSide": "bottom" },
+    { "from": "subagent", "to": "search_cli", "label": "exa_search.py" },
+    { "from": "search_cli", "to": "exa_tavily", "label": "SDK（重试 + 熔断）", "variant": "emphasis" },
+    { "from": "search_cli", "to": "serpapi", "label": "HTTP /search" },
+    { "from": "subagent", "to": "anysearch", "label": "MCP 工具调用", "variant": "dashed" },
+    { "from": "lead", "to": "evidence", "label": "add：登记 URL", "fromSide": "bottom", "toSide": "top", "via": [[295, 380], [115, 380]] },
+    { "from": "subagent", "to": "evidence", "label": "登记检索结果", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "控制层（两步状态机）", "items": ["STARTED → DONE 两阶段，参数一经 set_params 即冻结", "active-session 指针 + 跨进程文件锁防并发写", "done 后清除指针；add_dimensions 重开为 EXTENDED"] },
+    { "dot": "rose", "title": "机器可验证硬门禁", "items": ["done = validate_report 结构/引用/双语校验 + SHA-256 指纹", "每条参考文献 URL 必须在证据台账命中，untraced 即失败", "DONE 后改报告或补台账，check 触发 INTEGRITY:MISMATCH"] },
+    { "dot": "emerald", "title": "检索层（六源并行）", "items": ["主代理走 tavily_search.py，子代理走 exa_search.py", "共享骨架提供超时/重试/熔断与统一 JSON 错误契约", "SerpApi / AnySearch / SciVerse 为补强源，可独立降级"] }
+  ]
+}

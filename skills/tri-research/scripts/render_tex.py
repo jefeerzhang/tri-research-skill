@@ -282,7 +282,7 @@ __BODY__
         r"{\rmfamily\fontsize{7.5}{10}\selectfont\color{SecondaryInk} 排版：XeLaTeX · 5×8 英寸}"
         r"\end{titlepage}\setcounter{page}{1}"
     )
-    body = "\n\n".join(render_section(t, l) for t, l in sections)
+    body = "\n\n".join(render_section(t, lines) for t, lines in sections)
     return (
         template.replace("__FONTS__", font_block(fonts_dir))
         .replace("__TITLE__", safe_title)
