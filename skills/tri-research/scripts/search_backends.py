@@ -50,13 +50,13 @@ except ImportError:
 
 
 def _exa_normalize_result(result: Any) -> dict[str, Any]:
+    text = getattr(result, "text", None) or ""
+    published = getattr(result, "published_date", None)
     return {
         "title": result.title,
         "url": result.url,
-        "snippet": (result.text or "")[:500] if hasattr(result, "text") and result.text else "",
-        "published_date": str(result.published_date)
-        if hasattr(result, "published_date") and result.published_date
-        else "",
+        "snippet": text[:500],
+        "published_date": str(published) if published else "",
     }
 
 
@@ -98,19 +98,17 @@ class ExaBackend(_search_cli.Backend):
 def _exa_answer(client: Any, args: Any) -> dict[str, Any]:
     """Managed body: one SDK call + citation shaping; lifecycle is skeleton's."""
     resp = client.answer(args.query, text=True)
-    citations = []
-    if hasattr(resp, "citations") and resp.citations:
-        for cit in resp.citations:
-            citations.append(
-                {
-                    "title": cit.title if hasattr(cit, "title") else "",
-                    "url": cit.url if hasattr(cit, "url") else "",
-                    "text": (cit.text or "")[:1000] if hasattr(cit, "text") and cit.text else "",
-                }
-            )
+    citations = [
+        {
+            "title": getattr(cit, "title", ""),
+            "url": getattr(cit, "url", ""),
+            "text": (getattr(cit, "text", None) or "")[:1000],
+        }
+        for cit in getattr(resp, "citations", None) or []
+    ]
     return {
         "query": args.query,
-        "answer": resp.answer if hasattr(resp, "answer") else "",
+        "answer": getattr(resp, "answer", ""),
         "citations": citations,
     }
 
@@ -120,8 +118,8 @@ def _exa_contents(client: Any, args: Any) -> list[dict[str, Any]]:
     return [
         {
             "url": p.url,
-            "title": p.title if hasattr(p, "title") else "",
-            "text": (p.text or "")[:5000] if hasattr(p, "text") and p.text else "",
+            "title": getattr(p, "title", ""),
+            "text": (getattr(p, "text", None) or "")[:5000],
         }
         for p in resp.results
     ]

@@ -41,19 +41,14 @@ from validate_report import (  # noqa: E402
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
-# Cross-process file locking, with a lock-file poll (the adversarial fallback
-# for filesystems without advisory locks). fcntl is POSIX-only; msvcrt is
-# Windows-only; on other platforms both imports fail and we degrade to
-# blocking-with-poll. See StateStore.write_lock below.
+# Cross-process file locking. fcntl is POSIX-only; on Windows we fall back
+# to msvcrt with a lock-file poll so LOCK_WAIT_SECONDS is honored. See
+# session_lock below.
 try:
     import fcntl
-except ImportError:  # pragma: no cover - platform-dependent
-    try:
-        import msvcrt  # type: ignore[import-not-found]
+except ImportError:  # Windows
+    import msvcrt  # type: ignore[import-not-found]
 
-        _HAVE_MSVCRT = True
-    except ImportError:
-        _HAVE_MSVCRT = False
     fcntl = None  # type: ignore[assignment]
 
 LOCK_WAIT_SECONDS = 30.0
@@ -75,8 +70,7 @@ def session_lock(lock_path: Path) -> Iterator[None]:
     try:
         if fcntl is not None:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
-        elif _HAVE_MSVCRT:  # pragma: no cover - Windows only
-            # msvcrt.LK_LOCK retries for ~10s then raises bare OSError;
+        else:  # Windows: msvcrt.LK_LOCK retries ~10s then raises bare OSError;
             # poll with LK_NBLCK instead so LOCK_WAIT_SECONDS is honored
             # and timeouts surface as StateError (ERROR: line, exit 1),
             # not a traceback.
@@ -90,70 +84,20 @@ def session_lock(lock_path: Path) -> Iterator[None]:
                     if datetime.now().timestamp() > deadline:
                         raise StateError(f"timed out waiting for state lock: {lock_path}") from None
                     _sleep(LOCK_POLL_SECONDS)
-        else:  # pragma: no cover - exotic platforms
-            deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
-            while True:
-                # Read-then-create with O_CREAT|O_EXCL: atomic claim, no
-                # exists()/stat() race window. An existing EMPTY file is an
-                # unheld marker (see write_lock docstring); content means
-                # some process recorded its pid there.
-                try:
-                    held_by = lock_path.read_text(encoding="utf-8").strip()
-                except FileNotFoundError:
-                    held_by = ""
-                except OSError:
-                    held_by = "?"  # unreadable — treat as held by unknown
-                if not held_by:
-                    try:
-                        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                        os.write(fd, (str(os.getpid()) + "\n").encode("utf-8"))
-                        os.close(fd)
-                        break
-                    except FileExistsError:
-                        pass  # lost the claim race — re-check holder
-                elif held_by.isdigit() and not _pid_alive(int(held_by)):
-                    # Stale lock: holder crashed before cleanup. Steal it.
-                    try:
-                        lock_path.unlink()
-                    except FileNotFoundError:
-                        pass
-                if datetime.now().timestamp() > deadline:
-                    raise StateError(f"timed out waiting for state lock: {lock_path}")
-                _sleep(LOCK_POLL_SECONDS)
         yield
     finally:
         if fcntl is not None:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-        elif _HAVE_MSVCRT:  # pragma: no cover - Windows only
+        else:
             lock_handle.seek(0)
             msvcrt.locking(lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
-        elif lock_path.exists():  # pragma: no cover - exotic platforms
-            try:
-                lock_path.unlink()
-            except FileNotFoundError:
-                pass
         lock_handle.close()
 
 
-def _sleep(seconds: float) -> None:  # pragma: no cover - Windows only
+def _sleep(seconds: float) -> None:
     import time
 
     time.sleep(seconds)
-
-
-def _pid_alive(pid: int) -> bool:  # pragma: no cover - exotic platforms only
-    """Best-effort liveness probe for stale-lock detection (POSIX semantics).
-
-    Only reached on platforms with neither fcntl nor msvcrt, so os.kill's
-    Windows TerminateProcess behavior is irrelevant here.
-    """
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except (PermissionError, NotImplementedError, OSError):
-        return True
-    return True
 
 
 def default_state_dir() -> Path:
@@ -404,12 +348,10 @@ class StateStore:
     def write_lock(self, session_id: str) -> Iterator[None]:
         """Cross-process lock guarding a session's read-modify-write.
 
-        Advisory locks (fcntl / msvcrt) are authoritative when available;
-        the lock file then persists on disk as an empty marker and is
-        deliberately NOT unlinked (deleting a locked file lets a third
-        process lock the orphaned inode — a classic race). On platforms
-        with neither module the file is removed on unlock and its presence
-        with content doubles as the held flag (see session_lock).
+        Advisory locks (fcntl on POSIX, msvcrt on Windows) are authoritative;
+        the lock file persists on disk as an empty marker and is deliberately
+        NOT unlinked (deleting a locked file lets a third process lock the
+        orphaned inode — a classic race).
         """
         with session_lock(self.state_path(session_id).with_suffix(".lock")):
             yield

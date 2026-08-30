@@ -12,28 +12,13 @@ if [ -n "${PYTHON_BIN:-}" ] && [ -x "${PYTHON_BIN}" ]; then
     exec "${PYTHON_BIN}" "${SCRIPT_DIR}/state_machine.py" "$@"
 fi
 
-# 2. Standard names on PATH (Unix shells; cmd.exe on Windows).
+# 2. Standard names on PATH (python3/python/py; py.exe covers all Windows
+#    installs made by the official installer).
 for candidate in python3 python py; do
     if command -v "${candidate}" >/dev/null 2>&1; then
         exec "${candidate}" "${SCRIPT_DIR}/state_machine.py" "$@"
     fi
 done
-
-# 3. Common Windows install locations (Git Bash / MSYS / WSL interop).
-if [ -n "${WINDIR:-}" ] || uname -s 2>/dev/null | grep -qi "mingw\|msys\|cygwin"; then
-    for candidate in \
-        "/c/Python313/python.exe" \
-        "/c/Python312/python.exe" \
-        "/c/Python311/python.exe" \
-        "/c/Python310/python.exe" \
-        "/c/Program Files/Python313/python.exe" \
-        "/c/Program Files/Python312/python.exe"
-    do
-        if [ -x "${candidate}" ]; then
-            exec "${candidate}" "${SCRIPT_DIR}/state_machine.py" "$@"
-        fi
-    done
-fi
 
 echo "ERROR:no Python interpreter found. Set PYTHON_BIN or add python3/python/py to PATH." >&2
 exit 127

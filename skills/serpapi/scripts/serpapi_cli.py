@@ -171,12 +171,10 @@ def _serpapi_invoke_fetch(
 
 
 def _serpapi_fetch_cli(
-    engine, query, hl, gl, num, api_key, since=None, *, backend: Any | None = None
+    engine, query, hl, gl, num, api_key, since=None, *, backend: Any
 ) -> dict[str, Any]:
-    """CLI-facing fetch that preserves the original SerpApi exit codes."""
+    """CLI-facing fetch through invoke(), preserving SerpApi exit codes."""
     try:
-        if backend is None:
-            return _serpapi_fetch(engine, query, hl, gl, num, api_key, since)
         return _serpapi_invoke_fetch(backend, engine, query, hl, gl, num, api_key, since)
     except SerpApiError as exc:
         sys.stderr.write(str(exc) + "\n")
@@ -253,7 +251,9 @@ def _serpapi_cmd_export(args: Any) -> None:
     if getattr(args, "no_proxy", False):
         _search_cli.clear_proxy_vars()
     api_key = load_key(args.api_key)
-    data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since)
+    data = _serpapi_fetch_cli(
+        args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=SERPAPI_BACKEND
+    )
     organic = data.get("organic_results", [])
     ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = []
