@@ -2,6 +2,16 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **`--no-proxy check` 静默失效**：全局标志 `--no-proxy` 在 `check` 分支从未被消费（`search` / `batch_search` / managed command / `REGISTRY.check` 都会先清代理环境变量），代理掐断 HTTPS 握手时探活仍带着 `HTTPS_PROXY` 去跑，持续输出假的 `{"available": false}`——恰是该标志要救的场景。现 `check` 分支执行前同样经 `_maybe_clear_proxy`，与 Registry 半边及 serpapi SKILL.md「子命令前传 `--no-proxy`，仅本次运行清除」的契约对齐。回归测试：`tests/test_search_cli_resilience.py::CheckTimeoutTests::test_no_proxy_flag_clears_proxy_for_check`。
+
+### Added
+
+- **`--no-proxy` 消费源码闸门**：新增 `tests/test_global_flag_consumption.py`——静态扫描 `_search_cli`，断言 `_maybe_clear_proxy` 恰定义一次、每个触网命令分支（`check` / `search` / `batch_search` / managed command）各消费一次，且消费点位于首次 `invoke()` 之前。与 `test_host_helpers.py` 的元组唯一性闸门互补：那个防「清理逻辑被重复定义」，这个防「某分支该调没调」（本次 bug 的成因类）。经变异测试双向验证：删掉任一消费行闸门变红，还原变绿。`Registry.check` 不在闸门范围（程序化 seam 走显式 `no_proxy` 布尔参数，无全局 flag）。
+
 ## [6.7.0] - 2026-08-30
 
 ### Added
