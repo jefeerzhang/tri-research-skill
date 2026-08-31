@@ -7,6 +7,7 @@ calls fail fast. JSON shapes and exit codes stay the existing contract.
 Seam: `_search_cli.search` / `batch_search` / `check` with a FakeBackend
 standing in for the external SDK. Tests do not reach private helpers.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,6 +35,9 @@ class FakeBackend(_search_cli.Backend):
     env_key = "FAKE_SEARCH_KEY"
     client_factory = staticmethod(lambda key: object())
     flags = ()
+    global_flags = (
+        _search_cli.Flag("no_proxy", ("--no-proxy",), "Clear proxy env vars for this run", action="store_true"),
+    )
     max_attempts = 3
     retry_backoff = 0.0
     call_timeout = 5.0
@@ -46,9 +50,11 @@ class FakeBackend(_search_cli.Backend):
         self.hang = False
         self.release = threading.Event()
         self.error: Exception | None = ConnectionError("connection reset")
+        self.proxy_seen_at_probe: str | None = "<not run>"
 
     def probe(self, client: object) -> bool:
         self.calls += 1
+        self.proxy_seen_at_probe = os.environ.get("HTTPS_PROXY")
         if self.hang:
             self.release.wait()
         if self.fail_times > 0:
@@ -242,6 +248,32 @@ class CheckTimeoutTests(unittest.TestCase):
         payload = json.loads(buf.getvalue())
         self.assertFalse(payload["available"])
         self.assertIn("error", payload)
+
+    def test_no_proxy_flag_clears_proxy_for_check(self) -> None:
+        """`--no-proxy check` must probe without proxy env vars.
+
+        Bug: the global flag parsed fine but the `check` branch never called
+        _maybe_clear_proxy, so the probe still ran with HTTPS_PROXY set and
+        SSL-breaking proxies kept lying about availability. The Registry
+        half (`REGISTRY.check(no_proxy=True)`) already cleared; the CLI
+        surface must match (SKILL.md: "--no-proxy before the subcommand …
+        clears those variables for that run only").
+        """
+        saved = os.environ.get("HTTPS_PROXY")
+        os.environ["HTTPS_PROXY"] = "http://proxy.invalid"
+        backend = FakeBackend()
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                rc = _search_cli.run(backend, ["--no-proxy", "check"])
+            self.assertEqual(rc, 0)
+            self.assertEqual(json.loads(buf.getvalue()), {"available": True})
+            self.assertIsNone(backend.proxy_seen_at_probe)
+        finally:
+            if saved is None:
+                os.environ.pop("HTTPS_PROXY", None)
+            else:
+                os.environ["HTTPS_PROXY"] = saved
 
 
 if __name__ == "__main__":

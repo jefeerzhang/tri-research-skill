@@ -462,6 +462,11 @@ def run(backend: Backend, argv: list[str] | None = None) -> int:
     parser = build_parser(backend)
     args = parser.parse_args(argv)
     if args.command == "check":
+        # The global --no-proxy flag must take effect here too: without this
+        # the probe ran with proxy env vars intact, so SSL-breaking proxies
+        # kept producing false "unavailable" JSON (the CLI diverged from
+        # REGISTRY.check(no_proxy=True), which has always cleared).
+        _maybe_clear_proxy(args)
         check(backend)
     elif args.command == "search":
         search(backend, args)
