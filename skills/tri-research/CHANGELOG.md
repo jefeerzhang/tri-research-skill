@@ -6,6 +6,9 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ### Fixed
 
+- **`find_xelatex` 拼错 TinyTeX 路径**：曾用 `C:\Users\{USERNAME}\AppData\...`，在 USERNAME≠配置目录名（中文显示名/域账户）时即使 TinyTeX 已装也探测失败。现按 `%APPDATA%` 与家目录下 `Library/TinyTeX`、`.TinyTeX` 探测。回归：`tests/test_render_tex.py::FindXelatexTests`。
+- **Windows 锁超时被 unlock OSError 盖住**：`session_lock` 在未拿到锁就超时时，`finally` 仍 `LK_UNLCK`，把约定的 `StateError`（`ERROR:` 行）盖成 traceback。现仅在已加锁时解锁。回归：`tests/test_session_lock.py`。
+- **`render_tex` 表格短行 / URL 含 `}`**：列数不齐时 longtable 缺 `&`；`\url{...}` 遇 `}` 提前闭合。现短行补空单元格，URL 改用 `\url|...|`。
 - **`--no-proxy check` 静默失效**：全局标志 `--no-proxy` 在 `check` 分支从未被消费（`search` / `batch_search` / managed command / `REGISTRY.check` 都会先清代理环境变量），代理掐断 HTTPS 握手时探活仍带着 `HTTPS_PROXY` 去跑，持续输出假的 `{"available": false}`——恰是该标志要救的场景。现 `check` 分支执行前同样经 `_maybe_clear_proxy`，与 Registry 半边及 serpapi SKILL.md「子命令前传 `--no-proxy`，仅本次运行清除」的契约对齐。回归测试：`tests/test_search_cli_resilience.py::CheckTimeoutTests::test_no_proxy_flag_clears_proxy_for_check`。
 
 ### Added

@@ -6,9 +6,9 @@
 7 个 ``## `` 章节、行内 ``[N]`` / 置信标签、单行参考文献、执行情况表格）；
 契约外的 Markdown 降级为转义纯文本。
 
-**drawio 框架图排除**：报告里内嵌的机制/结构图（``![...]`` 图片行）在生成
-LaTeX 时**跳过**，因此 PDF 不含中间产物 drawio 框架图（与 ``report-format.md``
-「机制图（可选）」的约定一致）。图片说明（``*图：...*``）作为文字保留。
+**drawio 框架图排除**：报告里内嵌的机制/结构图（``![...]`` 图片行）及其
+``*图：...*`` 说明在生成 LaTeX 时一并**跳过**，因此 PDF 不含中间产物 drawio
+框架图（与 ``report-format.md``「机制图（可选）」的约定一致）。
 
 版式：内置 XeLaTeX + xeCJK 书样（5x8 英寸、思源/系统 CJK 字体可配、回退
 Noto CJK），自包含、不依赖外部模板仓库。
@@ -92,8 +92,9 @@ def render_reference(number: int, entry: str) -> str:
     if url_match:
         url = _strip_url_punctuation(url_match.group(0))
         if url:
-            # \\url{} 自带特殊字符处理，不转义。
-            parts.append(r" \url{%s}" % url)
+            # Use \\url|...| so a literal } in the URL cannot close the argument early.
+            # hyperref treats | as an alternate delimiter; brace form breaks on }.
+            parts.append(r" \url|" + url + "|")
     return r"\refitem{%d}{%s}" % (number, "".join(parts))
 
 
@@ -111,13 +112,18 @@ def render_table(lines: list[str]) -> str:
         return ""
     ncols = max(len(r) for r in rows)
     colspec = "p{0.95in}p{2.85in}" if ncols == 2 else "".join(["l"] * ncols)
+    def _pad(row: list[str]) -> list[str]:
+        if len(row) >= ncols:
+            return row[:ncols]
+        return row + [""] * (ncols - len(row))
+
     head, *body = rows
     out = [r"\begin{longtable}{@{}%s@{}}" % colspec, r"\toprule"]
-    out.append(" & ".join(inline(c) for c in head) + r" \\")
+    out.append(" & ".join(inline(c) for c in _pad(head)) + r" \\")
     out.append(r"\midrule")
     out.append(r"\endhead")
     for row in body:
-        out.append(" & ".join(inline(c) for c in row) + r" \\")
+        out.append(" & ".join(inline(c) for c in _pad(row)) + r" \\")
     out.append(r"\bottomrule")
     out.append(r"\end{longtable}")
     return "\n".join(out)
@@ -293,19 +299,31 @@ __BODY__
 
 
 def find_xelatex() -> str | None:
-    """依次探测：环境变量 -> TinyTeX 常见路径 -> PATH。"""
+    """依次探测：环境变量 -> TinyTeX/MiKTeX 常见路径 -> PATH。
+
+    Windows TinyTeX 必须走 ``%APPDATA%``（不能拼 ``C:\\Users\\{USERNAME}``）：
+    配置目录名经常与 USERNAME 不一致（中文显示名、域账户等）。
+    """
     for var in ("TRI_RESEARCH_XELATEX", "XELATEX"):
         val = os.environ.get(var)
         if val and Path(val).exists():
             return val
+    candidates: list[Path] = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(Path(appdata) / "TinyTeX" / "bin" / "windows" / "xelatex.exe")
+    home = Path.home()
+    for rel in (("Library", "TinyTeX", "bin"), (".TinyTeX", "bin")):
+        base = home.joinpath(*rel)
+        if base.is_dir():
+            candidates.extend(sorted(base.glob("*/xelatex")))
+            candidates.extend(sorted(base.glob("*/xelatex.exe")))
     if sys.platform.startswith("win"):
-        user = os.environ.get("USERNAME", "")
-        for base in (rf"C:\Users\{user}\AppData\Roaming\TinyTeX\bin\windows", r"C:\Program Files\MiKTeX\miktex\bin\x64"):
-            p = Path(base) / "xelatex.exe"
-            if p.exists():
-                return str(p)
-    found = shutil.which("xelatex")
-    return found
+        candidates.append(Path(r"C:\Program Files\MiKTeX\miktex\bin\x64\xelatex.exe"))
+    for path in candidates:
+        if path.is_file():
+            return str(path)
+    return shutil.which("xelatex")
 
 
 def compile(engine: str, tex_path: Path, out_dir: Path) -> int:

@@ -67,18 +67,21 @@ def session_lock(lock_path: Path) -> Iterator[None]:
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     lock_handle = lock_path.open("a+", encoding="utf-8")
+    locked = False
     try:
         if fcntl is not None:
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+            locked = True
         else:  # Windows: msvcrt.LK_LOCK retries ~10s then raises bare OSError;
             # poll with LK_NBLCK instead so LOCK_WAIT_SECONDS is honored
             # and timeouts surface as StateError (ERROR: line, exit 1),
-            # not a traceback.
+            # not a traceback. Only unlock if we actually acquired.
             lock_handle.seek(0)
             deadline = datetime.now().timestamp() + LOCK_WAIT_SECONDS
             while True:
                 try:
                     msvcrt.locking(lock_handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    locked = True
                     break
                 except OSError:
                     if datetime.now().timestamp() > deadline:
@@ -86,12 +89,15 @@ def session_lock(lock_path: Path) -> Iterator[None]:
                     _sleep(LOCK_POLL_SECONDS)
         yield
     finally:
-        if fcntl is not None:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-        else:
-            lock_handle.seek(0)
-            msvcrt.locking(lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
-        lock_handle.close()
+        try:
+            if locked:
+                if fcntl is not None:
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                else:
+                    lock_handle.seek(0)
+                    msvcrt.locking(lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
+        finally:
+            lock_handle.close()
 
 
 def _sleep(seconds: float) -> None:

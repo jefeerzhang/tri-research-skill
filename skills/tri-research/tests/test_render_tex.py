@@ -8,9 +8,11 @@ Compilation is NOT required (needs xelatex); these test ``--no-compile``.
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys_path = str(ROOT / "scripts")
@@ -19,7 +21,14 @@ import sys  # noqa: E402
 if sys_path not in sys.path:
     sys.path.insert(0, sys_path)
 
-from render_tex import build_document, create_parser, strip_ref_meta  # noqa: E402
+from render_tex import (  # noqa: E402
+    build_document,
+    create_parser,
+    find_xelatex,
+    render_reference,
+    render_table,
+    strip_ref_meta,
+)
 
 REPORT = """# 测试主题：机制与证据
 
@@ -93,8 +102,14 @@ class TestRenderTex(unittest.TestCase):
 
     def test_reference_metadata_stripped(self) -> None:
         tex, _ = run_no_compile(REPORT)
-        self.assertIn(r'\refitem{1}{Author, "Title", Journal, 2025 \url{https://doi.org/10.1000/example}}', tex)
-        self.assertIn(r'\refitem{2}{王三; 李四, "中文标题", 出版社, 2026 \url{https://example.com/a}}', tex)
+        self.assertIn(
+            r'\refitem{1}{Author, "Title", Journal, 2025 \url|https://doi.org/10.1000/example|}',
+            tex,
+        )
+        self.assertIn(
+            r'\refitem{2}{王三; 李四, "中文标题", 出版社, 2026 \url|https://example.com/a|}',
+            tex,
+        )
         self.assertNotIn("来源:", tex)
         self.assertNotIn("层级:", tex)
 
@@ -112,6 +127,53 @@ class TestRenderTex(unittest.TestCase):
         self.assertIn("DEEP RESEARCH REPORT", doc)
         self.assertIn(r"\newcommand{\refitem}", doc)
         self.assertIn(r"\end{document}", doc)
+
+    def test_render_table_pads_short_rows_to_header_width(self) -> None:
+        tex = render_table(["| a | b |", "|---|---|", "| onlyone |"])
+        self.assertIn(r"onlyone &  \\", tex)
+
+    def test_render_reference_keeps_url_with_closing_brace(self) -> None:
+        line = render_reference(1, 'A, "T", 2020, URL: https://ex.com/a}b')
+        self.assertIn(r"\url|https://ex.com/a}b|", line)
+        self.assertNotIn(r"\url{https://ex.com/a}", line)
+
+
+class FindXelatexTests(unittest.TestCase):
+    """Seam: find_xelatex() — discover engine via env / known installs / PATH."""
+
+    def test_discovers_tinytex_under_appdata_even_when_username_differs(self) -> None:
+        # Repro: Chinese Windows often has USERNAME≠profile folder
+        # (e.g. USERNAME=张剑, profile=jefeer). Hard-coding
+        # C:\\Users\\{USERNAME}\\... misses a real TinyTeX install.
+        with tempfile.TemporaryDirectory() as tmps:
+            appdata = Path(tmps) / "Roaming"
+            engine = appdata / "TinyTeX" / "bin" / "windows" / "xelatex.exe"
+            engine.parent.mkdir(parents=True)
+            engine.write_bytes(b"")
+            env = {
+                "APPDATA": str(appdata),
+                "USERNAME": "NotTheProfileName",
+            }
+            with mock.patch.dict(os.environ, env, clear=False):
+                for key in ("TRI_RESEARCH_XELATEX", "XELATEX"):
+                    os.environ.pop(key, None)
+                with mock.patch("render_tex.shutil.which", return_value=None):
+                    found = find_xelatex()
+            self.assertEqual(found, str(engine))
+
+    def test_discovers_tinytex_under_home_dot_tinytex(self) -> None:
+        with tempfile.TemporaryDirectory() as tmps:
+            home = Path(tmps) / "home"
+            engine = home / ".TinyTeX" / "bin" / "x86_64-linux" / "xelatex"
+            engine.parent.mkdir(parents=True)
+            engine.write_bytes(b"")
+            with mock.patch.dict(os.environ, {}, clear=False):
+                for key in ("TRI_RESEARCH_XELATEX", "XELATEX", "APPDATA"):
+                    os.environ.pop(key, None)
+                with mock.patch.object(Path, "home", return_value=home):
+                    with mock.patch("render_tex.shutil.which", return_value=None):
+                        found = find_xelatex()
+            self.assertEqual(found, str(engine))
 
 
 def _split(report: str) -> tuple[str, list[tuple[str, list[str]]]]:
