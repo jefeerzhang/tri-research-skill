@@ -14,9 +14,7 @@ class SkillContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         cls.readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        cls.subagent = (ROOT.parent / "research-subagent" / "SKILL.md").read_text(encoding="utf-8")
         _root_readme_path = REPO_ROOT / "README.md"
         cls.root_readme = _root_readme_path.read_text(encoding="utf-8") if _root_readme_path.exists() else ""
         cls.test_prompts = (ROOT / "test-prompts.json").read_text(encoding="utf-8")
@@ -41,17 +39,11 @@ class SkillContractTests(unittest.TestCase):
             self.assertIn(f"version-{v}", self.root_readme, "根 README 徽章版本漂移")
         self.assertIn(f'"version": "{v}"', self.test_prompts, "test-prompts.json 版本漂移")
 
-        marketplace = json.loads(
-            (REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
-        )
-        self.assertEqual(
-            v, marketplace["metadata"]["version"], "marketplace.json metadata.version 漂移"
-        )
+        marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual(v, marketplace["metadata"]["version"], "marketplace.json metadata.version 漂移")
 
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        rel = re.search(
-            r"^##\s+\[([^\]]+)\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$", changelog, re.MULTILINE
-        )
+        rel = re.search(r"^##\s+\[([^\]]+)\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$", changelog, re.MULTILINE)
         self.assertIsNotNone(rel, "CHANGELOG 缺少已发布版本条目")
         self.assertEqual(v, rel.group(1), "CHANGELOG 最新发布版本与 frontmatter 不一致")
 
@@ -86,6 +78,54 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("SerpApi", self.skill)
         self.assertIn("WebSearch", self.skill)
 
+    def test_exa_is_required_tier_across_docs(self) -> None:
+        """ADR-0001 把 Exa 提升为 required；各处文档表格/引导不得再标可选。
+
+        合约测试此前只查六源名字（test_six_source_table_present /
+        test_source_allocation），不查档位，于是 skill README / runtime-adapters
+        把 Exa 悄悄留成「可选」也没人拦。
+        """
+        runtime_adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        docs = (
+            ("skill", self.skill),
+            ("readme", self.readme),
+            ("root_readme", self.root_readme),
+            ("runtime_adapters", runtime_adapters),
+        )
+        for name, blob in docs:
+            if not blob:
+                continue
+            # 任何点名 Exa 且带档位词的表格行，必须是必选/required，不得是可选/optional。
+            for line in blob.splitlines():
+                if "Exa" in line and "|" in line and any(t in line for t in ("必选", "可选", "required", "optional")):
+                    self.assertTrue(
+                        ("必选" in line or "required" in line) and not ("可选" in line or "optional" in line),
+                        msg=f"{name}: Exa 档位漂移（应为必选/required）: {line}",
+                    )
+            self.assertNotIn("Exa 是可选", blob, msg=name)
+
+    def test_skill_does_not_claim_env_only_keys(self) -> None:
+        """SKILL 曾写「API key 只读环境变量」，但 KeyProvider 实为 cli > env > .env。
+
+        实现（_search_registry.KeyProvider + Backend.env_file，ADR-0004）早就吃
+        本地 `.env`；文档再说「只读环境变量」会误导用户以为 .env 不生效。
+        """
+        self.assertNotIn("只读环境变量", self.skill)
+        self.assertIn("`.env`", self.skill)
+
+    def test_anysearch_guide_has_real_validation_command(self) -> None:
+        """首次使用引导表 AnySearch 的验证列曾是占位符「验证命令」，须给可运行命令。
+
+        其他行（Exa/SciVerse/Tavily）都给了具体命令，AnySearch 行不能留占位符。
+        """
+        guide_row = next(
+            ln for ln in self.skill.splitlines() if ln.startswith("| **AnySearch**") and "npx skills add" in ln
+        )
+        cells = [c.strip() for c in guide_row.split("|")]
+        validation_cell = cells[3]  # ['', 源, 安装, 验证, 必要性, '']
+        self.assertNotIn("验证命令", validation_cell)
+        self.assertIn("`", validation_cell)
+
     def test_subagent_uses_only_allowed_sources(self) -> None:
         self.assertIn("AnySearch", self.subagent)
         self.assertIn("SciVerse", self.subagent)
@@ -116,10 +156,16 @@ class SkillContractTests(unittest.TestCase):
         # 格式契约下放到 references/report-format.md；SKILL.md 保留 context pointer，
         # 七章节锚点改在 reference 上断言。
         self.assertIn("references/report-format.md", self.skill)
-        reference = (ROOT / "references" / "report-format.md").read_text(
-            encoding="utf-8"
-        )
-        for section in ("## 概述", "## 已有事实", "## 主要文献观点", "## 主要矛盾与冲突点", "## 未来研究方向", "## 参考文献", "## 执行情况"):
+        reference = (ROOT / "references" / "report-format.md").read_text(encoding="utf-8")
+        for section in (
+            "## 概述",
+            "## 已有事实",
+            "## 主要文献观点",
+            "## 主要矛盾与冲突点",
+            "## 未来研究方向",
+            "## 参考文献",
+            "## 执行情况",
+        ):
             self.assertIn(section, reference)
         self.assertIn("层级:", reference)
         self.assertIn("来源:", reference)
@@ -150,7 +196,6 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("record_dispatch", state_script)
         self.assertNotIn("record_result", state_script)
 
-
     def test_hard_gates_documented(self) -> None:
         # Soft policies must not be presented as the only completion criteria
         self.assertIn("硬门禁", self.skill)
@@ -180,4 +225,3 @@ class SkillContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

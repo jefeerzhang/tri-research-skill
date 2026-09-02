@@ -288,6 +288,13 @@ class StateStore:
         must match the confirmed ``params.min_sources``.
         """
         session_id = validate_session_id(session_id)
+        # Expand `~/…` once, at the boundary: validate_and_build_proof already
+        # expanduser()s internally, but the Evidence Audit below reads the
+        # report through report_reference_urls, which does not. Passing the raw
+        # `~/…` made validation succeed while audit died on "cannot read
+        # report" — the documented default output path (~/tri-research-reports/)
+        # tripped this on every done.
+        report_path = Path(report_path).expanduser()
         with self.write_lock(session_id):
             data = self.load(session_id)
             if data["phase"] == "DONE":

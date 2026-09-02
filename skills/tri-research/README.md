@@ -33,7 +33,7 @@
 | **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）            | **必选** | https://anysearch.com/console/api-keys |
 | **Tavily**            | Lead Agent    | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选     | https://app.tavily.com/home            |
 | **SciVerse**          | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP）                          | **必选** | https://sciverse.space/docs#auth       |
-| **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`）                  | 可选     | https://dashboard.exa.ai/api-keys      |
+| **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`）                  | **必选** | https://dashboard.exa.ai/api-keys      |
 | **SerpApi**           | Lead Agent    | 中文 Google/Scholar 补强                                                   | 可选     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 宿主内置抽象能力（实现不固定，**不等于** Tavily）                          | 可选     | 无需申请（宿主内置）                   |
 
@@ -99,7 +99,7 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 
 ```bash
 pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>
-pip install exa-py && export EXA_API_KEY=<your-key>          # 可选
+pip install exa-py && export EXA_API_KEY=<your-key>
 pip install tavily-python && export TAVILY_API_KEY=<your-key> # 可选
 ```
 

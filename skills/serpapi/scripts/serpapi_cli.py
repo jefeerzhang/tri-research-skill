@@ -170,9 +170,7 @@ def _serpapi_invoke_fetch(
     )
 
 
-def _serpapi_fetch_cli(
-    engine, query, hl, gl, num, api_key, since=None, *, backend: Any
-) -> dict[str, Any]:
+def _serpapi_fetch_cli(engine, query, hl, gl, num, api_key, since=None, *, backend: Any) -> dict[str, Any]:
     """CLI-facing fetch through invoke(), preserving SerpApi exit codes."""
     try:
         return _serpapi_invoke_fetch(backend, engine, query, hl, gl, num, api_key, since)
@@ -224,10 +222,12 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
     if getattr(args, "no_proxy", False):
         _search_cli.clear_proxy_vars()
     api_key = load_key(args.api_key)
-    # Per-query value is always an object: {"results": [...]} on success,
-    # {"error": "..."} on failure — consumers never need type-switching.
-    # This also matches what the generic _search_cli batch path emits for
-    # Exa/Tavily ({"results": [...]}).
+    # SerpApi's per-query value is always an object: {"results": [...]} on
+    # success, {"error": "..."} on failure — consumers of THIS CLI never need
+    # type-switching. This does NOT match the generic _search_cli batch path
+    # (Exa/Tavily), which unwraps to a BARE list per query
+    # (`output.get("results", [])`). The two CLIs' batch shapes differ, so a
+    # consumer spanning both must handle list vs {"results": [...]}.
     all_results: dict[str, Any] = {}
     for query in args.query:
         try:
@@ -376,6 +376,11 @@ class SerpApiBackend(_search_cli.Backend):
             options.get("num"),
             client.api_key,
             options.get("since"),
+            # Derive the requests timeout from call_timeout — the same single
+            # knob the CLI path (_serpapi_invoke_fetch) uses. Without this the
+            # Registry path (which calls backend.search) fell back to
+            # _serpapi_fetch's hardcoded default 60 and diverged from the CLI.
+            timeout=int(self.call_timeout or 60),
         )
         return {"results": data.get("organic_results", [])}
 

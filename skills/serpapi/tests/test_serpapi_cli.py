@@ -183,6 +183,31 @@ class SerpApiRetryTests(unittest.TestCase):
         self.assertEqual(payload["q1"]["results"][0]["title"], "ok")
 
 
+class SerpApiTimeoutSourceTests(unittest.TestCase):
+    def test_backend_search_derives_requests_timeout_from_call_timeout(self) -> None:
+        """Registry 路径（SerpApiBackend.search）的 requests 超时必须从 call_timeout 派生。
+
+        Bug: CLI 路径（_serpapi_invoke_fetch）用 `int(backend.call_timeout or 60)`
+        算 requests 超时，但 Registry 走的 backend.search 直接调 _serpapi_fetch 不传
+        timeout，落到硬编码默认 60——调 call_timeout 只改了 CLI 一半，两条路不同源。
+        """
+        captured: dict = {}
+
+        def fake_fetch(engine, query, hl, gl, num, api_key, since=None, timeout=60):
+            captured["timeout"] = timeout
+            return {"organic_results": []}
+
+        backend = MODULE.SerpApiBackend()
+        backend.call_timeout = 17.0
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = fake_fetch
+        try:
+            backend.search(MODULE._serpapi_make_client("k"), "q", {})
+        finally:
+            MODULE._serpapi_fetch = original
+        self.assertEqual(captured["timeout"], 17)
+
+
 class CliNoKeyTests(unittest.TestCase):
     def test_engines_does_not_require_api_key(self) -> None:
         import io

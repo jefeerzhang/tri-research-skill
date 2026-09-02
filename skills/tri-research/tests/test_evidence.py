@@ -372,6 +372,15 @@ class EvidenceAuditTests(EvidenceCliHarness, unittest.TestCase):
         result = self.run_cli("--session", "audit-norm", "audit", "--report", str(report))
         self.assertIn("OK:all 1 reference URL(s) traced", result.stdout)
 
+    def test_audit_normalizes_percent_encoding(self) -> None:
+        # 报告引用写 %20、台账登记时是空格（或反之）：同一 URL 必须归一
+        # 命中，否则合法引用变 untraced，done 假失败。
+        self.start_session("audit-pct")
+        report = self.write_ref_report("audit-pct.md", [self.ref_line(1, "https://a.cn/x%20y")])
+        self.run_cli("--session", "audit-pct", "add", "--backend", "exa", "--query", "q", "--url", "https://a.cn/x y")
+        result = self.run_cli("--session", "audit-pct", "audit", "--report", str(report))
+        self.assertIn("OK:all 1 reference URL(s) traced", result.stdout)
+
     def test_audit_user_provided_counts_as_hit(self) -> None:
         self.start_session("audit-up")
         report = self.write_ref_report("audit-up.md", [self.ref_line(1, "https://gov.cn/report.pdf")])

@@ -10,7 +10,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 # Make sibling `_common` importable when this file is loaded via importlib
 # (state_machine.py does the same in its own bootstrap).
@@ -71,6 +71,30 @@ def normalize_topic(value: str) -> str:
     return "".join(character.casefold() for character in value if character.isalnum())
 
 
+def topic_in_title(expected_topic: str, title: str) -> bool:
+    """True when ``title`` contains the confirmed ``expected_topic``.
+
+    Substring matching on the separator-stripped normalized form lets a short
+    ASCII topic match inside a longer Latin word ("AI" ⊂ "FAILURE"), so a
+    report on the wrong subject was accepted. CJK topics have no word
+    delimiters and keep plain normalized-substring matching; a pure-ASCII topic
+    must additionally match at ASCII word boundaries in the case-folded title
+    (arbitrary separators allowed between the topic's own words, since
+    normalization drops them).
+    """
+    expected_normalized = normalize_topic(expected_topic)
+    actual_normalized = normalize_topic(title)
+    if not expected_normalized or expected_normalized not in actual_normalized:
+        return False
+    if not expected_normalized.isascii():
+        return True
+    words = re.findall(r"[a-z0-9]+", expected_topic.casefold())
+    if not words:
+        return True
+    pattern = r"(?<![a-z0-9])" + r"[^a-z0-9]*".join(re.escape(word) for word in words) + r"(?![a-z0-9])"
+    return re.search(pattern, title.casefold()) is not None
+
+
 def _strip_url_punctuation(url: str) -> str:
     # ASCII + common CJK trailing punctuation that URL_RE (\S+) may swallow
     # from surrounding prose (period, comma, Chinese quotes/brackets, etc.).
@@ -113,7 +137,13 @@ def canonicalize_url(value: str) -> str | None:
         (parsed.scheme.lower() == "http" and port == 80) or (parsed.scheme.lower() == "https" and port == 443)
     ):
         host = f"{host}:{port}"
-    path = re.sub(r"/{2,}", "/", parsed.path or "/").rstrip("/") or "/"
+    path = re.sub(r"/{2,}", "/", parsed.path or "/")
+    # Percent-encoding normalization (RFC 3986): decode then re-encode so that
+    # "%20" vs a literal space — or any differently-escaped/cased form —
+    # collapse to one canonical path. Without this the Evidence Audit treated
+    # the same URL as two, turning a legal citation untraced and failing done.
+    # safe keeps pchar sub-delims so ordinary paths are not over-encoded.
+    path = quote(unquote(path), safe="/:@!$&'()*+,;=").rstrip("/") or "/"
     query = urlencode(
         sorted(
             (key, value)
@@ -195,9 +225,8 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
 
     if expected_topic:
         heading = H1_RE.search(text)
-        expected_normalized = normalize_topic(expected_topic)
-        actual_normalized = normalize_topic(heading.group(1)) if heading else ""
-        if not expected_normalized or expected_normalized not in actual_normalized:
+        title = heading.group(1) if heading else ""
+        if not topic_in_title(expected_topic, title):
             errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
     execution_text = text.split("## 执行情况", 1)[1] if "## 执行情况" in text else ""
@@ -210,7 +239,17 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
             errors.append("执行情况缺少搜索源使用行")
         else:
             usage_cell = usage_match.group(1)
-            missing_backends = [name for name in REQUIRED_SOURCE_BACKENDS if name not in usage_cell]
+            # Word-boundary match, not substring: "Example" contains "Exa", so a
+            # row that never actually named Exa used to slip through the hard
+            # gate. Reject a hit only when the name is glued to another ASCII
+            # letter (a longer Latin word); adjacency to CJK / count text
+            # ("Exa：0条" / "Exa未配置") still counts — those are the real report
+            # formats, and \b would wrongly treat CJK as a word char.
+            missing_backends = [
+                name
+                for name in REQUIRED_SOURCE_BACKENDS
+                if not re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", usage_cell)
+            ]
             if missing_backends:
                 errors.append("执行情况搜索源使用未报告: " + " / ".join(missing_backends))
 

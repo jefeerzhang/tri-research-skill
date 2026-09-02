@@ -121,6 +121,40 @@ class ReportValidatorTests(unittest.TestCase):
             f"缺少搜索源使用行应被拒: {errors}",
         )
 
+    def test_rejects_backend_name_matched_only_as_substring(self) -> None:
+        """搜索源使用行必须点名后端本身，不能靠子串冒充。
+
+        Bug: 旧实现用 `name in usage_cell` 子串匹配——"Example" 含 "Exa"，
+        一行只写了 "Example: 0条"（根本没有 Exa）也能骗过硬门禁放行。
+        现改为词边界匹配，Exa 必须作为独立词出现。
+        """
+        report = valid_report().replace(
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Example: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("Exa" in e and "搜索源使用" in e for e in errors),
+            f"仅含 'Example' 的搜索源使用行不应满足 Exa 要求: {errors}",
+        )
+
+    def test_backend_name_adjacent_to_cjk_still_counts(self) -> None:
+        """词边界不能误伤紧邻中文的后端名（如 'Exa：0条' 全角冒号 / 'Exa未配置'）。"""
+        for cell in (
+            "AnySearch：2 / SciVerse：0 / Exa：0 / SerpApi：0 / WebSearch：0",
+            "AnySearch 2条、SciVerse 0条、Exa未配置、SerpApi 0条、WebSearch 0条",
+        ):
+            with self.subTest(cell=cell):
+                report = valid_report().replace(
+                    "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+                    f"| 搜索源使用 | {cell} |",
+                )
+                errors = MODULE.validate(report, 2)
+                self.assertFalse(
+                    any("搜索源使用" in e for e in errors),
+                    f"合法点名不应报缺: {errors}",
+                )
+
     def test_rejects_missing_sections(self) -> None:
         report = "# 标题\n\n无内容\n"
         errors = MODULE.validate(report, 2)
@@ -129,19 +163,13 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertTrue(any("参考文献" in error for error in errors))
 
     def test_rejects_missing_and_broken_citations(self) -> None:
-        report = (
-            valid_report()
-            .replace("[2] 作者", "[3] 作者")
-            .replace("https://publisher-one.org/one", "missing-url")
-        )
+        report = valid_report().replace("[2] 作者", "[3] 作者").replace("https://publisher-one.org/one", "missing-url")
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("不连续" in error for error in errors))
         self.assertTrue(any("URL" in error for error in errors))
 
     def test_rejects_duplicate_reference_urls(self) -> None:
-        report = valid_report().replace(
-            "https://publisher-two.cn/two", "https://publisher-one.org/one"
-        )
+        report = valid_report().replace("https://publisher-two.cn/two", "https://publisher-one.org/one")
         errors = MODULE.validate(report, 2)
         self.assertTrue(any("URL 重复" in error for error in errors))
 
@@ -152,15 +180,44 @@ class ReportValidatorTests(unittest.TestCase):
             "http://127.0.0.1/source",
         ):
             with self.subTest(url=invalid_url):
-                report = valid_report().replace(
-                    "https://publisher-one.org/one", invalid_url
-                )
+                report = valid_report().replace("https://publisher-one.org/one", invalid_url)
                 errors = MODULE.validate(report, 2)
                 self.assertTrue(any("URL 无效" in error for error in errors))
 
     def test_rejects_report_for_different_topic(self) -> None:
         errors = MODULE.validate(valid_report(), 2, expected_topic="量子芯片供应链")
         self.assertTrue(any("主题" in error for error in errors))
+
+    def test_rejects_short_ascii_topic_matched_inside_longer_word(self) -> None:
+        """短 ASCII 主题不能靠子串命中标题里的更长单词。
+
+        Bug: 主题匹配用 normalize 后的子串判断——normalize_topic("AI")="ai"
+        是 normalize_topic("FAILURE ANALYSIS")="failureanalysis" 的子串
+        （f-ai-lure），于是一份标题为 FAILURE ANALYSIS 的错报告会被当成
+        命中主题 "AI" 收下。现对纯 ASCII 主题要求词边界命中。
+        """
+        report = valid_report().replace("# 人工智能与劳动分配", "# FAILURE ANALYSIS")
+        errors = MODULE.validate(report, 2, expected_topic="AI")
+        self.assertTrue(
+            any("主题" in e for e in errors),
+            f"标题 FAILURE ANALYSIS 不应命中主题 AI: {errors}",
+        )
+
+    def test_accepts_ascii_topic_as_whole_word_in_title(self) -> None:
+        """纯 ASCII 主题作为独立词出现在标题里必须命中（词边界不得过度拒绝）。"""
+        for title, topic in (
+            ("AI 与收入分配深度研究", "AI"),
+            ("The AI Revolution", "AI"),
+            ("Revenue Inequality and Growth", "revenue"),
+            ("Machine Learning Basics", "machine learning"),
+        ):
+            with self.subTest(title=title, topic=topic):
+                report = valid_report().replace("# 人工智能与劳动分配", f"# {title}")
+                errors = MODULE.validate(report, 2, expected_topic=topic)
+                self.assertFalse(
+                    any("主题" in e for e in errors),
+                    f"标题 {title!r} 应命中主题 {topic!r}: {errors}",
+                )
 
     def test_rejects_report_without_chinese_evidence(self) -> None:
         """All-English references must fail the Chinese coverage check."""
@@ -182,9 +239,7 @@ class ReportValidatorTests(unittest.TestCase):
         """A stray Latin token (e.g. "CCTV") inside Chinese entries must not
         count as English evidence — the old ANY-style ENGLISH_RE check let
         reports with zero real English sources pass."""
-        entries = [
-            ZH_ENTRY.format(i=i).replace("中文研究", "中文研究 CCTV") for i in range(1, 11)
-        ]
+        entries = [ZH_ENTRY.format(i=i).replace("中文研究", "中文研究 CCTV") for i in range(1, 11)]
         errors = MODULE.validate(language_report(entries), 10)
         self.assertTrue(
             any("英文证据不足" in error for error in errors),
@@ -285,9 +340,7 @@ class ReportValidatorTests(unittest.TestCase):
     def test_trailing_chinese_quote_does_not_spoil_url_canonicalization(self) -> None:
         """URL_RE is greedy (\\\\S+); trailing 」/” must be stripped before canonicalize."""
         self.assertEqual(
-            MODULE.canonicalize_url(
-                MODULE._strip_url_punctuation("https://publisher-one.org/one」")
-            ),
+            MODULE.canonicalize_url(MODULE._strip_url_punctuation("https://publisher-one.org/one」")),
             "https://publisher-one.org/one",
         )
         # Same target with/without trailing 」 must count as one unique source
@@ -306,6 +359,29 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertTrue(
             any("URL 重复" in e for e in errors),
             msg=f"trailing 」 must not create a distinct URL. Errors: {errors}",
+        )
+
+    def test_canonicalize_url_normalizes_percent_encoding_in_path(self) -> None:
+        """path 里的 %20 与空格必须归一到同一 canonical URL。
+
+        Bug: canonicalize_url 只归一 query（parse_qsl+urlencode），path 原样保留，
+        于是报告写 %20、台账记空格（或反之）被当成两条不同 URL，合法引用
+        变 untraced，done 假失败。现对 path 也做 unquote→quote 归一。
+        """
+        encoded = MODULE.canonicalize_url("https://publisher.org/a%20b")
+        spaced = MODULE.canonicalize_url("https://publisher.org/a b")
+        self.assertEqual(encoded, spaced)
+        self.assertEqual(encoded, "https://publisher.org/a%20b")
+
+    def test_canonicalize_url_keeps_plain_path_stable(self) -> None:
+        """归一不得过度编码普通 path（否则会弄坏已有合法引用）。"""
+        self.assertEqual(
+            MODULE.canonicalize_url("https://publisher.org/one/two"),
+            "https://publisher.org/one/two",
+        )
+        self.assertEqual(
+            MODULE.canonicalize_url("https://en.wikipedia.org/wiki/AI_(disambiguation)"),
+            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
         )
 
     def test_nested_code_block_does_not_produce_ghost_citations(self) -> None:
@@ -351,11 +427,8 @@ class ReportValidatorTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_report_with_utf8_bom_validates(self) -> None:
-        errors = MODULE.validate(
-            "\ufeff" + valid_report(), 2, expected_topic="人工智能与劳动分配"
-        )
+        errors = MODULE.validate("\ufeff" + valid_report(), 2, expected_topic="人工智能与劳动分配")
         self.assertEqual(errors, [])
-
 
     def test_reference_parsing_stops_at_next_section(self) -> None:
         """## 参考文献 之后的章节（执行情况等）里的 [n] 行不是参考文献条目。
@@ -366,8 +439,7 @@ class ReportValidatorTests(unittest.TestCase):
         """
         report = valid_report().replace(
             "| 报告位置 | ~/tri-research-reports/report.md |",
-            "| 报告位置 | ~/tri-research-reports/report.md |\n\n"
-            "[9] 注：执行情况后的备注行，不是参考文献条目。",
+            "| 报告位置 | ~/tri-research-reports/report.md |\n\n[9] 注：执行情况后的备注行，不是参考文献条目。",
         )
         errors = MODULE.validate(report, 2)
         self.assertFalse(
@@ -375,7 +447,6 @@ class ReportValidatorTests(unittest.TestCase):
             f"执行情况章节里的 [9] 不应被当成参考文献: {errors}",
         )
         self.assertFalse(any("不连续" in e for e in errors), f"{errors}")
-
 
     def test_inline_code_is_not_a_citation(self) -> None:
         """行内代码 `arr[0]` 里的 [0] 不是正文引用。
@@ -393,7 +464,6 @@ class ReportValidatorTests(unittest.TestCase):
             any("[0]" in e for e in errors),
             f"行内代码里的 [0] 不应被当成引用: {errors}",
         )
-
 
     def test_h3_heading_is_not_accepted_as_h2_section(self) -> None:
         """### 概述 是三级标题，不满足 ## 概述 必需章节要求。

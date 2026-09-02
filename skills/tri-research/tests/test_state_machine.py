@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from _test_helpers import make_valid_report, register_report_evidence
 
@@ -157,6 +159,27 @@ class StateMachineTests(_CliHarness, unittest.TestCase):
         report = self.write_valid_report("wrong-topic.md", topic="完全不同的主题")
         result = self.run_cli("--session", "wrong-topic", "done", "--report", str(report), ok=False)
         self.assertIn("主题", result.stderr)
+
+    def test_done_expands_tilde_report_path_for_audit(self) -> None:
+        """`done --report ~/…` 必须在 Evidence Audit 阶段也读得到报告。
+
+        Bug: validate_and_build_proof 内部 expanduser() 了报告路径，但
+        complete() 把原始 `~/…` 直接传给 audit_report → report_reference_urls，
+        后者不 expanduser，read_text() 抛 "cannot read report"——结构验收过了，
+        done 却在台账对账假失败（按文档默认路径 `~/tri-research-reports/` 走
+        就会踩到）。
+        """
+        home = Path(self.temp_dir.name) / "home"
+        home.mkdir()
+        self.run_cli("--session", "tilde", "start")
+        self.set_params("tilde")
+        report = home / "report.md"
+        make_valid_report(report)
+        self.register_evidence("tilde", report)
+        # HOME 供 POSIX/CI，USERPROFILE 供 Windows；子进程继承 patch 后的环境。
+        with mock.patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+            result = self.run_cli("--session", "tilde", "done", "--report", "~/report.md")
+        self.assertIn("STATE:DONE", result.stdout)
 
     def test_sessions_isolated(self) -> None:
         self.run_cli("--session", "sess-a", "start")
