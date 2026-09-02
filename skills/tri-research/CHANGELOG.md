@@ -15,6 +15,10 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 - **`--no-proxy` 消费源码闸门**：新增 `tests/test_global_flag_consumption.py`——静态扫描 `_search_cli`，断言 `_maybe_clear_proxy` 恰定义一次、每个触网命令分支（`check` / `search` / `batch_search` / managed command）各消费一次，且消费点位于首次 `invoke()` 之前。与 `test_host_helpers.py` 的元组唯一性闸门互补：那个防「清理逻辑被重复定义」，这个防「某分支该调没调」（本次 bug 的成因类）。经变异测试双向验证：删掉任一消费行闸门变红，还原变绿。`Registry.check` 不在闸门范围（程序化 seam 走显式 `no_proxy` 布尔参数，无全局 flag）。
 
+### Changed
+
+- **AnySearch 3.1.1 兼容核对（结论：无需改代码）**：上游 AnySearch v3.1.1（CLI Checksums & Automatic Client Version Sync）为补丁级发布——新增 `SHA256SUMS.txt` 脚本完整性校验、以 SKILL.md 为版本单一真源同步 `X-Anysearch-Client` 头、补 SemVer 校验与契约测试，官方明确「不改变搜索和内容提取行为」。tri-research 与 AnySearch 只通过文档 + Agent 运行时 CLI 命令耦合（无任何 Python 代码 import / 调用 / 解析其版本），`search` / `batch_search` / `extract` / `get_sub_domains` / `runtime.conf` 契约原样保留；文档版本标注为「3.1 版」（中版本粒度），3.1.1 仍落在该范围，故 SKILL / README 版本标注无需改。仅在根 README 安装段补一句可选的 `SHA256SUMS.txt` 完整性校验提示（与本项目「报告 SHA-256 / 证据台账 / INTEGRITY 机器复核」的核验风格一致）。
+
 ## [6.7.0] - 2026-08-30
 
 ### Added

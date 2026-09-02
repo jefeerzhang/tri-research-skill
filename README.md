@@ -53,13 +53,13 @@ Tri Research 正是为解决这类问题而生。它适合文献综述、政策�
 
 Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**推荐流程**靠执行纪律约束，跳过不会让 `done` 失败。
 
-| 硬门禁（代码拦截 `DONE`）                                       | 推荐流程（最佳实践，代码不审计）    |
-| --------------------------------------------------------------- | ----------------------------------- |
-| `start` / `set_params` / `done --report`                        | 研究意图澄清、`RESEARCH_CONTEXT.md` |
-| 七章结构、引用闭环、min_sources、合法唯一 URL、**引用溯源对账** | 质量门、Gap-Fill、多波次检索        |
-| 报告级中英证据、执行情况源使用行                                | 来源内容核验、声明-来源匹配、红队   |
-| 参数冻结与报告 SHA-256 + 台账指纹                               | 置信标签、大纲适配、综合子代理      |
-|                                                                | 机制图嵌入（drawio）· 渲染 LaTeX/PDF |
+| 硬门禁（代码拦截 `DONE`）                                       | 推荐流程（最佳实践，代码不审计）     |
+| --------------------------------------------------------------- | ------------------------------------ |
+| `start` / `set_params` / `done --report`                        | 研究意图澄清、`RESEARCH_CONTEXT.md`  |
+| 七章结构、引用闭环、min_sources、合法唯一 URL、**引用溯源对账** | 质量门、Gap-Fill、多波次检索         |
+| 报告级中英证据、执行情况源使用行                                | 来源内容核验、声明-来源匹配、红队    |
+| 参数冻结与报告 SHA-256 + 台账指纹                               | 置信标签、大纲适配、综合子代理       |
+|                                                                 | 机制图嵌入（drawio）· 渲染 LaTeX/PDF |
 
 ## 快速开始
 
@@ -80,6 +80,8 @@ export EXA_API_KEY=<your-key>
 
 # AnySearch（必选，建议配置，通用网页搜索）— Key 申请：https://anysearch.com/console/api-keys
 npx skills add anysearch-ai/anysearch-skill
+# 完整性校验（可选）：AnySearch 3.1.1 起随包附带 SHA256SUMS.txt，装完在其 skill 目录核对脚本未被篡改
+#   Linux/macOS：sha256sum -c SHA256SUMS.txt    Windows：Get-FileHash scripts\anysearch_cli.ps1 -Algorithm SHA256（逐个比对）
 # 可选配置以提额：export ANYSEARCH_API_KEY=<your-key>（未配置时匿名可用，低限额）
 
 # SciVerse（必选，学术论文）— Key 申请：https://sciverse.space/docs#auth
