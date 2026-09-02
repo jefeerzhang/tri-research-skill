@@ -15,7 +15,7 @@
 
 ## Pull requests as a triage surface
 
-**PRs as a request surface: no.** _（如果这个 repo 把 external PRs 当作 feature requests，则设为 `yes`；`/triage` 会读取这个 flag。）_
+**PRs as a request surface: yes.** _（`/triage` 会读取这个 flag；`yes` 表示外部贡献者的 PR 也进 triage queue，走与 issues 相同的 labels 和 states，用下方 `gh pr` 命令。）_
 
 设为 `yes` 时，PRs 走与 issues 相同的 labels 和 states，使用 `gh pr` 对应命令：
 
