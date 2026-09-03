@@ -1,6 +1,6 @@
 ---
 name: serpapi
-description: Scrape Google and 100+ other search engines (Bing, Baidu, DuckDuckGo, YouTube, Amazon, Google Scholar, Maps, Flights, etc.) via the SerpApi real-time JSON API. Use when the user wants structured search-engine results, SERP data, competitor/SEO monitoring, price tracking, or any task that needs real search-engine output without writing a scraper. Also trigger when the user mentions SerpApi, "搜索API", "抓取谷歌", or wants real Google results in JSON.
+description: Scrape Google and 100+ search engines (Bing, Baidu, DuckDuckGo, YouTube, Amazon, Google Scholar, Maps, Flights, etc.) as structured JSON via the SerpApi real-time API. Use when the user wants real search-engine results, SERP data, competitor/SEO monitoring, price tracking, or any task that needs search output without writing a scraper. Also trigger when the user mentions SerpApi, "搜索API", "抓取谷歌", or wants real Google results in JSON.
 version: 1.0.0
 authors:
   - testclaw
@@ -13,79 +13,38 @@ credentials:
 
 ## Overview
 
-SerpApi is a real-time API that returns structured JSON for Google and 100+ other
-search engines. It handles proxies, CAPTCHA solving, and global geolocation so you
-get exactly what a human sees. This skill bundles a cross-platform CLI that wraps
-`https://serpapi.com/search`.
+SerpApi returns structured JSON for Google and 100+ other search engines, handling proxies, CAPTCHAs, and geolocation so you get what a human sees. This skill wraps a cross-platform CLI for `https://serpapi.com/search`.
 
-**Proxy note:** if a proxy environment variable (`HTTP_PROXY`/`HTTPS_PROXY`)
-breaks the HTTPS handshake to `serpapi.com` (e.g. `SSL: UNEXPECTED_EOF_WHILE_READING`),
-pass `--no-proxy` before the subcommand — the CLI clears those variables for
-that run only, and never mutates the environment otherwise.
+## When to use
 
-## Trigger
+- Real Google/Bing/Baidu/DuckDuckGo/Yahoo/Yandex results as structured data
+- Vertical SERPs: Maps, Local, Shopping, Jobs, Scholar, News, Images, Videos, Flights, Hotels, Finance, Patents, Play Store, YouTube transcripts
+- Competitor/SEO monitoring, price tracking, review scraping, ad intelligence
+- Any task where a hand-written scraper would be needed but an API is cleaner
 
-Activate this skill when the user needs:
+**Default provider? No.** SerpApi is a supplement: when unavailable (no key, quota exhausted, network error), report it and fall back to other available search methods — never a silent interchange.
 
-1. Real Google/Bing/Baidu/DuckDuckGo/Yahoo/Yandex search results as structured data.
-2. Vertical SERP data: Google Maps, Local, Shopping, Jobs, Scholar, News, Images,
-   Videos, Flights, Hotels, Finance, Patents, Play Store, YouTube transcripts, etc.
-3. Competitor/SEO monitoring, price tracking, review scraping, ad intelligence.
-4. Any task where a hand-written scraper would be needed but an API is cleaner.
+## API key
 
-**Rule:** Do not be the exclusive search provider. When SerpApi is unavailable
-(no key, quota exhausted, network error), inform the user and fall back to other
-available search methods.
+Priority: `--api_key` flag > `.env` file (`SERPAPI_KEY`) > environment variable.
 
-## Recommended Entry Point
+Guide the user in their language: register at <https://serpapi.com> (free, 250 searches/month, no credit card) → Dashboard → API Key → save to `<skill_dir>/.env` as `SERPAPI_KEY=...` or export the env var. Don't paste keys in chat — store them in `.env` instead.
 
-Run the CLI `doc` command for the full interface spec (offline, no network):
+| Scenario          | Behavior                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| No key            | Refuse to run; show the setup guide.                                                                   |
+| Invalid key       | API returns `{"error": "API key not valid..."}`; report and ask the user to recheck.                   |
+| Quota exhausted   | API returns `{"error": "Your search limit is exhausted..."}`; inform user, suggest upgrading.          |
+| Network/SSL error | Usually a proxy issue — retry with `--no-proxy` (clears `HTTP_PROXY`/`HTTPS_PROXY` for that run only). |
 
-| Runtime    | Command                                                                           |
-| ---------- | --------------------------------------------------------------------------------- |
-| Python     | `python <skill_dir>/scripts/serpapi_cli.py doc`                                   |
-| PowerShell | `powershell -ExecutionPolicy Bypass -File <skill_dir>/scripts/serpapi_cli.py doc` |
+## CLI
 
-## API Key Management
+`python <skill_dir>/scripts/serpapi_cli.py <command> [options]` — run `doc` first for the offline usage summary.
 
-### Key source priority
-
-```text
---api_key CLI flag  >  .env file (SERPAPI_KEY)  >  system environment variable
-```
-
-### How to get a key (guide the user in their language)
-
-> **SerpApi API Key setup**
->
-> 1. Go to https://serpapi.com/ and click **Register** (free, no credit card, 250 searches/month).
-> 2. After login, open the **Dashboard → API Key** page. Copy the key.
-> 3. Save it to `<skill_dir>/.env`: `SERPAPI_KEY=<your_key_here>`
->    or set the env var: `$env:SERPAPI_KEY="<your_key_here>"`
->
-> For security, avoid pasting keys directly in chat. Store them in `.env` instead.
-
-### Quota / error handling
-
-| Scenario          | Behavior                                                                                           |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| No key            | Refuse to run; show the setup guide above.                                                         |
-| Invalid key       | API returns `{"error": "API key not valid..."}`. Report and ask user to recheck key.               |
-| Quota exhausted   | API returns `{"error": "Your search limit is exhausted..."}`. Inform user, suggest upgrading plan. |
-| Network/SSL error | Usually a proxy issue — retry with `--no-proxy` (clears `HTTP_PROXY`/`HTTPS_PROXY` for that run).  |
-
-## CLI Usage
-
-| Runtime | Invocation                                                      |
-| ------- | --------------------------------------------------------------- |
-| Python  | `python <skill_dir>/scripts/serpapi_cli.py <command> [options]` |
-
-### Commands
-
-- `doc` — print full interface spec (offline).
-- `check` — availability probe: verifies SDK, key and a live 1-result query; always prints JSON (`{"available": true|false, "error": "..."}`), never a traceback.
-- `search --engine google --query "KEYWORD" [--hl zh-cn] [--gl cn] [--num 10] [--json]` — run a search (print to stdout).
-- `batch_search --query "Q1" --query "Q2" [--engine ...] [--hl ...] [--gl ...] [--num ...] [--since ...]` — run multiple queries sequentially; output maps each query to an object: `{"results": [...]}` on success, `{"error": "..."}` on failure.
+- `doc` — print usage summary (offline).
+- `check` — availability probe: SDK + key + one live 1-result query; always prints JSON (`{"available": true|false, "error": "..."}`), never a traceback.
+- `search --engine google --query "KEYWORD" [--hl zh-cn] [--gl cn] [--num 10] [--json] [--api_key KEY]` — run a search (print to stdout).
+- `batch_search --query "Q1" --query "Q2" [--engine ...] [--hl ...] [--gl ...] [--num ...] [--since ...]` — run multiple queries sequentially; output maps each query to `{"results": [...]}` on success, `{"error": "..."}` on failure.
 - `export --query "KEYWORD" [--hl zh-cn] [--gl cn] [--num 10] [--out path.md]` — run a search and save as a Markdown file (default: `data/output/<query>_检索结果.md`).
 - `engines` — list supported engines.
 
@@ -104,16 +63,10 @@ python serpapi_cli.py export --query "stranded assets" --out ./report.md
 
 ### Output
 
-- `search` (default): readable list (position, title, link, snippet). With `--json`: raw SerpApi JSON.
+- `search` (default): readable list (position, title, link, snippet); with `--json`: raw SerpApi JSON.
 - `export`: writes a Markdown report with title/link/snippet per result, auto-creating the output directory.
 
-## 安全边界
-
-- 只向 `https://serpapi.com/search` 发 GET 请求，不写、不改任何外部数据。
-- 不删除、不覆盖用户文件；`export` 只新建/追加 `data/output/` 下的文件。
-- 不收集密钥：key 仅从 `SERPAPI_KEY` 环境变量或 `--api_key` 读取，绝不写入日志或 stdout。
-- 不是默认搜索源：SerpApi 不可用时停止并报错，不静默替代其他搜索方式。
-- 查询内容会发送至 SerpApi 并触发计费（按次扣额度），避免用其查询含敏感信息的私密内容。
+**Proxy note:** if a proxy environment variable (`HTTP_PROXY`/`HTTPS_PROXY`) breaks the HTTPS handshake to `serpapi.com` (e.g. `SSL: UNEXPECTED_EOF_WHILE_READING`), pass `--no-proxy` before the subcommand — the CLI clears those variables for that run only, and never mutates the environment otherwise.
 
 ## Supported engines (subset)
 
@@ -122,3 +75,11 @@ google_maps, google_shopping, google_news, google_images, google_jobs, google_fl
 google_hotels, google_finance, google_patents, google_play, google_local, google_trends,
 walmart, ebay, apple_app_store, instagram, yelp, tripadvisor, facebook, naver, brave.
 Run `engines` for the full categorized list.
+
+## Safety
+
+- Only GET to `https://serpapi.com/search`; never write or modify external data.
+- Never delete or overwrite user files; `export` only creates/appends under `data/output/`.
+- Keys are read via `SERPAPI_KEY` (env or `.env`) or `--api_key` only — never written to logs or stdout.
+- Not the default search provider: when unavailable, stop and report — don't silently substitute other search methods.
+- Queries go to SerpApi and bill quota per call — avoid sending private or sensitive content in queries.

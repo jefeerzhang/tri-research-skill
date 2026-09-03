@@ -4,6 +4,10 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **SKILL.md 文档重构（writing-for-agents）**：四份 SKILL.md（tri-research / research-subagent / serpapi / citations）按「steps 优先、reference 下放、pointer 前置」重排——主导 SKILL 研究流程前置且每步补完成标准，可选交付（drawio 机制图 / LaTeX-PDF / TinyTeX 安装）下放到新文件 `references/delivery.md` 并经 context pointer 触达，工具速查与 SciVerse 调用规范保留内联；serpapi `doc` 描述改回「usage summary（实测仅 8 行）」以免过度承诺；文档语言在单文件内统一。行为零变化，`test_skill_contract` 全部钉住字符串原样保留。
+
 ### Fixed
 
 - **`find_xelatex` 拼错 TinyTeX 路径**：曾用 `C:\Users\{USERNAME}\AppData\...`，在 USERNAME≠配置目录名（中文显示名/域账户）时即使 TinyTeX 已装也探测失败。现按 `%APPDATA%` 与家目录下 `Library/TinyTeX`、`.TinyTeX` 探测。回归：`tests/test_render_tex.py::FindXelatexTests`。

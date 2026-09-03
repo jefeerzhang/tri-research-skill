@@ -131,7 +131,9 @@ tri-research/
 │   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口
 │   └── exa_search.py              # Exa 搜索 CLI 薄入口
 ├── references/
-│   └── runtime-adapters.md
+│   ├── report-format.md           # 报告验收格式契约
+│   ├── runtime-adapters.md        # 跨运行时适配
+│   └── delivery.md                # 可选交付：机制图嵌入 + LaTeX/PDF + TinyTeX
 └── tests/
 ```
 
