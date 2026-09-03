@@ -25,7 +25,7 @@ import types
 import unittest
 from pathlib import Path
 
-from _test_helpers import example_report, register_report_evidence
+from _test_helpers import example_report, patch_required_backends, register_report_evidence
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -102,28 +102,29 @@ class ModuleImportTests(unittest.TestCase):
             def make_args(command: str, **kwargs):
                 return argparse_namespace(command, session=session, state_dir=store.state_dir, **kwargs)
 
-            # start
-            self.assertEqual(mod.run(make_args("start")), 0)
-            # set_params
-            params = json.dumps(
-                {
-                    "topic": "人工智能与劳动分配",
-                    "min_sources": 12,
-                    "keywords_zh": ["人工智能", "劳动分配"],
-                    "keywords_en": ["artificial intelligence", "labor allocation"],
-                },
-                ensure_ascii=False,
-            )
-            self.assertEqual(mod.run(make_args("set_params", params_json=params)), 0)
-            # done
-            register_report_evidence(store.state_dir, session, SAMPLE)
-            self.assertEqual(
-                mod.run(make_args("done", report=SAMPLE, min_sources=12)),
-                0,
-                msg="done step failed — validate_report likely not reachable",
-            )
-            # check
-            self.assertEqual(mod.run(make_args("check")), 0)
+            with patch_required_backends(mod):
+                # start
+                self.assertEqual(mod.run(make_args("start")), 0)
+                # set_params
+                params = json.dumps(
+                    {
+                        "topic": "人工智能与劳动分配",
+                        "min_sources": 12,
+                        "keywords_zh": ["人工智能", "劳动分配"],
+                        "keywords_en": ["artificial intelligence", "labor allocation"],
+                    },
+                    ensure_ascii=False,
+                )
+                self.assertEqual(mod.run(make_args("set_params", params_json=params)), 0)
+                # done
+                register_report_evidence(store.state_dir, session, SAMPLE)
+                self.assertEqual(
+                    mod.run(make_args("done", report=SAMPLE, min_sources=12)),
+                    0,
+                    msg="done step failed — validate_report likely not reachable",
+                )
+                # check
+                self.assertEqual(mod.run(make_args("check")), 0)
 
             data = store.load(session)
             self.assertEqual(data["phase"], "DONE")

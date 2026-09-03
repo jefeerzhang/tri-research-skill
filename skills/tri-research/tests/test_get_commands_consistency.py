@@ -21,7 +21,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import load_module
+from _test_helpers import load_module, required_backend_cli_env
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -45,6 +45,7 @@ class GetCommandsConsistencyTests(unittest.TestCase):
                     "start",
                 ],
                 capture_output=True, text=True,
+                env=required_backend_cli_env(),
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             # Now query get_phase
@@ -56,6 +57,7 @@ class GetCommandsConsistencyTests(unittest.TestCase):
                     "get_phase",
                 ],
                 capture_output=True, text=True,
+                env=required_backend_cli_env(),
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
             # Contract: stdout must contain a SESSION: marker.
@@ -83,6 +85,7 @@ class GetCommandsConsistencyTests(unittest.TestCase):
                 proc = subprocess.run(
                     [sys.executable, str(SCRIPT), *args],
                     capture_output=True, text=True,
+                    env=required_backend_cli_env(),
                 )
                 self.assertEqual(proc.returncode, 0, proc.stderr)
             last = proc

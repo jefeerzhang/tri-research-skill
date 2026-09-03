@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import example_report, register_report_evidence
+from _test_helpers import example_report, register_report_evidence, required_backend_cli_env
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -40,6 +40,7 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
                     [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), *args],
                     capture_output=True,
                     text=True,
+                    env=required_backend_cli_env(),
                 )
                 if ok and proc.returncode != 0:
                     self.fail(f"command failed: {args}\nstdout={proc.stdout}\nstderr={proc.stderr}")
@@ -98,6 +99,7 @@ class ActiveSessionAfterDoneTests(unittest.TestCase):
                     [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), *args],
                     capture_output=True,
                     text=True,
+                    env=required_backend_cli_env(),
                 )
                 if ok and proc.returncode != 0:
                     self.fail(f"command failed: {args}\nstdout={proc.stdout}\nstderr={proc.stderr}")

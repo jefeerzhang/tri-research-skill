@@ -143,7 +143,7 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 | **SerpApi**           | Lead Agent    | 中文 Google + Scholar                          | 可选 (`optional`)                                      | 250 次/月免费                                     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 通用补充（宿主内置抽象，**不**等于 Tavily）    | 可选 (`optional`)                                      | 宿主提供                                          | 无需申请（宿主内置）                   |
 
-**降级策略：** `required`（Exa / SciVerse）缺失时在源检测阶段暂停并引导配置；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名降级；`optional` 源静默跳过，单源失败不阻断。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
+**硬门禁：** `required`（Exa / SciVerse）在 `state_machine start` 前机器强制（Key + SDK，缺则 `ERROR:`，无降级逃逸，ADR-0006）；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名；`optional` 源静默跳过，单源失败不阻断。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
 
 ## 状态机
 

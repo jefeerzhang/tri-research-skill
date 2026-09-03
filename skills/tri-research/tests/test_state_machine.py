@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from _test_helpers import make_valid_report, register_report_evidence
+from _test_helpers import make_valid_report, register_report_evidence, required_backend_cli_env
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "state_machine.py"
 
@@ -26,7 +26,7 @@ class _CliHarness:
 
     def run_cli(self, *args: str, ok: bool = True) -> subprocess.CompletedProcess:
         command = [sys.executable, str(SCRIPT), "--state-dir", str(self.state_dir), *args]
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, env=required_backend_cli_env())
         if ok and result.returncode != 0:
             self.fail(f"failed: {command}\nstdout={result.stdout}\nstderr={result.stderr}")
         if not ok and result.returncode == 0:

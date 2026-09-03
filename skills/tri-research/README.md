@@ -37,7 +37,7 @@
 | **SerpApi**           | Lead Agent    | 中文 Google/Scholar 补强                                                   | 可选     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 宿主内置抽象能力（实现不固定，**不等于** Tavily）                          | 可选     | 无需申请（宿主内置）                   |
 
-降级策略：必选源未配置 → 提示用户配置，同时尝试无 API 模式（AnySearch 支持匿名访问）。可选源不可用 → 静默跳过。
+硬门禁：Exa / SciVerse（`required`）必须在 `state_machine start` 前配齐 Key + SDK，否则会话无法创建（ADR-0006，无降级逃逸）。AnySearch（`recommended`）支持匿名访问；可选源不可用 → 静默跳过。
 
 ## 适用场景
 
@@ -95,12 +95,13 @@
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
 ```
 
-可选配置：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`EXA_API_KEY`、`SERPAPI_KEY`、`SCIVERSE_API_TOKEN`。
+**必选（`start` 硬门禁）**：`EXA_API_KEY` + `exa-py`，`SCIVERSE_API_TOKEN` + `sciverse`。
+可选：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`SERPAPI_KEY`。
 
 ```bash
-pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>
-pip install exa-py && export EXA_API_KEY=<your-key>
-pip install tavily-python && export TAVILY_API_KEY=<your-key> # 可选
+pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>   # required
+pip install exa-py && export EXA_API_KEY=<your-key>               # required
+pip install tavily-python && export TAVILY_API_KEY=<your-key>     # optional
 ```
 
 ## 测试

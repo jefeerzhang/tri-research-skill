@@ -3,7 +3,7 @@ name: research-subagent
 description: |
   tri-research 研究子代理：用 AnySearch + SciVerse + Exa 执行中英双语聚焦检索，返回结构化发现。
   触发：被 tri-research 主导代理派发子任务时。
-  不适用：写最终报告（主导代理职责）、脱离 tri-research 的单独调用、无 AnySearch / SciVerse 任一后端可用。
+  不适用：写最终报告（主导代理职责）、脱离 tri-research 的单独调用、无 Exa / SciVerse（`required`）可用。
 version: "6.7.0"
 ---
 
@@ -60,7 +60,7 @@ asyncio.run(search())
 
 > ⚠️ **流程要求：每个研究角度 × 每个可用源 × 中文 + 英文 = 应全部执行。** 每个角度都要产出中文 query 和英文 query，并在全部可用源上各执行一遍；只搜一种语言是流程缺陷。主 skill 的 `validate_report.py` 只做报告级双语检查，不逐角度审计，本节靠你执行。
 
-1. **预检**：AnySearch（`recommended`，匿名可用）、SciVerse（`required`）、Exa（`required`）各轻量查询一次确认可用性；`required` 缺失 → 暂停并引导配置
+1. **预检**：AnySearch（`recommended`，匿名可用）、SciVerse（`required`）、Exa（`required`）各轻量查询一次确认可用性；主流程已在 `start` 对 Exa/SciVerse 做 K+S 硬门禁——此处若仍失败，停止本子任务并回报，不得无 Key/SDK 降级续跑
 2. **并行搜索**：对三源同时发起不同角度的查询，每角度中英各一条，在各源上各执行一遍
    - 示例：`AnySearch batch_search --queries '[{"query":"人工智能 就业替代"},{"query":"AI job displacement"}]'`
    - 示例：`SciVerse semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation employment"`

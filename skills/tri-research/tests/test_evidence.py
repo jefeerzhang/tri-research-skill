@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report, register_report_evidence, report_reference_urls
+from _test_helpers import make_valid_report, register_report_evidence, report_reference_urls, required_backend_cli_env
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "evidence.py"
 STATE_MACHINE = Path(__file__).parents[1] / "scripts" / "state_machine.py"
@@ -28,14 +28,14 @@ class EvidenceCliHarness:
 
     def run_state_cli(self, *args: str, ok: bool = True) -> subprocess.CompletedProcess:
         command = [sys.executable, str(STATE_MACHINE), "--state-dir", str(self.state_dir), *args]
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, env=required_backend_cli_env())
         if ok and result.returncode != 0:
             self.fail(f"state_machine failed: {command}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
     def run_cli(self, *args: str, ok: bool = True) -> subprocess.CompletedProcess:
         command = [sys.executable, str(SCRIPT), "--state-dir", str(self.state_dir), *args]
-        result = subprocess.run(command, capture_output=True, text=True)
+        result = subprocess.run(command, capture_output=True, text=True, env=required_backend_cli_env())
         if ok and result.returncode != 0:
             self.fail(f"failed: {command}\nstdout={result.stdout}\nstderr={result.stderr}")
         if not ok and result.returncode == 0:

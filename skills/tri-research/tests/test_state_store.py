@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import load_module, make_valid_report, register_report_evidence
+from _test_helpers import load_module, make_valid_report, patch_required_backends, register_report_evidence
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
@@ -31,6 +31,9 @@ def _params(**overrides):
 class StateStoreTests(unittest.TestCase):
     def setUp(self) -> None:
         self.sm = load_module(SCRIPTS_DIR / "state_machine.py", "sm_store_test")
+        self._gate = patch_required_backends(self.sm)
+        self._gate.start()
+        self.addCleanup(self._gate.stop)
         self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.state_dir = Path(self.tmp.name) / "state"
         self.store = self.sm.StateStore(self.state_dir)

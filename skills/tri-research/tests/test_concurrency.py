@@ -20,7 +20,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report, register_report_evidence
+from _test_helpers import make_valid_report, register_report_evidence, required_backend_cli_env
 
 SKILL_ROOT = Path(__file__).parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "state_machine.py"
@@ -31,6 +31,7 @@ def run_cli(state_dir: Path, *args: str) -> subprocess.CompletedProcess:
         [sys.executable, str(SCRIPT), "--state-dir", str(state_dir), *args],
         capture_output=True,
         text=True,
+        env=required_backend_cli_env(),
     )
 
 
@@ -168,6 +169,7 @@ class ConcurrencyTests(unittest.TestCase):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    env=required_backend_cli_env(),
                 )
                 for _ in range(2)
             ]
@@ -205,6 +207,7 @@ class ConcurrencyTests(unittest.TestCase):
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         text=True,
+                        env=required_backend_cli_env(),
                     )
                     for i in range(6)
                 ]

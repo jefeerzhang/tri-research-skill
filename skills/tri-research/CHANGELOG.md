@@ -6,6 +6,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 ### Changed
 
+- **Required Backend 硬门禁（ADR-0006）**：Exa / SciVerse 在 `state_machine start` 前机器强制 K+S（Key 可解析 + SDK 可 import）；失败不建会话、无用户/env 逃逸。废 SKILL「用户明确要求降级」与 README「必选未配置仍尝试无 API」逃逸口；AnySearch 匿名与中段优雅降级保留。模块：`scripts/required_backends.py`。回归：`tests/test_required_backends.py` + 合约钉子。
 - **SKILL.md 文档重构（writing-for-agents）**：四份 SKILL.md（tri-research / research-subagent / serpapi / citations）按「steps 优先、reference 下放、pointer 前置」重排——主导 SKILL 研究流程前置且每步补完成标准，可选交付（drawio 机制图 / LaTeX-PDF / TinyTeX 安装）下放到新文件 `references/delivery.md` 并经 context pointer 触达，工具速查与 SciVerse 调用规范保留内联；serpapi `doc` 描述改回「usage summary（实测仅 8 行）」以免过度承诺；文档语言在单文件内统一。行为零变化，`test_skill_contract` 全部钉住字符串原样保留。
 
 ### Fixed

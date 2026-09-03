@@ -30,6 +30,7 @@ from _common import (  # noqa: E402
     now_iso,
     source_threshold,
 )
+from required_backends import require_required_backends  # noqa: E402
 from validate_report import (  # noqa: E402
     ReportMissingError,
     ReportTamperedError,
@@ -198,7 +199,15 @@ class StateStore:
             pass  # already gone — no-op
 
     def start_session(self, session_id: str | None = None) -> dict[str, Any]:
-        """Start a new session and make it the active session."""
+        """Start a new session and make it the active session.
+
+        Required Backends (Exa + SciVerse) must pass the K+S gate before any
+        state is written (ADR-0006). Failure raises StateError and leaves
+        no session / active pointer behind.
+        """
+        # Gate before lock/path work so a failed check cannot leave lock noise
+        # or partial files; the gate itself is side-effect free.
+        require_required_backends()
         if session_id is None:
             # Second granularity: two researches opened within the same
             # minute used to collide on "session already exists".

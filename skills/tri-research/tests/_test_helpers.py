@@ -2,8 +2,32 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
+from unittest import mock
+
+REQUIRED_SDK_STUBS = Path(__file__).resolve().parent / "_stubs" / "required_sdks"
+
+
+def required_backend_cli_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Env for subprocess CLIs that call ``start``: fake keys + stub SDKs.
+
+    Production has no escape hatch (ADR-0006); tests supply importable stub
+    packages on PYTHONPATH and dummy keys so K+S passes without real SDKs.
+    """
+    env = dict(base if base is not None else os.environ)
+    env["EXA_API_KEY"] = env.get("EXA_API_KEY") or "test-exa-key"
+    env["SCIVERSE_API_TOKEN"] = env.get("SCIVERSE_API_TOKEN") or "test-sciverse-token"
+    stub = str(REQUIRED_SDK_STUBS)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = stub + (os.pathsep + existing if existing else "")
+    return env
+
+
+def patch_required_backends(module) -> mock._patch:
+    """No-op the Required Backend gate on an in-process loaded state_machine."""
+    return mock.patch.object(module, "require_required_backends", lambda: None)
 
 
 def report_reference_urls(report_path: Path) -> list[str]:

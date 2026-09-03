@@ -104,6 +104,27 @@ class SkillContractTests(unittest.TestCase):
                     )
             self.assertNotIn("Exa 是可选", blob, msg=name)
 
+    def test_required_backends_have_no_degrade_escape(self) -> None:
+        """ADR-0006：文档不得再暗示无 Exa/SciVerse 仍可开跑。"""
+        forbidden = (
+            "用户明确要求降级",
+            "同时尝试无 API 模式",
+            "必选源未配置 → 提示用户配置，同时尝试",
+        )
+        for name, blob in (
+            ("skill", self.skill),
+            ("readme", self.readme),
+            ("root_readme", self.root_readme),
+            ("subagent", self.subagent),
+        ):
+            if not blob:
+                continue
+            for phrase in forbidden:
+                self.assertNotIn(phrase, blob, msg=f"{name} still allows required degrade: {phrase!r}")
+        self.assertIn("硬门禁", self.skill)
+        self.assertIn("ADR-0006", self.skill)
+        self.assertIn("required_backends", (ROOT / "scripts" / "state_machine.py").read_text(encoding="utf-8"))
+
     def test_skill_does_not_claim_env_only_keys(self) -> None:
         """SKILL 曾写「API key 只读环境变量」，但 KeyProvider 实为 cli > env > .env。
 
