@@ -1,25 +1,23 @@
 # tri-research-skill
 
-多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 补强 + citations 可选复核）。
+## 触达分支（pointers）
 
-## Agent skills
-
-### Issue tracker
-
-Issues 存放在 GitHub Issues（jefeerzhang/tri-research-skill），全部通过 `gh` CLI 操作。See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-五个 canonical triage roles，label 字符串与 role 名相同（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix）。See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context：repo 根目录一个 `CONTEXT.md` + `docs/adr/`。See `docs/agents/domain.md`.
+- **Issue / PR 操作**：创建、查看、评论、打/去 label、关闭，一律经 `gh` CLI；PR 也是 triage 请求面、wayfinder 的 map/child/blocking 协议——全部在 `docs/agents/issue-tracker.md`
+- **Triage 角色**：五个 canonical roles——needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix，label 字符串与 role 同名；映射表见 `docs/agents/triage-labels.md`
+- **动代码前**：先读根目录 `CONTEXT.md`（领域词汇与 Avoid 词），需要决策背景再翻 `docs/adr/`；存在才读，缺失直接跳过。规则见 `docs/agents/domain.md`
 
 ## 开发约定
 
-- Python 脚本位于 `skills/*/scripts/`，标准库优先；测试用 `unittest`
-- 运行全部测试：`python -m unittest discover -s skills/tri-research/tests` 与 `python -m unittest discover -s skills/serpapi/tests`
-- **测试数对账守门员**：`skills/tri-research/tests/test_count_drift.py` 静态统计 tri-research/serpapi 测试数（4 条断言），防止 README / 示例 / CHANGELOG 中硬编码数字漂移；新增/删除测试时若该文件红，应同步更新文档
-- CI 同时跑 ubuntu + windows（见 `.github/workflows/python-package.yml`），并包含 ruff（E/F）+ markdownlint-cli2 静态校验（`lint` job），涉及文件读写时注意跨平台换行与路径
-- 提交信息遵循中文 Conventional Commits（type 英文、scope/描述中文）
+- Python 脚本在 `skills/*/scripts/`，标准库优先；测试用 `unittest`
+- 全量测试（两侧都跑）：
+
+  ```bash
+  python -m unittest discover -s skills/tri-research/tests
+  python -m unittest discover -s skills/serpapi/tests
+  ```
+
+- **测试数对账守门员**：`skills/tri-research/tests/test_count_drift.py` 静态统计两侧测试数（4 条断言），钉住 README / 示例 / CHANGELOG 里硬编码的数字。新增/删除测试后它变红 → 同步那些文档的数字
+- **跨平台**：CI 同时跑 ubuntu + windows（`.github/workflows/python-package.yml`，Python 3.11–3.13 × 两系统，UTF-8 规避 Windows cp1252）；文件读写注意换行与路径
+- **提交**：中文 Conventional Commits——type 英文小写、scope/描述中文（本地 commitlint + lint-staged 管格式）
+
+**收尾**：改动落地前，全量测试通过、count-drift 守门员绿、commitlint 不红。
