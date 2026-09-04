@@ -2,13 +2,14 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
-## [Unreleased]
+## [6.8.0] - 2026-09-04
 
 ### Changed
 
 - **Required Backend 硬门禁（ADR-0006）**：Exa / SciVerse 在 `state_machine start` 前机器强制 K+S（Key 可解析 + SDK 可 import）；失败不建会话、无用户/env 逃逸。废 SKILL「用户明确要求降级」与 README「必选未配置仍尝试无 API」逃逸口；AnySearch 匿名与中段优雅降级保留。模块：`scripts/required_backends.py`。回归：`tests/test_required_backends.py` + 合约钉子。
 - **SKILL.md 文档重构（writing-for-agents）**：四份 SKILL.md（tri-research / research-subagent / serpapi / citations）按「steps 优先、reference 下放、pointer 前置」重排——主导 SKILL 研究流程前置且每步补完成标准，可选交付（drawio 机制图 / LaTeX-PDF / TinyTeX 安装）下放到新文件 `references/delivery.md` 并经 context pointer 触达，工具速查与 SciVerse 调用规范保留内联；serpapi `doc` 描述改回「usage summary（实测仅 8 行）」以免过度承诺；文档语言在单文件内统一。行为零变化，`test_skill_contract` 全部钉住字符串原样保留。
 - **SerpApi 升为 required（ADR-0007）**：`state_machine start` 前对 SerpApi 强制 `SERPAPI_KEY` 可解析 + 轻量探活成功（复用 `SerpApiBackend.probe`），失败 `StateError`、不建会话、无降级逃逸；Exa / SciVerse 仍为 K+S（不变）。Google Scholar 确立为 SerpApi 的**间接**能力（`--engine google_scholar`），SKILL/README/CONTEXT 钉住「SerpApi ≠ Google Scholar」；仅人文社科主题约定 Lead 至少一轮 `google_scholar`。子代理仍无 SerpApi；`来源:` 词汇仍记 `SerpApi`。测试经 `required_backend_cli_env` 注入 `SERPAPI_KEY` + PYTHONPATH 上的 stub `requests` 离线通过，探活成败在 gate seam mock（无 `ALLOW_DEGRADED`）。回归：`test_required_backends`、`test_skill_contract`。
+- **AnySearch 3.1.1 兼容核对（结论：无需改代码）**：上游 AnySearch v3.1.1（CLI Checksums & Automatic Client Version Sync）为补丁级发布——新增 `SHA256SUMS.txt` 脚本完整性校验、以 SKILL.md 为版本单一真源同步 `X-Anysearch-Client` 头、补 SemVer 校验与契约测试，官方明确「不改变搜索和内容提取行为」。tri-research 与 AnySearch 只通过文档 + Agent 运行时 CLI 命令耦合（无任何 Python 代码 import / 调用 / 解析其版本），`search` / `batch_search` / `extract` / `get_sub_domains` / `runtime.conf` 契约原样保留；文档版本标注为「3.1 版」（中版本粒度），3.1.1 仍落在该范围，故 SKILL / README 版本标注无需改。仅在根 README 安装段补一句可选的 `SHA256SUMS.txt` 完整性校验提示（与本项目「报告 SHA-256 / 证据台账 / INTEGRITY 机器复核」的核验风格一致）。
 
 ### Fixed
 
@@ -27,10 +28,6 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Added
 
 - **`--no-proxy` 消费源码闸门**：新增 `tests/test_global_flag_consumption.py`——静态扫描 `_search_cli`，断言 `_maybe_clear_proxy` 恰定义一次、每个触网命令分支（`check` / `search` / `batch_search` / managed command）各消费一次，且消费点位于首次 `invoke()` 之前。与 `test_host_helpers.py` 的元组唯一性闸门互补：那个防「清理逻辑被重复定义」，这个防「某分支该调没调」（本次 bug 的成因类）。经变异测试双向验证：删掉任一消费行闸门变红，还原变绿。`Registry.check` 不在闸门范围（程序化 seam 走显式 `no_proxy` 布尔参数，无全局 flag）。
-
-### Changed
-
-- **AnySearch 3.1.1 兼容核对（结论：无需改代码）**：上游 AnySearch v3.1.1（CLI Checksums & Automatic Client Version Sync）为补丁级发布——新增 `SHA256SUMS.txt` 脚本完整性校验、以 SKILL.md 为版本单一真源同步 `X-Anysearch-Client` 头、补 SemVer 校验与契约测试，官方明确「不改变搜索和内容提取行为」。tri-research 与 AnySearch 只通过文档 + Agent 运行时 CLI 命令耦合（无任何 Python 代码 import / 调用 / 解析其版本），`search` / `batch_search` / `extract` / `get_sub_domains` / `runtime.conf` 契约原样保留；文档版本标注为「3.1 版」（中版本粒度），3.1.1 仍落在该范围，故 SKILL / README 版本标注无需改。仅在根 README 安装段补一句可选的 `SHA256SUMS.txt` 完整性校验提示（与本项目「报告 SHA-256 / 证据台账 / INTEGRITY 机器复核」的核验风格一致）。
 
 ## [6.7.0] - 2026-08-30
 

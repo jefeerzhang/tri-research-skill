@@ -4,7 +4,7 @@ description: |
   tri-research 研究子代理：用 AnySearch + SciVerse + Exa 执行中英双语聚焦检索，返回结构化发现。
   触发：被 tri-research 主导代理派发子任务时。
   不适用：写最终报告（主导代理职责）、脱离 tri-research 的单独调用、无 Exa / SciVerse（`required`）可用。
-version: "6.7.0"
+version: "6.8.0"
 ---
 
 # 研究子代理

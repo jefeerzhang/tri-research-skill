@@ -1,7 +1,7 @@
 ---
 name: citations
 description: "tri-research 引文复核：只读核验研究报告中 [N] 行内引用、参考文献条目、层级与来源字段，返回 OK / WARN / FAIL 检查表。不写报告、不联网、不修改源文件。"
-version: "6.7.0"
+version: "6.8.0"
 ---
 
 ## 职责
