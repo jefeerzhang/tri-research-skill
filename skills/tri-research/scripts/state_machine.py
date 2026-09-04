@@ -31,14 +31,7 @@ from _common import (  # noqa: E402
     source_threshold,
 )
 from required_backends import require_required_backends  # noqa: E402
-from validate_report import (  # noqa: E402
-    ReportMissingError,
-    ReportTamperedError,
-    ReportValidationError,
-    require_complete_proof,
-    validate_and_build_proof,
-    verify_proof_integrity,
-)
+from validate_report import ReportValidationError  # noqa: E402
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -297,7 +290,7 @@ class StateStore:
         must match the confirmed ``params.min_sources``.
         """
         session_id = validate_session_id(session_id)
-        # Expand `~/…` once, at the boundary: validate_and_build_proof already
+        # Expand `~/…` once, at the boundary: proof.build_proof already
         # expanduser()s internally, but the Evidence Audit below reads the
         # report through report_reference_urls, which does not. Passing the raw
         # `~/…` made validation succeed while audit died on "cannot read
@@ -315,7 +308,14 @@ class StateStore:
             if min_sources is not None and min_sources != confirmed_min_sources:
                 raise StateError(f"--min-sources does not match confirmed min_sources ({confirmed_min_sources})")
             try:
-                proof = validate_and_build_proof(
+                # build_proof fuses the report half (validate_report) with the
+                # ledger half (evidence) behind the proof facade; the evidence
+                # audit below is a *separate* hard gate over traceability.
+                from proof import build_proof  # local: proof -> evidence -> state_machine
+
+                proof = build_proof(
+                    self,
+                    session_id,
                     report_path,
                     confirmed_min_sources,
                     expected_topic=params["topic"],
@@ -327,7 +327,7 @@ class StateStore:
             # evidence.py imports this module at load time, so a top-level
             # import would be circular. Runs while the write lock is held
             # but only reads the ledger — no new locking of its own.
-            from evidence import audit_report, format_untraced, ledger_fingerprint
+            from evidence import audit_report, format_untraced
 
             untraced, total = audit_report(self, session_id, report_path)
             if untraced:
@@ -335,9 +335,9 @@ class StateStore:
                     f"evidence audit failed: {len(untraced)}/{total} reference URL(s) untraced: "
                     f"{format_untraced(untraced)}"
                 )
-            # Ledger snapshot fingerprint: part of the proof, so `check`
-            # can catch post-DONE ledger edits (e.g. backdated rows).
-            proof.update(ledger_fingerprint(self, session_id))
+            # Ledger snapshot fingerprint is already inside `proof` (the
+            # ledger half built by proof.build_proof), so `check` can catch
+            # post-DONE ledger edits (e.g. backdated rows).
             timestamp = proof["validated_at"]
             data["phase"] = "DONE"
             data["updated_at"] = timestamp
@@ -428,8 +428,10 @@ def emit(data: dict[str, Any], store: StateStore) -> None:
         # module; translate its error to StateError so the CLI prints
         # ERROR: and exits 1 instead of a traceback.
         try:
-            require_complete_proof(data.get("report_validation"), data["session_id"])
-        except ReportValidationError as exc:
+            from proof import ProofError, require_complete  # local: avoid circular import
+
+            require_complete(data.get("report_validation"), data["session_id"])
+        except ProofError as exc:
             raise StateError(str(exc)) from exc
         proof = data["report_validation"]
         print(f"REPORT:{proof['path']}")
@@ -455,29 +457,18 @@ def _verify_integrity_line(data: dict[str, Any], store: StateStore) -> None:
         print("INTEGRITY:OK")
         return
     proof = data["report_validation"]  # emit() already asserted completeness
-    try:
-        verify_proof_integrity(proof)
-    except ReportMissingError as exc:
-        print("INTEGRITY:MISSING")
-        raise StateError(str(exc)) from exc
-    except ReportTamperedError as exc:
-        print("INTEGRITY:MISMATCH")
-        raise StateError(str(exc)) from exc
-    # Ledger fingerprint half (lazy import: evidence.py imports this module).
-    from evidence import (
-        LedgerMissingError,
-        LedgerTamperedError,
-        evidence_path,
-        verify_ledger_integrity,
-    )
+    # One facade verifies both halves (report + ledger) and translates every
+    # failure into ProofMissingError / ProofTamperedError, each carrying a
+    # `marker` so the caller never needs to know which half was at fault.
+    from proof import ProofMissingError, ProofTamperedError, verify_integrity
 
     try:
-        verify_ledger_integrity(proof, evidence_path(store, data["session_id"]))
-    except LedgerMissingError as exc:
-        print("INTEGRITY:MISSING")
+        verify_integrity(proof, store, data["session_id"])
+    except ProofMissingError as exc:
+        print(f"INTEGRITY:{exc.marker}")
         raise StateError(str(exc)) from exc
-    except LedgerTamperedError as exc:
-        print("INTEGRITY:MISMATCH")
+    except ProofTamperedError as exc:
+        print(f"INTEGRITY:{exc.marker}")
         raise StateError(str(exc)) from exc
     print("INTEGRITY:OK")
 
