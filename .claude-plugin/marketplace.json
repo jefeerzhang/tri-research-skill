@@ -6,7 +6,7 @@
     "url": "https://github.com/jefeerzhang"
   },
   "metadata": {
-    "description": "多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 补强 + citations 可选复核）",
+    "description": "多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 必选含间接 Scholar + citations 可选复核）",
     "version": "6.8.0"
   },
   "plugins": [
