@@ -311,7 +311,12 @@ class StateStore:
                 # build_proof fuses the report half (validate_report) with the
                 # ledger half (evidence) behind the proof facade; the evidence
                 # audit below is a *separate* hard gate over traceability.
-                from proof import ProofError, build_proof  # local: proof -> evidence -> state_machine
+                # Note: ProofError is not raised on this path — only by
+                # require_complete / verify_integrity (check). Ledger failures
+                # here are Ledger*Error (ReportValidationError subclass) and
+                # flatten to StateError like report validation failures; marker
+                # mapping lives on the verify path, not complete().
+                from proof import build_proof  # local: proof -> evidence -> state_machine
 
                 proof = build_proof(
                     self,
@@ -320,11 +325,6 @@ class StateStore:
                     confirmed_min_sources,
                     expected_topic=params["topic"],
                 )
-            except ProofError as exc:
-                # ProofError subclasses ReportValidationError; catch it first so
-                # ledger-side failures keep their proof marker semantics instead
-                # of being flattened into a generic report-validation message.
-                raise StateError(str(exc)) from exc
             except ReportValidationError as exc:
                 raise StateError(str(exc)) from exc
             # Evidence Audit hard gate: every reference URL in the report
