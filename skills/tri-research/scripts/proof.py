@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 # Make sibling modules importable however this file is loaded (direct
 # script execution, tests via importlib, external tooling) — same bootstrap
@@ -40,6 +40,7 @@ from validate_report import (  # noqa: E402
     ReportTamperedError,
     ReportValidationError,
     validate_and_build_proof,
+    verify_proof_integrity,
 )
 from evidence import (  # noqa: E402
     LedgerMissingError,
@@ -48,6 +49,9 @@ from evidence import (  # noqa: E402
     ledger_fingerprint,
     verify_ledger_integrity,
 )
+
+if TYPE_CHECKING:
+    from state_machine import StateStore
 
 # Full proof contract (schema v4): the report half plus the ledger half.
 # This is the single source of truth for what a DONE proof must carry.
@@ -73,7 +77,7 @@ class ProofTamperedError(ProofError):
 
 
 def build_proof(
-    store: Any,
+    store: StateStore,
     session_id: str,
     report_path: Path,
     min_sources: int,
@@ -110,7 +114,7 @@ def require_complete(proof: Any, session_id: str) -> None:
         )
 
 
-def verify_integrity(proof: dict[str, Any], store: Any, session_id: str) -> str:
+def verify_integrity(proof: dict[str, Any], store: StateStore, session_id: str) -> str:
     """Verify both halves of a proof against their DONE fingerprints.
 
     Recomputes the report hash (``validate_report``) and the ledger hash
@@ -120,8 +124,6 @@ def verify_integrity(proof: dict[str, Any], store: Any, session_id: str) -> str:
     ``marker``), so the caller no longer needs to know which half failed.
     """
     try:
-        from validate_report import verify_proof_integrity  # local to keep imports tidy
-
         verify_proof_integrity(proof)
     except ReportMissingError as exc:
         raise ProofMissingError(str(exc)) from exc

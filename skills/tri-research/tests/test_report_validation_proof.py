@@ -48,7 +48,9 @@ class ReportValidationProofTests(unittest.TestCase):
             self.vr.validate_and_build_proof(report, 10, expected_topic="人工智能与劳动分配")
         self.assertIn("validation failed", str(ctx.exception))
 
-    def test_require_complete_proof_accepts_full_proof(self) -> None:
+    def test_require_complete_proof_delegates_to_proof_module(self) -> None:
+        # Shim must keep working: schema ownership is in proof.require_complete,
+        # but older callers still import require_complete_proof from here.
         proof = {
             "path": "/tmp/report.md",
             "sha256": "abc",
@@ -56,11 +58,12 @@ class ReportValidationProofTests(unittest.TestCase):
             "evidence_lines": 10,
             "evidence_sha256": "def",
         }
-        self.vr.require_complete_proof(proof, "s1")
+        self.vr.require_complete_proof(proof, "s1")  # must not raise
 
     def test_require_complete_proof_rejects_proof_without_ledger_fingerprint(self) -> None:
         # Schema v4: the ledger snapshot fingerprint is mandatory — a proof
         # from before the Evidence Ledger (or a hand-edited state) is corrupt.
+        # Raises ProofError, which subclasses ReportValidationError.
         with self.assertRaises(self.vr.ReportValidationError) as ctx:
             self.vr.require_complete_proof({"path": "/tmp/report.md", "sha256": "abc", "min_sources": 10}, "s1")
         self.assertIn("evidence", str(ctx.exception))

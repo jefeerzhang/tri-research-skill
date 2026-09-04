@@ -375,22 +375,20 @@ def validate_and_build_proof(
 
 
 def require_complete_proof(proof: Any, session_id: str) -> None:
-    """Assert that a DONE state carries a complete report_validation proof.
+    """Compatibility shim: full DONE schema lives in ``proof.require_complete``.
 
-    Raises ReportValidationError — never KeyError — so callers can translate
-    it to a CLI-friendly error without a traceback.
+    Kept so older imports / tests that still call this name keep working.
+    Lazily imports ``proof`` to avoid a load-time cycle (``proof`` already
+    imports this module). Re-raises as this module's ``ReportValidationError``
+    so importlib dual-load callers still match ``isinstance`` against the
+    loaded copy (same pattern as StateError in ``_common``).
     """
-    required = ("path", "sha256", "min_sources", "evidence_lines", "evidence_sha256")
-    if not isinstance(proof, dict):
-        raise ReportValidationError(
-            f"phase=DONE but report_validation is missing for session {session_id!r} — state file is corrupt"
-        )
-    missing = [key for key in required if key not in proof or proof[key] in (None, "")]
-    if missing:
-        raise ReportValidationError(
-            f"phase=DONE but report_validation is incomplete for session "
-            f"{session_id!r} (missing: {', '.join(missing)}) — state file is corrupt"
-        )
+    from proof import ProofError, require_complete  # local: proof → validate_report
+
+    try:
+        require_complete(proof, session_id)
+    except ProofError as exc:
+        raise ReportValidationError(str(exc)) from exc
 
 
 def verify_proof_integrity(proof: dict[str, Any]) -> None:
@@ -409,7 +407,7 @@ def verify_proof_integrity(proof: dict[str, Any]) -> None:
     """
     raw_path = proof["path"]
     if not isinstance(raw_path, str):
-        # require_complete_proof only rejects None/""; a hand-corrupted state
+        # proof.require_complete only rejects None/""; a hand-corrupted state
         # could hold a non-string. Guard so we keep the module's never-
         # traceback invariant instead of crashing inside Path().
         raise ReportMissingError(f"report not readable: proof path is not a string: {raw_path!r}")

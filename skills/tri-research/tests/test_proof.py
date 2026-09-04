@@ -99,6 +99,13 @@ class ProofModuleTests(unittest.TestCase):
         with self.assertRaises(self.proof.ProofTamperedError):
             self.proof.verify_integrity(proof, self.store, self._session())
 
+    def test_verify_integrity_detects_missing_ledger(self) -> None:
+        report = self._report()
+        proof = self.proof.build_proof(self.store, self._session(), report, 10, expected_topic="人工智能与劳动分配")
+        self.evidence.evidence_path(self.store, self._session()).unlink()
+        with self.assertRaises(self.proof.ProofMissingError):
+            self.proof.verify_integrity(proof, self.store, self._session())
+
 
 if __name__ == "__main__":
     unittest.main()
