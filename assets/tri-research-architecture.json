@@ -46,6 +46,6 @@
   "cards": [
     { "dot": "cyan", "title": "控制层（两步状态机）", "items": ["STARTED → DONE 两阶段，参数一经 set_params 即冻结", "active-session 指针 + 跨进程文件锁防并发写", "done 后清除指针；add_dimensions 重开为 EXTENDED"] },
     { "dot": "rose", "title": "机器可验证硬门禁", "items": ["done = validate_report 结构/引用/双语校验 + SHA-256 指纹", "每条参考文献 URL 必须在证据台账命中，untraced 即失败", "DONE 后改报告或补台账，check 触发 INTEGRITY:MISMATCH"] },
-    { "dot": "emerald", "title": "检索层（六源并行）", "items": ["主代理走 tavily_search.py，子代理走 exa_search.py", "共享骨架提供超时/重试/熔断与统一 JSON 错误契约", "SerpApi / AnySearch / SciVerse 为补强源，可独立降级"] }
+    { "dot": "emerald", "title": "检索层（六源并行）", "items": ["主代理走 tavily_search.py，子代理走 exa_search.py", "共享骨架提供超时/重试/熔断与统一 JSON 错误契约", "SerpApi / SciVerse 为 required（start 门禁），AnySearch 为 recommended 可匿名降级"] }
   ]
 }

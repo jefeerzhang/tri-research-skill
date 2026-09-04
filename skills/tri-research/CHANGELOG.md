@@ -8,6 +8,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 
 - **Required Backend 硬门禁（ADR-0006）**：Exa / SciVerse 在 `state_machine start` 前机器强制 K+S（Key 可解析 + SDK 可 import）；失败不建会话、无用户/env 逃逸。废 SKILL「用户明确要求降级」与 README「必选未配置仍尝试无 API」逃逸口；AnySearch 匿名与中段优雅降级保留。模块：`scripts/required_backends.py`。回归：`tests/test_required_backends.py` + 合约钉子。
 - **SKILL.md 文档重构（writing-for-agents）**：四份 SKILL.md（tri-research / research-subagent / serpapi / citations）按「steps 优先、reference 下放、pointer 前置」重排——主导 SKILL 研究流程前置且每步补完成标准，可选交付（drawio 机制图 / LaTeX-PDF / TinyTeX 安装）下放到新文件 `references/delivery.md` 并经 context pointer 触达，工具速查与 SciVerse 调用规范保留内联；serpapi `doc` 描述改回「usage summary（实测仅 8 行）」以免过度承诺；文档语言在单文件内统一。行为零变化，`test_skill_contract` 全部钉住字符串原样保留。
+- **SerpApi 升为 required（ADR-0007）**：`state_machine start` 前对 SerpApi 强制 `SERPAPI_KEY` 可解析 + 轻量探活成功（复用 `SerpApiBackend.probe`），失败 `StateError`、不建会话、无降级逃逸；Exa / SciVerse 仍为 K+S（不变）。Google Scholar 确立为 SerpApi 的**间接**能力（`--engine google_scholar`），SKILL/README/CONTEXT 钉住「SerpApi ≠ Google Scholar」；仅人文社科主题约定 Lead 至少一轮 `google_scholar`。子代理仍无 SerpApi；`来源:` 词汇仍记 `SerpApi`。测试经 `required_backend_cli_env` 注入 `SERPAPI_KEY` + PYTHONPATH 上的 stub `requests` 离线通过，探活成败在 gate seam mock（无 `ALLOW_DEGRADED`）。回归：`test_required_backends`、`test_skill_contract`。
 
 ### Fixed
 

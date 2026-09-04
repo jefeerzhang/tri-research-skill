@@ -71,7 +71,7 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-res
 
 ### 配置搜索后端
 
-Tri Research 依赖多个搜索后端，其中 **AnySearch / SciVerse / Exa 为必选**（AnySearch 为 `recommended`，匿名可用但建议配置）：
+Tri Research 依赖多个搜索后端，其中 **AnySearch / SciVerse / Exa / SerpApi 为必选**（AnySearch 为 `recommended`，匿名可用但建议配置；SerpApi 为 Key + 探活，见 ADR-0007）：
 
 ```bash
 # Exa（必选，网页 + 学术 + 公司 + 问答）— Key 申请：https://dashboard.exa.ai/api-keys
@@ -88,9 +88,11 @@ npx skills add anysearch-ai/anysearch-skill
 pip install sciverse
 export SCIVERSE_API_TOKEN=<your-token>
 
-# Tavily / SerpApi（可选，仅 Lead Agent）— Key 申请：https://app.tavily.com/home / https://serpapi.com/dashboard
-export TAVILY_API_KEY=<your-key>
+# SerpApi（必选，仅 Lead Agent，Google Scholar 间接通道）— Key 申请：https://serpapi.com/dashboard
 export SERPAPI_KEY=<your-key>
+
+# Tavily（可选，仅 Lead Agent）— Key 申请：https://app.tavily.com/home
+export TAVILY_API_KEY=<your-key>
 ```
 
 密钥从环境变量读取，可选本地 `.env` 兜底（已 gitignore），不写入仓库、日志或研究报告。
@@ -140,10 +142,10 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 | **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索                        | **必选（建议配置）** (`recommended`，匿名可用，低限额) | 匿名可用（低限额），免费 key 提额                 | https://anysearch.com/console/api-keys |
 | **SciVerse**          | Lead + 子代理 | 学术论文语义检索（Python SDK）                 | **必选** (`required`)                                  | 注册送试用额度                                    | https://sciverse.space/docs#auth       |
 | **Tavily**            | Lead Agent    | 深度网页搜索与提取（不等于 Runtime WebSearch） | 可选 (`optional`)                                      | 免费档（额度以官网为准）                          | https://app.tavily.com/home            |
-| **SerpApi**           | Lead Agent    | 中文 Google + Scholar                          | 可选 (`optional`)                                      | 250 次/月免费                                     | https://serpapi.com/dashboard          |
+| **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP                     | **必选** (`required`，Key + 探活)               | 250 次/月免费                                     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 通用补充（宿主内置抽象，**不**等于 Tavily）    | 可选 (`optional`)                                      | 宿主提供                                          | 无需申请（宿主内置）                   |
 
-**硬门禁：** `required`（Exa / SciVerse）在 `state_machine start` 前机器强制（Key + SDK，缺则 `ERROR:`，无降级逃逸，ADR-0006）；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名；`optional` 源静默跳过，单源失败不阻断。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
+**硬门禁：** `required`（Exa / SciVerse）在 `state_machine start` 前机器强制（Key + SDK，缺则 `ERROR:`，无降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前 Key 可解析 + 轻量探活成功（ADR-0007）；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名；`optional` 源静默跳过，单源失败不阻断。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
 
 ## 状态机
 

@@ -29,7 +29,7 @@ _Avoid_: key loader、env helper 混称
 _Avoid_: backend config 泛称
 
 **BackendRequirementLevel**:
-Search Backend 的三档必要性分级，决定缺 key/SDK 时的编排行为：`required`（Exa / SciVerse）在 Research Session `start` 前由机器强制（K+S：Key 可解析且 SDK 可 import），缺失则 `StateError`、无用户降级逃逸；`recommended` 缺失仅黄字提醒但允许匿名降级；`optional` 缺失静默跳过。
+Search Backend 的三档必要性分级，决定缺 key/SDK 时的编排行为：`required`（Exa / SciVerse：K+S——Key 可解析且 SDK 可 import；SerpApi：Key 可解析 + 轻量探活成功，见 ADR-0007）在 Research Session `start` 前由机器强制，缺失/探活失败则 `StateError`、无用户降级逃逸；`recommended` 缺失仅黄字提醒但允许匿名降级；`optional` 缺失静默跳过。
 _Avoid_: 必选/可选二分、优先级混称、文档-only 约束
 
 **Managed Command**:
@@ -51,3 +51,11 @@ _Avoid_: 引用校验、格式验收混称（那是 Report Validation）
 **Report Validation**:
 报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
+
+**Google Scholar（间接能力）**:
+不是独立 Search Backend——它是 SerpApi 经 `--engine google_scholar` 提供的**间接**能力。SerpApi 是 `required` 的**发现通道**；Google Scholar 的学术书目/语义面由 SciVerse 承担。
+_Avoid_: 把 SerpApi 与 Google Scholar 混为一谈（接了 SerpApi ≠ 补了 Scholar）、把 Evidence/`来源:` 改名 "Google Scholar"
+
+**SciVerse（学术 SDK 路径）**:
+学术书目与语义检索的唯一 SD 路径（Python SDK `AgentToolsClient`，禁止 MCP），承担「学术面」。**不是** OpenAlex 的代名词——即使底层可能复用 OpenAlex 类覆盖，术语上不得把 SciVerse 改名为 OpenAlex。
+_Avoid_: SciVerse 与 OpenAlex 混称

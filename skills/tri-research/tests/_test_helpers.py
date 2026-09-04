@@ -19,6 +19,10 @@ def required_backend_cli_env(base: dict[str, str] | None = None) -> dict[str, st
     env = dict(base if base is not None else os.environ)
     env["EXA_API_KEY"] = env.get("EXA_API_KEY") or "test-exa-key"
     env["SCIVERSE_API_TOKEN"] = env.get("SCIVERSE_API_TOKEN") or "test-sciverse-token"
+    # SerpApi is a `required` backend (Key + probe). The probe reuses
+    # SerpApiBackend.probe -> requests.get; the stub `requests` package in
+    # REQUIRED_SDK_STUBS makes that probe pass offline (see requests.py).
+    env["SERPAPI_KEY"] = env.get("SERPAPI_KEY") or "test-serpapi-key"
     stub = str(REQUIRED_SDK_STUBS)
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = stub + (os.pathsep + existing if existing else "")

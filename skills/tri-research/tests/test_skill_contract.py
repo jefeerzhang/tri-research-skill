@@ -104,6 +104,37 @@ class SkillContractTests(unittest.TestCase):
                     )
             self.assertNotIn("Exa 是可选", blob, msg=name)
 
+    def test_serpapi_is_required_tier_across_docs(self) -> None:
+        """ADR-0007：SerpApi 升为 required（Key + 探活）；各处文档不得再标可选/静默跳过。"""
+        runtime_adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        docs = (
+            ("skill", self.skill),
+            ("readme", self.readme),
+            ("root_readme", self.root_readme),
+            ("runtime_adapters", runtime_adapters),
+        )
+        for name, blob in docs:
+            if not blob:
+                continue
+            for line in blob.splitlines():
+                if "SerpApi" in line and "|" in line and any(t in line for t in ("必选", "可选", "required", "optional")):
+                    self.assertTrue(
+                        ("必选" in line or "required" in line) and not ("可选" in line or "optional" in line),
+                        msg=f"{name}: SerpApi 档位漂移（应为必选/required）: {line}",
+                    )
+            self.assertNotIn("SerpApi 是可选", blob, msg=name)
+            # 静默跳过与 required 矛盾，文档不得再把 SerpApi 说成会静默跳过。
+            self.assertNotIn("SerpApi 静默跳过", blob, msg=name)
+
+    def test_google_scholar_is_indirect_serpapi_only_for_hss(self) -> None:
+        """Scholar 是 SerpApi 的间接能力；仅人文社科强制至少一轮 google_scholar。"""
+        self.assertIn("google_scholar", self.skill)
+        self.assertIn("人文社科", self.skill)
+        self.assertIn("Google Scholar", self.skill)
+        self.assertIn("STEM", self.skill)  # STEM 主题不强制 google_scholar
+        # 不得宣称 Scholar 是独立后端，或无差别地让所有主题强制。
+        self.assertNotIn("Google Scholar 是独立", self.skill)
+
     def test_required_backends_have_no_degrade_escape(self) -> None:
         """ADR-0006：文档不得再暗示无 Exa/SciVerse 仍可开跑。"""
         forbidden = (
@@ -123,7 +154,11 @@ class SkillContractTests(unittest.TestCase):
                 self.assertNotIn(phrase, blob, msg=f"{name} still allows required degrade: {phrase!r}")
         self.assertIn("硬门禁", self.skill)
         self.assertIn("ADR-0006", self.skill)
+        self.assertIn("ADR-0007", self.skill)
         self.assertIn("required_backends", (ROOT / "scripts" / "state_machine.py").read_text(encoding="utf-8"))
+        # SerpApi 也在 required 门禁内（Key + 探活，ADR-0007），不是可选源。
+        gate = (ROOT / "scripts" / "required_backends.py").read_text(encoding="utf-8")
+        self.assertIn("SERPAPI_KEY", gate)
 
     def test_skill_does_not_claim_env_only_keys(self) -> None:
         """SKILL 曾写「API key 只读环境变量」，但 KeyProvider 实为 cli > env > .env。
