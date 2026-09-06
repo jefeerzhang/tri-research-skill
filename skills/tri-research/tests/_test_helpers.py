@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import os
-import re
+import sys
 from pathlib import Path
 from unittest import mock
+
+_SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from _report_parse import parse_report  # noqa: E402
 
 REQUIRED_SDK_STUBS = Path(__file__).resolve().parent / "_stubs" / "required_sdks"
 
@@ -36,17 +42,11 @@ def patch_required_backends(module) -> mock._patch:
 
 def report_reference_urls(report_path: Path) -> list[str]:
     """Raw reference URLs from a report's 参考文献 section, in order, deduped."""
-    text = Path(report_path).read_text(encoding="utf-8")
-    refs = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
-    next_section = re.search(r"(?m)^## ", refs)
-    if next_section:
-        refs = refs[: next_section.start()]
+    parsed = parse_report(Path(report_path).read_text(encoding="utf-8"))
     urls: list[str] = []
-    for match in re.finditer(r"https?://\S+", refs):
-        # Same trailing-punctuation strip as validate_report._strip_url_punctuation.
-        url = match.group(0).rstrip(".,;:。，；：）》」』”’\"'")
-        if url not in urls:
-            urls.append(url)
+    for reference in parsed.references:
+        if reference.url and reference.url not in urls:
+            urls.append(reference.url)
     return urls
 
 

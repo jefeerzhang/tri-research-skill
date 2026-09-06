@@ -11,8 +11,10 @@ populating report_validation).
 Contract: if phase is DONE, report_validation MUST be present.
 emit() (or its caller) must raise so this is loud, not silent.
 """
+
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,8 +23,16 @@ from _test_helpers import load_module
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
+
 def _load_state_machine():
     return load_module(SCRIPTS_DIR / "state_machine.py", "sm_under_test")
+
+
+def _write_state(store, data: dict) -> None:
+    """Forge a state file on disk, the way a hand edit would."""
+    store.state_path(data["session_id"]).write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 class EmitSilentDoneTests(unittest.TestCase):
@@ -43,7 +53,7 @@ class EmitSilentDoneTests(unittest.TestCase):
                 "history": [{"phase": "DONE", "at": "2026-07-22T00:00:00+00:00"}],
                 # NOTE: no "report_validation" key
             }
-            store.save(data)
+            _write_state(store, data)
 
             with self.assertRaises(Exception) as ctx:
                 sm.emit(data, store)
@@ -67,7 +77,7 @@ class EmitSilentDoneTests(unittest.TestCase):
                 "history": [{"phase": "DONE", "at": "2026-07-22T00:00:00+00:00"}],
                 "report_validation": {"path": "/tmp/report.md"},  # missing sha256/min_sources
             }
-            store.save(data)
+            _write_state(store, data)
 
             with self.assertRaises(sm.StateError) as ctx:
                 sm.emit(data, store)
@@ -75,8 +85,7 @@ class EmitSilentDoneTests(unittest.TestCase):
             self.assertIn("DONE", msg)
             self.assertIn("report_validation", msg)
             self.assertTrue(
-                "sha256" in msg or "min_sources" in msg or "incomplete" in msg.lower()
-                or "missing" in msg.lower(),
+                "sha256" in msg or "min_sources" in msg or "incomplete" in msg.lower() or "missing" in msg.lower(),
                 msg=f"error should name the incomplete proof: {msg!r}",
             )
 

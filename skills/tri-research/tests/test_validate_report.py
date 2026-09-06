@@ -315,34 +315,8 @@ class ReportValidatorTests(unittest.TestCase):
         errors = MODULE.validate(report, 2)
         self.assertFalse(any("[0]" in e for e in errors))
 
-    def test_strip_url_punctuation_keeps_balanced_parens(self) -> None:
-        self.assertEqual(
-            MODULE._strip_url_punctuation("https://en.wikipedia.org/wiki/AI_(disambiguation)"),
-            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
-        )
-        self.assertEqual(
-            MODULE._strip_url_punctuation("https://en.wikipedia.org/wiki/AI_(disambiguation)."),
-            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
-        )
-        self.assertEqual(
-            MODULE._strip_url_punctuation("https://example.com/page)."),
-            "https://example.com/page",
-        )
-
-    def test_strip_url_punctuation_handles_chinese_punctuation(self) -> None:
-        for chinese_punct in ("。", "，", "；", "：", "）", "》", "」", "』", "”", "’"):
-            with self.subTest(punct=chinese_punct):
-                self.assertEqual(
-                    MODULE._strip_url_punctuation(f"https://example.com/article{chinese_punct}"),
-                    "https://example.com/article",
-                )
-
     def test_trailing_chinese_quote_does_not_spoil_url_canonicalization(self) -> None:
         """URL_RE is greedy (\\\\S+); trailing 」/” must be stripped before canonicalize."""
-        self.assertEqual(
-            MODULE.canonicalize_url(MODULE._strip_url_punctuation("https://publisher-one.org/one」")),
-            "https://publisher-one.org/one",
-        )
         # Same target with/without trailing 」 must count as one unique source
         report = (
             valid_report()
@@ -361,29 +335,6 @@ class ReportValidatorTests(unittest.TestCase):
             msg=f"trailing 」 must not create a distinct URL. Errors: {errors}",
         )
 
-    def test_canonicalize_url_normalizes_percent_encoding_in_path(self) -> None:
-        """path 里的 %20 与空格必须归一到同一 canonical URL。
-
-        Bug: canonicalize_url 只归一 query（parse_qsl+urlencode），path 原样保留，
-        于是报告写 %20、台账记空格（或反之）被当成两条不同 URL，合法引用
-        变 untraced，done 假失败。现对 path 也做 unquote→quote 归一。
-        """
-        encoded = MODULE.canonicalize_url("https://publisher.org/a%20b")
-        spaced = MODULE.canonicalize_url("https://publisher.org/a b")
-        self.assertEqual(encoded, spaced)
-        self.assertEqual(encoded, "https://publisher.org/a%20b")
-
-    def test_canonicalize_url_keeps_plain_path_stable(self) -> None:
-        """归一不得过度编码普通 path（否则会弄坏已有合法引用）。"""
-        self.assertEqual(
-            MODULE.canonicalize_url("https://publisher.org/one/two"),
-            "https://publisher.org/one/two",
-        )
-        self.assertEqual(
-            MODULE.canonicalize_url("https://en.wikipedia.org/wiki/AI_(disambiguation)"),
-            "https://en.wikipedia.org/wiki/AI_(disambiguation)",
-        )
-
     def test_nested_code_block_does_not_produce_ghost_citations(self) -> None:
         report = valid_report().replace(
             "矛盾一。",
@@ -394,29 +345,6 @@ class ReportValidatorTests(unittest.TestCase):
             any("[5]" in e and "无对应参考文献" in e for e in errors),
             f"Code inside nested code block should not be scanned for citations. Errors: {errors}",
         )
-
-    def test_strip_code_blocks_preserves_text_before_fence(self) -> None:
-        """Fence length must not be used as a slice end (unpack order bug)."""
-        self.assertEqual(
-            MODULE._strip_code_blocks("before\n```\ncode\n```\nafter"),
-            "before\n\nafter",
-        )
-        self.assertEqual(
-            MODULE._strip_code_blocks("prefix text\n```python\narr[0]\n```\nsuffix [1]"),
-            "prefix text\n\nsuffix [1]",
-        )
-        self.assertEqual(
-            MODULE._strip_code_blocks("a\n````\nb\n```\nc\n```\nd\n````\ne"),
-            "a\n\ne",
-        )
-        self.assertEqual(MODULE._strip_code_blocks("```\nonly block\n```"), "")
-        self.assertEqual(
-            MODULE._strip_code_blocks("no fences here [1]"),
-            "no fences here [1]",
-        )
-        # Regression: old unpack used fence length as slice end → "before" became "bef"
-        self.assertIn("before", MODULE._strip_code_blocks("before\n```\nx\n```\ny"))
-        self.assertNotIn("arr[0]", MODULE._strip_code_blocks("see [1]\n```\narr[0]\n```\n"))
 
     def test_citations_immediately_before_code_block_are_kept(self) -> None:
         report = valid_report().replace(

@@ -28,7 +28,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from validate_report import H1_RE, REFERENCE_RE, URL_RE, _strip_url_punctuation  # noqa: E402
+from _report_parse import Section, parse_reference, parse_report  # noqa: E402
 
 TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
 SEP_ROW_RE = re.compile(r":?-{2,}:?")
@@ -83,18 +83,15 @@ def strip_ref_meta(text: str) -> str:
 
 def render_reference(number: int, entry: str) -> str:
     """一行参考文献 -> \\refitem{N}{作者, "标题", 出处, 年份. \\url{URL}}。"""
-    url_match = URL_RE.search(entry)
-    before = entry[: url_match.start()] if url_match else entry
-    text = strip_ref_meta(before)
+    reference = parse_reference(number, entry)
+    text = strip_ref_meta(reference.prefix)
     if not text:
         text = strip_ref_meta(entry)
     parts = [esc(text)]
-    if url_match:
-        url = _strip_url_punctuation(url_match.group(0))
-        if url:
-            # Use \\url|...| so a literal } in the URL cannot close the argument early.
-            # hyperref treats | as an alternate delimiter; brace form breaks on }.
-            parts.append(r" \url|" + url + "|")
+    if reference.url:
+        # Use \\url|...| so a literal } in the URL cannot close the argument early.
+        # hyperref treats | as an alternate delimiter; brace form breaks on }.
+        parts.append(r" \url|" + reference.url + "|")
     return r"\refitem{%d}{%s}" % (number, "".join(parts))
 
 
@@ -112,6 +109,7 @@ def render_table(lines: list[str]) -> str:
         return ""
     ncols = max(len(r) for r in rows)
     colspec = "p{0.95in}p{2.85in}" if ncols == 2 else "".join(["l"] * ncols)
+
     def _pad(row: list[str]) -> list[str]:
         if len(row) >= ncols:
             return row[:ncols]
@@ -129,13 +127,13 @@ def render_table(lines: list[str]) -> str:
     return "\n".join(out)
 
 
-def render_section(title: str, lines: list[str]) -> str:
+def render_section(section: Section) -> str:
     """章节 body -> LaTeX。跳过 ``![...]`` 图片行（drawio 框架图）。"""
+    title, lines = section.title, section.lines
     if title == "参考文献":
-        refs = [(int(number), entry) for number, entry in REFERENCE_RE.findall("\n".join(lines))]
-        if not refs:
+        if not section.references:
             raise RenderError("参考文献章节无有效条目")
-        items = "\n\n".join(render_reference(n, e) for n, e in refs)
+        items = "\n\n".join(render_reference(r.number, r.entry) for r in section.references)
         return r"\section{%s}" % esc(title) + "\n\n" + items + "\n"
 
     blocks: list[str] = []
@@ -181,17 +179,10 @@ def render_section(title: str, lines: list[str]) -> str:
     return r"\section{%s}" % esc(title) + ("\n\n" + body if body else "") + "\n"
 
 
-def split_sections(text: str) -> tuple[str, list[str]]:
-    """把报告拆成 (H1 标题, [(章节名, 行)...])。标题之前的内容按前言保留。"""
-    heading = H1_RE.search(text)
-    title = heading.group(1) if heading else ""
-    sections: list[tuple[str, list[str]]] = []
-    for part in re.split(r"(?m)^(?=## )", text):
-        if not part.startswith("## "):
-            continue
-        title_line, _, body = part[3:].partition("\n")
-        sections.append((title_line.strip(), body.splitlines()))
-    return title, sections
+def split_sections(text: str) -> tuple[str, list[Section]]:
+    """把报告拆成 (H1 标题, [Section...])——切分规则归 _report_parse。"""
+    parsed = parse_report(text)
+    return parsed.title, parsed.sections
 
 
 def font_block(fonts_dir: Path | None) -> str:
@@ -230,7 +221,7 @@ HEADER_FOOTER = r"""
 """
 
 
-def build_document(title: str, sections: list[tuple[str, list[str]]], fonts_dir: Path | None) -> str:
+def build_document(title: str, sections: list[Section], fonts_dir: Path | None) -> str:
     """组装 XeLaTeX 书样文档（自包含内置模板）。"""
     safe_title = esc(title)
     template = r"""% !TEX program = xelatex
@@ -288,7 +279,7 @@ __BODY__
         r"{\rmfamily\fontsize{7.5}{10}\selectfont\color{SecondaryInk} 排版：XeLaTeX · 5×8 英寸}"
         r"\end{titlepage}\setcounter{page}{1}"
     )
-    body = "\n\n".join(render_section(t, lines) for t, lines in sections)
+    body = "\n\n".join(render_section(section) for section in sections)
     return (
         template.replace("__FONTS__", font_block(fonts_dir))
         .replace("__TITLE__", safe_title)
@@ -349,7 +340,9 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
     parser.add_argument("-o", "--output", type=Path, help="输出 .tex 路径 (default: 报告同目录 .tex)")
-    parser.add_argument("--fonts-dir", type=Path, default=None, help="思源字体目录 (含 SourceHanSerifCN-Regular.otf 等)")
+    parser.add_argument(
+        "--fonts-dir", type=Path, default=None, help="思源字体目录 (含 SourceHanSerifCN-Regular.otf 等)"
+    )
     parser.add_argument("--no-compile", action="store_true", help="只生成 .tex，不自动编译 PDF")
     parser.add_argument("--engine", default=None, help="xelatex 路径/命令 (default: 自动探测)")
     return parser
@@ -364,7 +357,7 @@ def run(args: argparse.Namespace) -> int:
     except (OSError, UnicodeDecodeError) as exc:
         raise RenderError(f"cannot read report: {exc}") from exc
     title, sections = split_sections(text)
-    if not any(section_title == "参考文献" for section_title, _ in sections):
+    if not any(section.title == "参考文献" for section in sections):
         raise RenderError(f"not a research report: no 参考文献 section in {report_path}")
     output_path = (args.output or default_output(report_path)).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)

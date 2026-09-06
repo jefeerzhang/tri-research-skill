@@ -13,15 +13,15 @@
 也是 ``state_machine.py done`` 的硬门禁：报告里每条引用 URL 经统一归一化
 后必须能在台账命中，untraced 即失败。
 
-密钥、报告与状态机的契约分别由 state_machine.py / validate_report.py 负责；
-本模块只管台账的写入与查询，不解析报告、不调用任何搜索后端。
+报告的解析归 _report_parse.py（与验收器、外壳同一份语法），密钥与状态机的契约
+归 state_machine.py / validate_report.py；本模块只管台账的写入与比对，
+不调用任何搜索后端。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -36,17 +36,14 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 from _common import StateError, now_iso  # noqa: E402
+from _report_parse import canonicalize_url, parse_report  # noqa: E402
 from state_machine import (  # noqa: E402
     StateStore,
     default_state_dir,
     validate_session_id,
 )
 from validate_report import (  # noqa: E402
-    REFERENCE_RE,
-    URL_RE,
     ReportValidationError,
-    _strip_url_punctuation,
-    canonicalize_url,
     sha256_bytes,
 )
 
@@ -65,6 +62,26 @@ class LedgerMissingError(LedgerIntegrityError):
 
 class LedgerTamperedError(LedgerIntegrityError):
     """The ledger bytes changed after the DONE proof recorded its fingerprint."""
+
+
+class EvidenceAuditFailed(StateError):
+    """Evidence Audit found report references with no ledger hit.
+
+    Owns the one sentence both callers must agree on — the ``untraced/total``
+    count — and carries the pairs themselves, so each caller appends only its
+    own layer (the `done` gate adds the detail list, the `audit` command adds
+    the registration guidance). Subclasses StateError because `done` raises it
+    from inside the state machine, whose CLI catches that class.
+    """
+
+    def __init__(self, untraced: list[tuple[int, str]], total: int) -> None:
+        super().__init__(f"evidence audit failed: {len(untraced)}/{total} reference URL(s) untraced")
+        self.untraced = untraced
+        self.total = total
+
+    def detail(self) -> str:
+        """Full detail list for the DONE gate — no truncation by design."""
+        return "; ".join(f"[{number}] {url}" for number, url in self.untraced)
 
 
 def evidence_path(store: StateStore, session_id: str) -> Path:
@@ -175,30 +192,21 @@ def load_records(path: Path) -> list[dict[str, Any]]:
 def report_reference_urls(report_path: Path) -> dict[int, str]:
     """Extract canonical reference URLs (number → canonical URL) from a report.
 
-    Same extraction recipe as ``validate_report.validate`` — REFERENCE_RE
-    scoped to the 参考文献 section, then _strip_url_punctuation +
-    canonicalize_url — so both sides of the audit share one URL dialect
-    and cannot drift apart. Entries whose URL fails canonicalization are
-    omitted here; the structural validator already rejects those reports.
+    The whole grammar comes from :func:`_report_parse.parse_report` — the same
+    seam the structural gate reads — so the audit and the gate cannot drift
+    apart about which URL a reference carries. Entries whose URL fails
+    canonicalization are omitted here; the validator already rejects those
+    reports before ``done`` reaches this point.
     """
     try:
         text = report_path.read_text(encoding="utf-8")
     except OSError as exc:
         raise StateError(f"cannot read report: {exc}") from exc
-    references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
-    next_section = re.search(r"(?m)^## ", references_text)
-    if next_section:
-        references_text = references_text[: next_section.start()]
-    urls: dict[int, str] = {}
-    for number, entry in REFERENCE_RE.findall(references_text):
-        url_match = URL_RE.search(entry)
-        if not url_match:
-            continue
-        raw_url = _strip_url_punctuation(url_match.group(0))
-        canonical_url = canonicalize_url(raw_url)
-        if canonical_url is not None:
-            urls[int(number)] = canonical_url
-    return urls
+    return {
+        reference.number: reference.canonical_url
+        for reference in parse_report(text).references
+        if reference.canonical_url is not None
+    }
 
 
 def ledger_urls(records: list[dict[str, Any]]) -> set[str]:
@@ -215,24 +223,20 @@ def audit_report(
     store: StateStore,
     session_id: str,
     report_path: Path,
-) -> tuple[list[tuple[int, str]], int]:
+) -> int:
     """Evidence Audit: report references against the session ledger.
 
-    Returns ``(untraced, total)`` where ``untraced`` is a sorted list of
-    ``(reference_number, canonical_url)`` pairs with no ledger hit and
-    ``total`` is the number of canonical reference URLs extracted. An
+    Returns the number of canonical reference URLs checked; raises
+    :class:`EvidenceAuditFailed` when any of them has no ledger hit. An
     empty/missing ledger is not special-cased: it makes every reference
     untraced. Raises StateError for a corrupt ledger or unreadable report.
     """
     known = ledger_urls(load_records(evidence_path(store, session_id)))
     reference_urls = report_reference_urls(report_path)
     untraced = [(number, url) for number, url in sorted(reference_urls.items()) if url not in known]
-    return untraced, len(reference_urls)
-
-
-def format_untraced(untraced: list[tuple[int, str]]) -> str:
-    """Full detail string for an audit failure — no truncation by design."""
-    return "; ".join(f"[{number}] {url}" for number, url in untraced)
+    if untraced:
+        raise EvidenceAuditFailed(untraced, len(reference_urls))
+    return len(reference_urls)
 
 
 def _print_summary(records: list[dict[str, Any]]) -> None:
@@ -350,16 +354,15 @@ def run(args: argparse.Namespace) -> int:
         report_path = args.report.expanduser()
         if not report_path.is_file():
             raise StateError(f"report does not exist: {report_path}")
-        untraced, total = audit_report(store, session_id, report_path)
-        if untraced:
-            # Full detail list, untruncated: the caller (Lead Agent) needs
-            # exactly these to know which references to register.
-            for number, url in untraced:
+        try:
+            total = audit_report(store, session_id, report_path)
+        except EvidenceAuditFailed as exc:
+            # Full detail, one line per miss: the caller (Lead Agent) needs
+            # exactly these to know which references to register. The count
+            # sentence itself is the exception's — `done` says the same thing.
+            for number, url in exc.untraced:
                 print(f"UNTRACED:[{number}] {url}")
-            raise StateError(
-                f"evidence audit failed: {len(untraced)}/{total} reference URL(s) untraced; "
-                "register them via 'evidence.py add' before done"
-            )
+            raise StateError(f"{exc}; register them via 'evidence.py add' before done") from exc
         print(f"OK:all {total} reference URL(s) traced to the evidence ledger")
         return 0
 
