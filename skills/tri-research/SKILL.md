@@ -4,7 +4,7 @@ description: |
   多源带引用深度研究：并行子代理 + 六个搜索后端 + 证据台账，产出可通过硬门禁验收的中英双语研究报告。
   触发：深度研究 / 多元研究 / 文献综述 / 研究报告；需要 10+ 可核验来源；多实体或多视角对比分析。
   不适用：简单事实查询、单一本地代码问题。
-version: "6.8.0"
+version: "6.9.0"
 ---
 
 ## 触发条件
@@ -56,6 +56,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 ```
 
 `start` 会机器检查 Exa（`EXA_API_KEY` + `exa-py`）与 SciVerse（`SCIVERSE_API_TOKEN` + `sciverse`），并对 SerpApi 解析 `SERPAPI_KEY` + 做一次轻量探活；未配置或探活失败则 `ERROR:` 退出、不建会话——须先按「首次使用引导」配齐再开跑。
+
 | 类型         | 是否派子代理 | 执行方式                                                              |
 | ------------ | ------------ | --------------------------------------------------------------------- |
 | 简单问题     | 不派         | Lead 直接搜全部维度                                                   |
@@ -139,7 +140,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 | **AnySearch**         | Lead Agent + 子代理 | 通用网页 + 垂直领域（CLI-only，3.1 版，public HTTP） | **必选（建议配置）** (`recommended`，匿名可用) |
 | **SciVerse**          | Lead Agent + 子代理 | 学术论文（Python SDK 必选）                          | **必选** (`required`)                          |
 | **Tavily**            | Lead Agent          | 深度网页搜索与提取                                   | 可选 (`optional`)                              |
-| **SerpApi**           | Lead Agent          | Google Scholar（间接）与垂直 SERP                   | **必选** (`required`，Key + 探活)              |
+| **SerpApi**           | Lead Agent          | Google Scholar（间接）与垂直 SERP                    | **必选** (`required`，Key + 探活)              |
 | **Runtime WebSearch** | Lead Agent          | 通用补充（宿主内置抽象，不等于 Tavily）              | 可选 (`optional`)                              |
 
 硬门禁：`required`（Exa / SciVerse）在 `state_machine start` 前机器强制（缺 Key 或 SDK → `StateError`，无用户降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前机器强制（Key 可解析 + 轻量探活成功，ADR-0007）。`recommended`（AnySearch）缺失 → 黄字提醒但允许匿名；`optional` 不可用 → 静默跳过，单源失败不阻断。Exa / SciVerse / SerpApi / AnySearch 为**必选搜索源**（AnySearch 为 `recommended` 允许匿名）。
@@ -150,14 +151,14 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 研究开始前检测各源可用性并汇总。**Exa / SciVerse / SerpApi 未配齐或探活失败则 `start` 直接失败**——须先安装 SDK、申请 Key 并写入环境变量（或 `.env` / `$SCIVERSE_HOME/.env`）。`recommended` / `optional` 未装 → 黄字或静默跳过，不拦研究。无子代理时 Lead 直接用所有可用源搜。
 
-| 源            | 安装                                                         | 验证                                                             | 必要性                                                                        |
-| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Exa**       | `pip install exa-py` → `export EXA_API_KEY=<key>`            | `python scripts/exa_search.py check`                             | **必选** (`required`) — https://dashboard.exa.ai/api-keys                     |
-| **AnySearch** | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | `<cmd> search "test" --max_results 1`（`<cmd>` 探测见下）        | **必选（建议配置）** (`recommended`) — https://anysearch.com/console/api-keys |
-| **SciVerse**  | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` | **必选** (`required`) — https://sciverse.space/docs#auth                      |
-| **Tavily**    | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        | 可选                                                                          |
-| **SerpApi**   | `pip install requests` → `export SERPAPI_KEY=<key>` | `python skills/serpapi/scripts/serpapi_cli.py check`            | **必选** (`required`) — https://serpapi.com/dashboard                         |
-| **Runtime WebSearch** | 宿主内置，无需配置                                    | —                                                                | 可选                                                                          |
+| 源                    | 安装                                                         | 验证                                                             | 必要性                                                                        |
+| --------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Exa**               | `pip install exa-py` → `export EXA_API_KEY=<key>`            | `python scripts/exa_search.py check`                             | **必选** (`required`) — https://dashboard.exa.ai/api-keys                     |
+| **AnySearch**         | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | `<cmd> search "test" --max_results 1`（`<cmd>` 探测见下）        | **必选（建议配置）** (`recommended`) — https://anysearch.com/console/api-keys |
+| **SciVerse**          | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` | **必选** (`required`) — https://sciverse.space/docs#auth                      |
+| **Tavily**            | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        | 可选                                                                          |
+| **SerpApi**           | `pip install requests` → `export SERPAPI_KEY=<key>`          | `python skills/serpapi/scripts/serpapi_cli.py check`             | **必选** (`required`) — https://serpapi.com/dashboard                         |
+| **Runtime WebSearch** | 宿主内置，无需配置                                           | —                                                                | 可选                                                                          |
 
 ### 工具调用（子代理经 Bash 调外部 CLI，独立进程不能直接用内部工具）
 
