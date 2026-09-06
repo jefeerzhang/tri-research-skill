@@ -55,7 +55,7 @@ def _exa_normalize_result(result: Any) -> dict[str, Any]:
     return {
         "title": result.title,
         "url": result.url,
-        "snippet": text[:500],
+        "snippet": _search_cli.truncate(text, _search_cli.SNIPPET_LIMIT),
         "published_date": str(published) if published else "",
     }
 
@@ -119,7 +119,7 @@ def _exa_contents(client: Any, args: Any) -> list[dict[str, Any]]:
         {
             "url": p.url,
             "title": getattr(p, "title", ""),
-            "text": (getattr(p, "text", None) or "")[:5000],
+            "text": _search_cli.truncate(getattr(p, "text", None), _search_cli.CONTENT_LIMIT),
         }
         for p in resp.results
     ]
@@ -148,7 +148,7 @@ EXA_BACKEND.commands = [
 # Register with global Registry (expand step #7 keeps old path working; new
 # callers can use REGISTRY.search("exa", ...) for uniform SearchResult).
 try:
-    REGISTRY.register(BackendSpec(name="exa", backend=EXA_BACKEND, env_key="EXA_API_KEY"))
+    REGISTRY.register(BackendSpec(name="exa", backend=EXA_BACKEND))
 except ValueError:
     pass  # already registered (re-import in tests with sys.modules["tavily"] blocked)
 
@@ -163,7 +163,7 @@ def _tavily_normalize_result(result: dict[str, Any]) -> dict[str, Any]:
         "title": result.get("title", ""),
         "url": result.get("url", ""),
         "snippet": result.get("snippet", ""),
-        "content": (result.get("content") or "")[:5000],
+        "content": _search_cli.truncate(result.get("content"), _search_cli.CONTENT_LIMIT),
         "score": result.get("score"),
     }
 
@@ -252,7 +252,7 @@ TAVILY_BACKEND.commands = [
 ]
 
 try:
-    REGISTRY.register(BackendSpec(name="tavily", backend=TAVILY_BACKEND, env_key="TAVILY_API_KEY"))
+    REGISTRY.register(BackendSpec(name="tavily", backend=TAVILY_BACKEND))
 except ValueError:
     pass
 

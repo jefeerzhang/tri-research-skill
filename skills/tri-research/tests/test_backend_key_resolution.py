@@ -11,6 +11,7 @@ resolution to KeyProvider; the priority rules themselves (cli > env >
 
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import os
@@ -71,13 +72,34 @@ class BackendKeyResolutionTests(unittest.TestCase):
         self.assertEqual(client, {"key": "k-from-envfile"})
         mocked.assert_called_once_with(None, ENV_KEY, self.backend.env_file)
 
-    def test_client_missing_everywhere_keeps_error_shape(self) -> None:
+    def test_client_missing_everywhere_raises_key_missing(self) -> None:
+        # client() no longer prints: the failure is typed, and each lane
+        # renders its own dialect (search / check / managed / gate).
         buf = io.StringIO()
         with self._patch_resolve(None), redirect_stdout(buf):
-            with self.assertRaises(SystemExit) as ctx:
+            with self.assertRaises(_search_cli.KeyMissing) as ctx:
                 self.backend.client()
+        self.assertEqual(str(ctx.exception), f"{ENV_KEY} not set")
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_search_lane_still_renders_json_error_and_exit_1(self) -> None:
+        buf = io.StringIO()
+        args = argparse.Namespace(query="q", no_proxy=False)
+        with self._patch_resolve(None), redirect_stdout(buf):
+            with self.assertRaises(SystemExit) as ctx:
+                _search_cli.search(self.backend, args)
         self.assertEqual(ctx.exception.code, 1)
         self.assertEqual(json.loads(buf.getvalue()), {"error": f"{ENV_KEY} not set"})
+
+    def test_missing_sdk_is_reported_before_missing_key(self) -> None:
+        # ADR-0002 order: an unset key cannot be fixed into a working client
+        # while the SDK is missing, so the actionable message comes first.
+        self.backend.sdk = None
+        buf = io.StringIO()
+        with self._patch_resolve(None), redirect_stdout(buf):
+            with self.assertRaises(_search_cli.SdkMissing) as ctx:
+                self.backend.client()
+        self.assertEqual(str(ctx.exception), "fake-sdk not installed")
 
     def test_check_delegates_to_key_provider(self) -> None:
         with self._patch_resolve("k-from-envfile"):
@@ -91,6 +113,16 @@ class BackendKeyResolutionTests(unittest.TestCase):
         with self._patch_resolve(None), redirect_stdout(buf):
             _search_cli.check(self.backend)
         self.assertEqual(json.loads(buf.getvalue()), {"available": False, "error": f"{ENV_KEY} not set"})
+
+    def test_check_reports_factory_failure_instead_of_traceback(self) -> None:
+        def broken_factory(_key: str):
+            raise RuntimeError("sdk build failed")
+
+        self.backend.client_factory = broken_factory
+        buf = io.StringIO()
+        with self._patch_resolve("k"), redirect_stdout(buf):
+            _search_cli.check(self.backend)
+        self.assertEqual(json.loads(buf.getvalue()), {"available": False, "error": "sdk build failed"})
 
 
 class BackendEnvFileDeclarationTests(unittest.TestCase):

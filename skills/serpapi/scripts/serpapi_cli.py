@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """SerpApi CLI wrapper for tri-research.
 
-Self-contained: declares the SerpApi backend, key-loading helpers, proxy
-handling, fetch client, and all five commands (search / check /
-batch_search / doc / engines / export) here. Lives next to the wrapper
+Self-contained: declares the SerpApi backend, its key/proxy dialect (the
+resolution itself lives in the shared `Backend.api_key`), the fetch client,
+and all commands (search / check / batch_search / doc / engines / export)
+here. Lives next to the wrapper
 (rather than in `tri-research/scripts/search_backends.py`) so the shared
 search-backend module stays symmetric across the Exa / Tavily / SerpApi
 shape — SerpApi's extra commands and key/proxy plumbing would otherwise
 dominate that module and obscure the Exa + Tavily skeleton.
 
-External command path (`python serpapi_cli.py search ...`) and JSON
+External command path (`python serpapi_cli.py search ...`) and success
 output shape are unchanged from 6.5.0; existing callers, sub-agents and
-tests keep working.
+tests keep working. A missing key now fails fast on every command (older
+`batch_search` reported one error per query and still exited 0).
 """
 
 from __future__ import annotations
@@ -72,16 +74,33 @@ class SerpApiError(Exception):
         self.exit_code = exit_code
 
 
-def load_key(cli_key: str | None = None) -> str | None:
-    """Resolve via KeyProvider (cli > env > this skill's .env), like Exa/Tavily.
+# SerpApi's dialect for a missing key: stderr hint + exit 1, not the JSON error
+# the other wrappers print. Two places say it (the fetch path when reached
+# directly, and the CLI commands), so it is spelled once.
+NO_KEY_HINT = "\n".join(
+    (
+        "No SerpApi key found. Set SERPAPI_KEY env var, add it to .env (SERPAPI_KEY=...), or pass --api_key.",
+        "Get a free key at https://serpapi.com/dashboard",
+    )
+)
 
-    The historical ImportError fallback + local `_key_from_env_file` copy
-    are gone: unreachable (the top-level `_search_cli` import above shares
-    its directory with `_search_registry`), same rationale as ADR-0002.
+
+def resolve_key(backend: Any, args: Any) -> str:
+    """SerpApi dialect for the shared bootstrap: proxy clearing + key via Backend.
+
+    ``--no-proxy`` and the cli > env > ``.env`` resolution belong to
+    ``Backend.api_key`` / ``_search_cli.wants_no_proxy`` (one home; this skill
+    no longer spells out its own ``.env`` path here). What stays local is only
+    what a missing key *looks like*: SerpApi has always answered with a stderr
+    hint and exit 1 rather than the JSON error the other wrappers print.
     """
-    from _search_registry import KeyProvider  # noqa: E402 — deferred like _backend_api_key
-
-    return KeyProvider.resolve(cli_key, "SERPAPI_KEY", Path(__file__).resolve().parents[1] / ".env")
+    if _search_cli.wants_no_proxy(args):
+        _search_cli.clear_proxy_vars()
+    try:
+        return backend.api_key(cli_key=args.api_key)
+    except _search_cli.KeyMissing:
+        sys.stderr.write(NO_KEY_HINT + "\n")
+        sys.exit(1)
 
 
 def build_tbs(since: str | None) -> str | None:
@@ -118,12 +137,7 @@ def _serpapi_fetch(
     if requests is None:
         raise SerpApiError("Missing dependency: requests. Install with: pip install requests", 2)
     if not api_key:
-        raise SerpApiError(
-            "No SerpApi key found. Set SERPAPI_KEY env var, add it to .env "
-            "(SERPAPI_KEY=...), or pass --api_key.\n"
-            "Get a free key at https://serpapi.com/dashboard",
-            1,
-        )
+        raise SerpApiError(NO_KEY_HINT, 1)
     params: dict[str, Any] = {"engine": engine, "q": query, "api_key": api_key, "output": "json"}
     if hl:
         params["hl"] = hl
@@ -208,9 +222,7 @@ def _serpapi_print_human(data: dict[str, Any]) -> None:
 
 
 def _serpapi_cmd_search(backend: Any, args: Any) -> None:
-    if getattr(args, "no_proxy", False):
-        _search_cli.clear_proxy_vars()
-    api_key = load_key(args.api_key)
+    api_key = resolve_key(backend, args)
     data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend)
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -219,9 +231,9 @@ def _serpapi_cmd_search(backend: Any, args: Any) -> None:
 
 
 def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
-    if getattr(args, "no_proxy", False):
-        _search_cli.clear_proxy_vars()
-    api_key = load_key(args.api_key)
+    # A missing key fails the whole run (like the shared batch path for
+    # Exa / Tavily) instead of emitting one error per query and exiting 0.
+    api_key = resolve_key(backend, args)
     # SerpApi's per-query value is always an object: {"results": [...]} on
     # success, {"error": "..."} on failure — consumers of THIS CLI never need
     # type-switching. This does NOT match the generic _search_cli batch path
@@ -248,9 +260,9 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
 
 
 def _serpapi_cmd_export(args: Any) -> None:
-    if getattr(args, "no_proxy", False):
-        _search_cli.clear_proxy_vars()
-    api_key = load_key(args.api_key)
+    # Unmanaged commands receive only `args` (ADR-0002), so this one reaches
+    # for the module singleton instead of a passed-in backend.
+    api_key = resolve_key(SERPAPI_BACKEND, args)
     data = _serpapi_fetch_cli(
         args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=SERPAPI_BACKEND
     )
@@ -351,7 +363,7 @@ class SerpApiBackend(_search_cli.Backend):
     missing_sdk_message = "requests not installed"
     env_key = "SERPAPI_KEY"
     # This skill's own .env, declared here so KeyProvider needs no layout
-    # knowledge (ADR-0004) — matches load_key's env_file below.
+    # knowledge (ADR-0004) — the only place this file names the path.
     env_file = Path(__file__).resolve().parents[1] / ".env"
     client_factory = staticmethod(_serpapi_make_client)
     call_timeout = 60.0
@@ -403,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
 try:
     from _search_registry import REGISTRY, BackendSpec  # noqa: E402
 
-    REGISTRY.register(BackendSpec(name="serpapi", backend=SERPAPI_BACKEND, env_key="SERPAPI_KEY"))
+    REGISTRY.register(BackendSpec(name="serpapi", backend=SERPAPI_BACKEND))
 except (ImportError, ValueError):
     pass
 

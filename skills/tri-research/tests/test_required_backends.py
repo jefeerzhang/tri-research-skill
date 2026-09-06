@@ -13,16 +13,23 @@ from unittest import mock
 
 from _test_helpers import load_module, patch_required_backends
 
+import _search_cli  # noqa: E402 — _test_helpers puts scripts/ on sys.path
+
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
 
-class _FakeSerpApiBackend:
+class _FakeSerpApiBackend(_search_cli.Backend):
     """Minimal stand-in for SerpApiBackend, used to isolate the gate seam.
 
     `_get_serpapi_backend` is patched to return one of these so the real
     ``serpapi_cli`` is never imported and the probe never touches the network.
+    Subclassing the shared ``Backend`` is deliberate: the gate assembles the
+    client through ``Backend.client()``, so a duck-typed stand-in would drift
+    from what production actually does.
     """
 
+    name = "SerpApi"
+    env_key = "SERPAPI_KEY"
     env_file = Path("serpapi.env")
     sdk = object()  # truthy → treat as "requests" installed
     missing_sdk_message = "requests not installed"
@@ -45,9 +52,7 @@ class _FakeSerpApiBackend:
 class RequiredBackendsGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.rb = load_module(SCRIPTS_DIR / "required_backends.py", "required_backends_gate_test")
-        self._serpapi_patch = mock.patch.object(
-            self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend()
-        )
+        self._serpapi_patch = mock.patch.object(self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend())
         self._serpapi_patch.start()
         self.addCleanup(self._serpapi_patch.stop)
 
@@ -97,9 +102,11 @@ class RequiredBackendsGateTests(unittest.TestCase):
         self.assertIn("serpapi_cli.py", msg)
 
     def test_serpapi_probe_failure_raises(self) -> None:
-        with mock.patch.object(self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend(
-            probe_error=RuntimeError("HTTP 401: API key not valid")
-        )):
+        with mock.patch.object(
+            self.rb,
+            "_get_serpapi_backend",
+            return_value=_FakeSerpApiBackend(probe_error=RuntimeError("HTTP 401: API key not valid")),
+        ):
             with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
                 with mock.patch.object(self.rb, "_sdk_importable", return_value=True):
                     with self.assertRaises(self.rb.StateError) as ctx:

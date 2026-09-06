@@ -80,7 +80,7 @@ def _registry_with_fake(**overrides) -> tuple[SearchBackendRegistry, FakeBackend
         setattr(fb, k, v)
     from _search_registry import BackendSpec
 
-    reg.register(BackendSpec(name="fake", backend=fb, env_key="FAKE_REGISTRY_KEY"))
+    reg.register(BackendSpec(name="fake", backend=fb))
     return reg, fb
 
 
@@ -232,7 +232,7 @@ class RegistryBatchTests(unittest.TestCase):
         flaky = Flaky()
         from _search_registry import BackendSpec
 
-        reg.register(BackendSpec(name="flaky", backend=flaky, env_key="FAKE_REGISTRY_KEY"))
+        reg.register(BackendSpec(name="flaky", backend=flaky))
         out = reg.batch_search("flaky", ["bad", "good"])
         self.assertIn("error", out["bad"])  # type: ignore[typeddict-item]
         self.assertIsInstance(out["good"], list)
@@ -276,6 +276,27 @@ class KeyProviderTests(unittest.TestCase):
         _search_cli.clear_proxy_vars()
         self.assertNotIn("HTTP_PROXY", os.environ)
         self.assertNotIn("https_proxy", os.environ)
+
+
+class RegistryBootstrapTests(unittest.TestCase):
+    """Client setup belongs to Backend.client(); the Registry lane only relays it."""
+
+    def setUp(self) -> None:
+        self.saved = os.environ.pop("FAKE_REGISTRY_KEY", None)
+
+    def tearDown(self) -> None:
+        if self.saved is not None:
+            os.environ["FAKE_REGISTRY_KEY"] = self.saved
+
+    def test_batch_fails_fast_once_when_key_is_missing(self) -> None:
+        reg, fb = _registry_with_fake()
+        with self.assertRaises(_search_cli.ClientSetupError):
+            reg.batch_search("fake", ["one", "two"])
+        self.assertEqual(fb.calls, 0)  # never reached a query, let alone N error dicts
+
+    def test_check_reports_missing_key_as_unavailable(self) -> None:
+        reg, _ = _registry_with_fake()
+        self.assertEqual(reg.check("fake"), {"available": False, "error": "FAKE_REGISTRY_KEY not set"})
 
 
 if __name__ == "__main__":
