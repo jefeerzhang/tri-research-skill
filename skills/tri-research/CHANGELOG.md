@@ -2,6 +2,23 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **报告语法收成单一 seam（`scripts/_report_parse.py`）**：章节切分、参考文献字段、行内标记、围栏判定与 URL 方言此前有 **4 份**平行实现——`validate_report.py`（判定）、`render_tex.py`（排版）、`evidence.py::report_reference_urls`（对账）、`tests/_test_helpers.py`（测试夹具），同一份文本按「谁在读」给出不同答案；`render_tex` 还 import 了 `validate_report` 的私有 `_strip_url_punctuation`。现在四方穿过同一个 `parse_report`（并新增可单条复用的 `parse_reference`）：验收器只留判定、渲染器只留排版、evidence 只留台账比对、夹具不再自带正则。`canonicalize_url` / `strip_url_punctuation` / `strip_code_blocks` / `REFERENCE_RE` / `URL_RE` / `H1_RE` 等从 `validate_report` 迁入，其私有 helpers 随之退役。术语见 `CONTEXT.md`「Report Parse」。回归：`tests/test_report_parse.py`（含「语法只能有一个家」源码闸门）。
+- **客户端装配收成 `Backend.client()` 单一出处**：「查 SDK → 解 key → 建 client」原先抄了 8 份（`_search_cli` 的 client / check / managed、Registry 的 `_resolve_backend` / search / check、`required_backends._serpapi_gap`、serpapi `load_key`），每份自己决定「第一次请求之前什么算不可用」。现在条件只在 `Backend.client()` 判定，失败以 `ClientSetupError`（`SdkMissing` / `KeyMissing`）抛出，输出方言仍归各条命令；SerpApi 只用 `Backend.api_key()` 半边。顺带删除 `BackendSpec.env_key`（ADR-0004 之后与 `Backend.env_key` 重复申报的死字段）与 serpapi `load_key` 里自拼的 `.env` 路径，`_run_with_timeout` 改公开名 `run_with_timeout`。决策见 `docs/adr/0008-客户端装配与截断上限各收进单一出处.md`。回归：`tests/test_backend_key_resolution.py`、`tests/test_search_registry.py::RegistryBootstrapTests`、`tests/test_host_helpers.py::ClientBootstrapConsolidationTests`。
+- **截断上限收成单一出处**：`SNIPPET_LIMIT=500` / `CONTENT_LIMIT=5000` 与 `truncate()` 现在只住在 `_search_cli`，Registry 与 `search_backends` 两条泳道共读——此前各存一份，同一条结果从哪条泳道取回就被截成不同长度。源码闸门钉住「上限声明全仓一次、两条泳道不得手写字段切片」。回归：`tests/test_host_helpers.py::ResultTruncationConsolidationTests`。
+- **`StateStore` 写入接口收窄**：公开的 `store.save(data)` 是绕过阶段迁移与写锁直接落盘 state JSON 的后门，`set_params` / `extend` / `complete` 各自手抄「取锁 → load → 改 → save」四行。改为私有 `_save` + 新增私有 `_transaction(session_id)` 上下文管理器（锁、load、正常退出才落盘三件事收进一处），三个变更命令只剩校验与改数据；`write_lock` 保持公开——`evidence.append_records` 需要它把台账追加与变更命令串行化，但它不写 state JSON。**行为变化**：门禁拒绝（阶段不符 / 报告不合法 / 溯源未过）时 state JSON 完全不动，不再可能留下半成品迁移。`complete` 的 `clear_active` 移到 DONE 落盘之后执行（顺序不变，只是不再占会话锁）。伪造损坏 state 的两个测试改用直接写 JSON 的夹具，不再借道产品代码。
+- **Evidence Audit 失败句收成 `EvidenceAuditFailed`**：`X/Y reference URL(s) untraced` 这句计数原先在 `audit` 命令与 `done` 门禁各写一遍，`format_untraced` 是它们的公共零件。现在失败句、`untraced` 明细与 `total` 都住在 `EvidenceAuditFailed`（`StateError` 子类，故 `done` 捕得到），两个消费方各自只追加自己的半句（指引登记 / 打印明细）。**未采纳**把 `done` 的报告验收与溯源对账合并成单一 `completion_gate`：两者的失败语义与修复路径不同（改报告 vs 补台账），合并只会得到一个返回混合错误列表的宽接口。回归：`tests/test_evidence.py::EvidenceAuditTests::test_audit_gate_is_callable_as_a_unit` / `test_both_commands_quote_the_gate_sentence_verbatim`。
+
+### Fixed
+
+- **`### 参考文献` 劫持参考文献切片**：参考文献正文范围用未锚定的 `text.split("## 参考文献")` 取，而章节存在性检查用锚定的 `^## ` 正则——正文里出现三级标题「### 参考文献」时切片点落在错误位置，该标题之后的全部内容都被当成参考文献条目，触发一连串编号 / 缺 URL / 未引用误报。现统一由 `parse_report` 以行首锚定的 `SECTION_SPLIT_RE` 切一次，每个 `Section` 自带其 `references`。
+- **SerpApi 缺 key 时批量检索静默成功**：`_serpapi_cmd_batch_search` 在循环里解析密钥，未配置 `SERPAPI_KEY` 时每条 query 各产一份 `{"error": …}`，命令**仍以 0 退出**——一次可行动的失败被摊成 N 份输出。现密钥在发出第一条请求前决定（`resolve_key` → `Backend.api_key()`），失败即 stderr 提示 + exit 1。`Registry.batch_search` 同类问题一并修掉：装配失败不再逐 query 复制，直接向上抛。回归：`skills/serpapi/tests/test_serpapi_cli.py::SerpApiRetryTests::test_batch_search_fails_fast_before_any_fetch`。
+- **`skills/serpapi/tests/test_serpapi_cli.py` 直跑漏测**：`if __name__ == "__main__": unittest.main()` 夹在类之间，直接运行该文件只执行到第一个测试类，后面两个类被静默跳过（`unittest discover` 跑的是全部，故 CI 一直是绿的）。入口移到文件末尾。
+- **helper 级语法测试随语法搬家**：`test_validate_report.py` 里直接调 `_strip_url_punctuation` / `canonicalize_url` / `_strip_code_blocks` 的 5 条用例迁入 `test_report_parse.py`（6.8.0 两条记录指向的 `ReportValidatorTests::test_canonicalize_url_normalizes_percent_encoding_in_path` 等，现为 `test_report_parse.py::UrlDialectTests::test_percent_encoding_in_path_is_normalized`）；验收器测试只留 `validate()` 的判定回归。
+
 ## [6.8.0] - 2026-09-04
 
 ### Changed
