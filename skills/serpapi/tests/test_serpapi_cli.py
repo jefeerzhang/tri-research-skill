@@ -7,17 +7,21 @@ and its value is wrongly returned as THE key.
 
 Both bugs lived in serpapi_cli's local `_key_from_env_file`, which
 candidate 5 deleted: parsing now lives solely in
-`_search_registry._key_from_env_file` (consumed via KeyProvider by
-load_key). These tests pin the shared implementation from the consumer
-side, keeping the historical bug coverage alive.
+`_search_registry._key_from_env_file` (consumed via KeyProvider, reached
+through the shared `Backend.api_key` by serpapi_cli's `resolve_key`). These
+tests pin the shared implementation from the consumer side, keeping the
+historical bug coverage alive.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import os
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "serpapi_cli.py"
@@ -27,7 +31,7 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
 
 # serpapi_cli bootstrapped tri-research/scripts onto sys.path above, so the
-# shared parser is importable here; serpapi's load_key delegates to it.
+# shared parser is importable here; resolve_key reaches it via Backend.api_key.
 import _search_registry  # noqa: E402
 
 
@@ -61,10 +65,6 @@ class EnvFileKeyTests(unittest.TestCase):
 
     def test_missing_file_returns_none(self) -> None:
         self.assertIsNone(_search_registry._key_from_env_file(Path(self.tmp.name) / "nope.env", "SERPAPI_KEY"))
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class SerpApiRetryTests(unittest.TestCase):
@@ -143,6 +143,49 @@ class SerpApiRetryTests(unittest.TestCase):
 
         self.assertEqual(calls["n"], 1)
         self.assertIn("No SerpApi key found", payload["q1"]["error"])
+
+    def test_batch_search_fails_fast_before_any_fetch(self) -> None:
+        """A missing key is decided once, before the first request.
+
+        Bug: the key was resolved per query, so an unconfigured SERPAPI_KEY
+        produced one error dict per query and the command still exited 0 —
+        the loop never saw a reason to stop. ``resolve_key`` now raises first.
+        """
+        import argparse
+
+        backend = MODULE.SerpApiBackend()
+        backend.env_file = None  # ignore a developer's real skills/serpapi/.env
+        saved = os.environ.pop("SERPAPI_KEY", None)
+        calls = {"n": 0}
+
+        def counting_fetch(*_args, **_kwargs):
+            calls["n"] += 1
+            return {}
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = counting_fetch
+        try:
+            args = argparse.Namespace(
+                query=["q1", "q2"],
+                engine="google",
+                hl=None,
+                gl=None,
+                num=None,
+                since=None,
+                api_key=None,
+                no_proxy=False,
+            )
+            err = io.StringIO()
+            with self.assertRaises(SystemExit) as ctx, redirect_stderr(err):
+                MODULE._serpapi_cmd_batch_search(backend, args)
+        finally:
+            MODULE._serpapi_fetch = original
+            if saved is not None:
+                os.environ["SERPAPI_KEY"] = saved
+
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertEqual(calls["n"], 0)
+        self.assertIn("No SerpApi key found", err.getvalue())
 
     def test_http_429_is_retried(self) -> None:
         import argparse
@@ -226,3 +269,7 @@ class CliNoKeyTests(unittest.TestCase):
         with redirect_stdout(buf):
             MODULE._search_cli.run(MODULE.SERPAPI_BACKEND, ["doc"])
         self.assertIn("serpapi_cli.py", buf.getvalue())
+
+
+if __name__ == "__main__":
+    unittest.main()

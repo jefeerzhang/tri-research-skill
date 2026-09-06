@@ -25,8 +25,8 @@ class RegistryWiringTests(unittest.TestCase):
         backs = REGISTRY.list_backends()
         self.assertIn("exa", backs)
         self.assertIn("tavily", backs)
-        self.assertEqual(REGISTRY.get("exa").env_key, "EXA_API_KEY")
-        self.assertEqual(REGISTRY.get("tavily").env_key, "TAVILY_API_KEY")
+        self.assertEqual(REGISTRY.get("exa").backend.env_key, "EXA_API_KEY")
+        self.assertEqual(REGISTRY.get("tavily").backend.env_key, "TAVILY_API_KEY")
 
     def test_serpapi_registered_via_cli_import(self) -> None:
         # SerpApi lives in separate skill; import its CLI to trigger registration
@@ -38,7 +38,7 @@ class RegistryWiringTests(unittest.TestCase):
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
         backs = REGISTRY.list_backends()
         self.assertIn("serpapi", backs)
-        self.assertEqual(REGISTRY.get("serpapi").env_key, "SERPAPI_KEY")
+        self.assertEqual(REGISTRY.get("serpapi").backend.env_key, "SERPAPI_KEY")
 
     def test_global_no_proxy_flag_present(self) -> None:
         for name in ("exa", "tavily"):
@@ -69,7 +69,7 @@ class RegistryWiringTests(unittest.TestCase):
                 return {"results": [{"title": "ok", "url": "https://example.com"}]}
 
         reg = SearchBackendRegistry()
-        reg.register(BackendSpec(name="fake2", backend=Fake(), env_key="FAKE2_KEY"))
+        reg.register(BackendSpec(name="fake2", backend=Fake()))
         import os
 
         os.environ["FAKE2_KEY"] = "k"

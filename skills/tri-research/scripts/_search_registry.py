@@ -16,20 +16,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-# Reuse skeleton mechanism (invoke / circuit / _run_with_timeout / Flag) — do
+# Reuse skeleton mechanism (invoke / circuit / run_with_timeout / Flag) — do
 # not duplicate. Registry is policy; _search_cli is mechanism.
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
+from _search_cli import CONTENT_LIMIT, SNIPPET_LIMIT, truncate  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # SearchResult — saturated small interface (B)
 # ---------------------------------------------------------------------------
 
-_SNIPPET_LIMIT = 500
-_CONTENT_LIMIT = 5000
+# Truncation limits live in _search_cli: the CLI lane and this lane must clip
+# result fields to the same widths, so neither may declare its own number.
 
 
 @dataclass(frozen=True)
@@ -61,12 +62,6 @@ class SearchResult:
         return d
 
 
-def _truncate(text: str | None, limit: int) -> str:
-    if not text:
-        return ""
-    return text[:limit]
-
-
 def _to_search_result(raw: dict[str, Any]) -> SearchResult:
     """Map a backend raw dict to SearchResult with uniform truncation."""
     # Backends differ: Exa uses title/url/snippet/published_date,
@@ -74,10 +69,10 @@ def _to_search_result(raw: dict[str, Any]) -> SearchResult:
     # SerpApi uses title/link/snippet, Fake uses title/url.
     url = raw.get("url") or raw.get("link") or ""
     title = raw.get("title") or ""
-    snippet = _truncate(raw.get("snippet") or raw.get("text") or "", _SNIPPET_LIMIT)
+    snippet = truncate(raw.get("snippet") or raw.get("text") or "", SNIPPET_LIMIT)
     content = raw.get("content")
     if content is not None:
-        content = _truncate(content, _CONTENT_LIMIT) or None
+        content = truncate(content, CONTENT_LIMIT) or None
     score = raw.get("score")
     try:
         score_val: float | None = float(score) if score is not None else None
@@ -158,7 +153,11 @@ class KeyProvider:
 
 @dataclass(frozen=True)
 class BackendSpec:
-    """Declarative spec consumed by Registry.
+    """Declarative spec consumed by Registry: which backend, plus identity.
+
+    Carries no key material or env-var name: ``env_key`` / ``env_file`` are
+    the backend's own declaration and the single source read by
+    ``Backend.client()``. A second copy here would be free to disagree.
 
     Tuning knobs live on the Backend instance itself (call_timeout /
     max_attempts / retry_backoff / circuit_threshold / circuit_cooldown);
@@ -167,7 +166,6 @@ class BackendSpec:
 
     name: str
     backend: _search_cli.Backend
-    env_key: str
 
 
 # ---------------------------------------------------------------------------
@@ -211,21 +209,6 @@ class SearchBackendRegistry:
     def list_backends(self) -> list[str]:
         return sorted(self._backends.keys())
 
-    # -- key / proxy helpers ------------------------------------------------
-    def _resolve_backend(
-        self, name: str, cli_key: str | None = None, no_proxy: bool = False
-    ) -> tuple[_search_cli.Backend, str]:
-        spec = self.get(name)
-        backend = spec.backend
-        if no_proxy:
-            _search_cli.clear_proxy_vars()
-        api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
-        if not api_key:
-            raise RuntimeError(f"{spec.env_key} not set")
-        # Ensure backend sees the same key via env for its client() path, but
-        # do not mutate os.environ globally — pass via client_factory directly.
-        return backend, api_key
-
     # -- search -------------------------------------------------------------
     def search(
         self,
@@ -237,13 +220,14 @@ class SearchBackendRegistry:
         no_proxy: bool = False,
     ) -> list[SearchResult]:
         """Search one query, return uniform SearchResult list (or raise)."""
-        backend, api_key = self._resolve_backend(name, cli_key, no_proxy)
+        backend = self.get(name).backend
+        if no_proxy:
+            _search_cli.clear_proxy_vars()
+        # Proxy / key / SDK rules live in Backend.client(); ClientSetupError
+        # subclasses RuntimeError, so programmatic callers keep catching one
+        # exception family.
+        client = backend.client(cli_key=cli_key)
         opts = options or {}
-        # Build a lightweight client without going through backend.client()'s
-        # env lookup — use the resolved key directly.
-        client = backend.client_factory(api_key) if backend.sdk is not None else None
-        if client is None and backend.sdk is None:
-            raise RuntimeError(backend.missing_sdk_message or f"{name} SDK not installed")
 
         def _call() -> dict[str, Any]:
             return backend.search(client, query, opts)
@@ -276,6 +260,11 @@ class SearchBackendRegistry:
         for q in queries:
             try:
                 out[q] = self.search(name, q, opts, cli_key=cli_key, no_proxy=no_proxy)
+            except _search_cli.ClientSetupError:
+                # A broken bootstrap is not a query outcome: repeating it once
+                # per query turns one actionable failure into N identical
+                # error dicts. Fails fast, like the CLI lane.
+                raise
             except Exception as exc:  # noqa: BLE001 — per-query isolation
                 out[q] = {"error": str(exc)}
         return out
@@ -287,17 +276,17 @@ class SearchBackendRegistry:
         except KeyError as exc:
             return {"available": False, "error": str(exc)}
         backend = spec.backend
-        if backend.sdk is None:
-            return {"available": False, "error": backend.missing_sdk_message}
         if no_proxy:
             _search_cli.clear_proxy_vars()
-        api_key = KeyProvider.resolve(cli_key, spec.env_key, spec.backend.env_file)
-        if not api_key:
-            return {"available": False, "error": f"{spec.env_key} not set"}
         try:
-            ok = _search_cli._run_with_timeout(
-                lambda: backend.probe(backend.client_factory(api_key)),
-                getattr(backend, "call_timeout", 30.0),
+            # One bootstrap with the CLI lane's semantics: Backend.client()
+            # decides what "unavailable before the first request" means
+            # (missing SDK, unresolvable key), and its message is the same
+            # text this method used to build by hand.
+            client = backend.client(cli_key=cli_key)
+            ok = _search_cli.run_with_timeout(
+                lambda: backend.probe(client),
+                backend.call_timeout,
             )
         except Exception as exc:  # noqa: BLE001 — probe must never traceback
             return {"available": False, "error": str(exc)}

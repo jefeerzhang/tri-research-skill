@@ -34,7 +34,7 @@
 | **Tavily**            | Lead Agent    | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选     | https://app.tavily.com/home            |
 | **SciVerse**          | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP）                          | **必选** | https://sciverse.space/docs#auth       |
 | **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`）                  | **必选** | https://dashboard.exa.ai/api-keys      |
-| **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP 补强                | **必选** | https://serpapi.com/dashboard          |
+| **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP 补强                                     | **必选** | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 宿主内置抽象能力（实现不固定，**不等于** Tavily）                          | 可选     | 无需申请（宿主内置）                   |
 
 硬门禁：Exa / SciVerse（`required`）必须在 `state_machine start` 前配齐 Key + SDK，SerpApi（`required`）必须 Key 可解析 + 轻量探活成功，否则会话无法创建（ADR-0006 / ADR-0007，无降级逃逸）。AnySearch（`recommended`）支持匿名访问；可选源不可用 → 静默跳过。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。
@@ -123,11 +123,15 @@ tri-research/
 ├── test-prompts.json
 ├── scripts/
 │   ├── _common.py
-│   ├── _search_cli.py             # 搜索 CLI 共享骨架（后端注册表）
+│   ├── _report_parse.py           # 报告语法单一 seam（章节 / 参考文献 / 行内 span / URL 方言）
+│   ├── _search_cli.py             # 搜索 CLI 共享骨架（client 装配 / 重试熔断 / 截断上限的单一出处）
+│   ├── _search_registry.py        # 程序化 seam：Result 归一 + KeyProvider + 后端注册表
 │   ├── search_backends.py         # 统一搜索后端声明（Exa + Tavily 对称骨架；SerpApi 自包含于 serpapi skill）
+│   ├── required_backends.py       # start 前的 Required Backend 硬门禁（K+S / Key+探活）
 │   ├── state_machine.py
 │   ├── state_machine.sh
-│   ├── validate_report.py
+│   ├── proof.py                   # DONE 证明门：建据 / 收全 / 完整性复核
+│   ├── validate_report.py         # 报告结构判定（语法读 _report_parse）
 │   ├── evidence.py                # 引用溯源台账（add / list / audit）
 │   ├── render_tex.py              # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 │   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口

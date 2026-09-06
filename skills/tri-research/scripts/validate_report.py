@@ -5,12 +5,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import ipaddress
 import re
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 # Make sibling `_common` importable when this file is loaded via importlib
 # (state_machine.py does the same in its own bootstrap).
@@ -19,11 +17,8 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
+from _report_parse import Reference, citation_numbers, parse_report, section_of  # noqa: E402
 
-REFERENCE_RE = re.compile(r"^\[(\d+)]\s+(.+)$", re.MULTILINE)
-INLINE_RE = re.compile(r"\[(\d+)]")
-URL_RE = re.compile(r"https?://\S+")
-H1_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z]{4,}\b")
 # 条目级语言判定阈值：一条参考文献必须在作者/标题段（URL 之前）出现足够
@@ -43,16 +38,17 @@ REQUIRED_SOURCE_BACKENDS = (
     "WebSearch",
 )
 SOURCE_USAGE_ROW_RE = re.compile(r"(?m)^\|?\s*搜索源使用\s*\|?\s*(.+?)\s*\|?\s*$")
-TRACKING_QUERY_KEYS = {
-    "fbclid",
-    "gclid",
-    "mc_cid",
-    "mc_eid",
-    "ref",
-    "ref_src",
-}
-RESERVED_HOSTS = {"example.com", "example.net", "example.org", "localhost"}
-RESERVED_SUFFIXES = (".example", ".invalid", ".localhost", ".test")
+# 契约要求的章节名（不含 "## " 前缀）：章节边界由 _report_parse 的锚定切分
+# 决定，这里只列名单。
+REQUIRED_HEADINGS = (
+    "概述",
+    "已有事实",
+    "主要文献观点",
+    "主要矛盾与冲突点",
+    "未来研究方向",
+    "参考文献",
+    "执行情况",
+)
 
 
 class ReportValidationError(RuntimeError):
@@ -95,97 +91,7 @@ def topic_in_title(expected_topic: str, title: str) -> bool:
     return re.search(pattern, title.casefold()) is not None
 
 
-def _strip_url_punctuation(url: str) -> str:
-    # ASCII + common CJK trailing punctuation that URL_RE (\S+) may swallow
-    # from surrounding prose (period, comma, Chinese quotes/brackets, etc.).
-    url = url.rstrip(".,;:。，；：）》」』”’\"'")
-    pairs = {")": "(", "]": "[", "}": "{", ">": "<"}
-    while url and url[-1] in pairs and url.count(url[-1]) > url.count(pairs[url[-1]]):
-        url = url[:-1]
-    return url
-
-
-def canonicalize_url(value: str) -> str | None:
-    try:
-        parsed = urlsplit(value)
-        port = parsed.port
-    except ValueError:
-        return None
-    if (
-        parsed.scheme.lower() not in {"http", "https"}
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-    ):
-        return None
-    host = parsed.hostname.lower()
-    if host in RESERVED_HOSTS or host.endswith(RESERVED_SUFFIXES):
-        return None
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        address = None
-    if address and (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_unspecified
-    ):
-        return None
-    if port and not (
-        (parsed.scheme.lower() == "http" and port == 80) or (parsed.scheme.lower() == "https" and port == 443)
-    ):
-        host = f"{host}:{port}"
-    path = re.sub(r"/{2,}", "/", parsed.path or "/")
-    # Percent-encoding normalization (RFC 3986): decode then re-encode so that
-    # "%20" vs a literal space — or any differently-escaped/cased form —
-    # collapse to one canonical path. Without this the Evidence Audit treated
-    # the same URL as two, turning a legal citation untraced and failing done.
-    # safe keeps pchar sub-delims so ordinary paths are not over-encoded.
-    path = quote(unquote(path), safe="/:@!$&'()*+,;=").rstrip("/") or "/"
-    query = urlencode(
-        sorted(
-            (key, value)
-            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-            if not key.lower().startswith("utm_") and key.lower() not in TRACKING_QUERY_KEYS
-        ),
-        doseq=True,
-    )
-    return urlunsplit((parsed.scheme.lower(), host, path, query, ""))
-
-
-def _strip_code_blocks(text: str) -> str:
-    """Remove fenced code blocks, correctly handling nested fences.
-
-    A code fence of N backticks is only closed by another run of exactly N
-    backticks — inner fences with fewer backticks are part of the block
-    content, not closing delimiters (CommonMark spec).
-    """
-    fence_re = re.compile(r"`{3,}")
-    result: list[str] = []
-    stack: list[tuple[int, int]] = []
-    pos = 0
-    for match in fence_re.finditer(text):
-        start = match.start()
-        end = match.end()
-        length = end - start
-        if not stack:
-            stack.append((length, start))
-        elif stack[-1][0] == length:
-            _open_length, open_start = stack.pop()
-            if not stack:
-                result.append(text[pos:open_start])
-                pos = end
-        else:
-            stack.append((length, start))
-    if pos == 0:
-        return text
-    result.append(text[pos:])
-    return "".join(result)
-
-
-def _language_entries(reference_entries: list[str]) -> tuple[int, int]:
+def _language_entries(references: list[Reference]) -> tuple[int, int]:
     """Count entries with real Chinese / English evidence, per entry.
 
     A reference counts as Chinese only if its author/title portion (before
@@ -196,8 +102,8 @@ def _language_entries(reference_entries: list[str]) -> tuple[int, int]:
     counted as English-language evidence.
     """
     chinese = english = 0
-    for entry in reference_entries:
-        content = entry.split("http")[0]
+    for reference in references:
+        content = reference.prefix
         if len(CHINESE_RE.findall(content)) >= MIN_CHINESE_CHARS_PER_ENTRY:
             chinese += 1
         if len(ENGLISH_WORD_RE.findall(content)) >= MIN_ENGLISH_WORDS_PER_ENTRY:
@@ -206,34 +112,21 @@ def _language_entries(reference_entries: list[str]) -> tuple[int, int]:
 
 
 def validate(text: str, min_sources: int, *, expected_topic: str | None = None) -> list[str]:
-    text = text.lstrip("\ufeff")
+    """结构门禁：只判定，语法一律读 _report_parse 的同一份解析结果。"""
+    parsed = parse_report(text)
     errors: list[str] = []
-    required_headings = (
-        "## 概述",
-        "## 已有事实",
-        "## 主要文献观点",
-        "## 主要矛盾与冲突点",
-        "## 未来研究方向",
-        "## 参考文献",
-        "## 执行情况",
-    )
-    for heading in required_headings:
-        # 锚定行首的二级标题，避免把 "### 概述" 这类三级标题（"## 概述"
-        # 的子串）误判为存在，也避免把正文中出现的 "## 概述" 片段当章节。
-        if not re.search(r"(?m)^" + re.escape(heading) + r"(?:\s|$)", text):
-            errors.append(f"缺少必需章节: {heading}")
+    for heading in REQUIRED_HEADINGS:
+        # 锚定行首的二级标题由 parse_report 负责：`### 概述` 不是章节，
+        # 正文里出现的 "## 概述" 片段也不会被当成章节起点。
+        if section_of(parsed, heading) is None:
+            errors.append(f"缺少必需章节: ## {heading}")
 
-    if expected_topic:
-        heading = H1_RE.search(text)
-        title = heading.group(1) if heading else ""
-        if not topic_in_title(expected_topic, title):
-            errors.append(f"报告标题未包含确认主题: {expected_topic}")
+    if expected_topic and not topic_in_title(expected_topic, parsed.title):
+        errors.append(f"报告标题未包含确认主题: {expected_topic}")
 
-    execution_text = text.split("## 执行情况", 1)[1] if "## 执行情况" in text else ""
+    execution = section_of(parsed, "执行情况")
+    execution_text = "\n".join(execution.lines) if execution else ""
     if execution_text:
-        next_section = re.search(r"(?m)^## ", execution_text)
-        if next_section:
-            execution_text = execution_text[: next_section.start()]
         usage_match = SOURCE_USAGE_ROW_RE.search(execution_text)
         if not usage_match:
             errors.append("执行情况缺少搜索源使用行")
@@ -253,15 +146,8 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
             if missing_backends:
                 errors.append("执行情况搜索源使用未报告: " + " / ".join(missing_backends))
 
-    references_text = text.split("## 参考文献", 1)[1] if "## 参考文献" in text else ""
-    # 截止到下一个二级标题：## 参考文献 之后的章节（执行情况、附录等）
-    # 里的 "[n] ..." 行不是参考文献条目，不能被 REFERENCE_RE 扫到。
-    next_section = re.search(r"(?m)^## ", references_text)
-    if next_section:
-        references_text = references_text[: next_section.start()]
-    ref_matches = REFERENCE_RE.findall(references_text)
-    references = {int(number): entry for number, entry in ref_matches}
-    if len(ref_matches) != len(references):
+    references = {reference.number: reference for reference in parsed.references}
+    if len(parsed.references) != len(references):
         errors.append("参考文献编号重复")
     if len(references) < min_sources:
         errors.append(f"至少需要 {min_sources} 条参考文献，实际 {len(references)} 条")
@@ -273,20 +159,16 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
             errors.append(f"参考文献编号不连续: {actual}")
 
     reference_urls: dict[int, str] = {}
-    for number, entry in sorted(references.items()):
-        url_match = URL_RE.search(entry)
-        if not url_match:
+    for number, reference in sorted(references.items()):
+        if reference.url is None:
             errors.append(f"参考文献 [{number}] 缺少 URL")
+        elif reference.canonical_url is None:
+            errors.append(f"参考文献 [{number}] URL 无效")
         else:
-            raw_url = _strip_url_punctuation(url_match.group(0))
-            canonical_url = canonicalize_url(raw_url)
-            if canonical_url is None:
-                errors.append(f"参考文献 [{number}] URL 无效")
-            else:
-                reference_urls[number] = canonical_url
-        if not re.search(r"层级[:：]\s*[123]", entry):
+            reference_urls[number] = reference.canonical_url
+        if reference.tier is None:
             errors.append(f"参考文献 [{number}] 缺少层级")
-        if not re.search(r"来源[:：]\s*[^\n]+", entry):
+        if reference.source is None:
             errors.append(f"参考文献 [{number}] 缺少来源工具")
 
     unique_urls = set(reference_urls.values())
@@ -298,14 +180,9 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
     if len(unique_urls) < min_sources:
         errors.append(f"至少需要 {min_sources} 个不重复来源，实际 {len(unique_urls)} 个")
 
-    body = text.split("## 参考文献", 1)[0]
-    body = _strip_code_blocks(body)
-    # 行内代码里的 [n] 不是引用，移除后再扫描。
-    # 围栏代码块已被 _strip_code_blocks 剥离，这里只剩行内代码。
-    # 先处理双反引号（可含内嵌单反引号），再处理单反引号。
-    body = re.sub(r"``.+?``", "", body, flags=re.DOTALL)
-    body = re.sub(r"`[^`\n]+`", "", body)
-    cited = {int(number) for number in INLINE_RE.findall(body)}
+    # 引用闭环的扫描范围与规则都在 seam 里：body 只到参考文献之前，围栏与行内
+    # 代码里的 [n] 不算引用，**[1]** 仍然算。
+    cited = citation_numbers(parsed.body_text)
     missing = sorted(cited - set(references))
     if missing:
         errors.append(f"正文引用无对应参考文献: {missing}")
@@ -313,9 +190,8 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
     if unused:
         errors.append(f"参考文献未在正文中引用: {unused}")
 
-    reference_entries = list(references.values())
     # Check language coverage in the author/title portion (before URL), not metadata fields
-    chinese_entries, english_entries = _language_entries(reference_entries)
+    chinese_entries, english_entries = _language_entries(list(references.values()))
     if chinese_entries == 0:
         errors.append("报告缺少中文来源")
     if english_entries < min(MIN_ENGLISH_ENTRIES, len(references)):

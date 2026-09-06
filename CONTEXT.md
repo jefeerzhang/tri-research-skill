@@ -9,23 +9,23 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置），分级见 `BackendRequirementLevel`。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:
-深 Module，统一管理所有 Web 搜索类后端的注册、Result 归一与 `KeyProvider`，interface 仅 `register / get / search → Result[]`。定位为**程序化 seam**（测试与未来直接 import 的调用方）；Agent 消费的命令行表面走 `_search_cli`，两条路不得混用错误契约。
+深 Module，统一管理所有 Web 搜索类后端的注册、Result 归一与探活，interface 为 `register / get / list_backends / search / batch_search / check`。它**只转接**客户端装配（调 `Backend.client()`）而不另定一套规则。定位为**程序化 seam**（测试与直接 import 的调用方）；Agent 消费的命令行表面走 `_search_cli`，两条路不得混用错误契约。
 _Avoid_: backend manager、search service
 
 **SearchResult**:
-Registry 对外暴露的饱和小接口，含 `title / url / snippet / content / score / published_date / engine_meta`，缺失为 `None`，截断由 Registry 统一。
+Registry 对外暴露的饱和小接口，含 `title / url / snippet / content / score / published_date / engine_meta`，缺失为 `None`；截断上限（snippet / content 两个宽度）住在 `_search_cli`，两条泳道共读一份，不得各自写死数字。
 _Avoid_: raw response、organic_results 直出
 
 **KeyProvider**:
-Seam 处的 Key 解析 Adapter，优先级 `cli --api_key > env > .env`，供所有 Search Backend 共用；`.env` 位置由各后端经 `Backend.env_file` 申报，本模块不含任何技能目录布局知识。
+Seam 处的 Key 解析 Adapter，优先级 `cli --api_key > env > .env`，供所有 Search Backend 共用；正常入口是 `Backend.api_key()`，`.env` 位置由各后端经 `Backend.env_file` 申报，本模块不含任何技能目录布局知识。
 _Avoid_: key loader、env helper 混称
 
 **BackendSpec**:
-声明式规格，描述单个 Search Backend 的 `name / env_key / flags / commands / timeout / circuit`，由 Registry 消费。
+声明式规格，描述「哪个 Search Backend 注册进了 Registry」——`name / backend`；调参旋钮住在 Backend 实例上。不携带 key 材料：`env_key` / `env_file` 是 Backend 自己的申报，同一信息两处维护就能彼此不同意。
 _Avoid_: backend config 泛称
 
 **BackendRequirementLevel**:
@@ -33,7 +33,7 @@ Search Backend 的三档必要性分级，决定缺 key/SDK 时的编排行为�
 _Avoid_: 必选/可选二分、优先级混称、文档-only 约束
 
 **Managed Command**:
-由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责密钥解析（经 `KeyProvider`，可读 `.env`）、SDK 缺失检查、client 构建、`invoke`（超时 / 重试 / 熔断）、错误 JSON 打印与退出码；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
+由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责顺序（代理清理 → 经 `Backend.client()` 装配 → `invoke`（超时 / 重试 / 熔断）→ 错误 JSON 打印与退出码）；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
 _Avoid_: 托管任务、wrapped command、managed handler 混称
 
 **Evidence Ledger**:
@@ -45,11 +45,15 @@ Evidence Ledger 的单条记录，只可能是两种 kind 之一：`seen`（搜�
 _Avoid_: 引用记录、采纳标记（adopted）混称
 
 **Evidence Audit**:
-报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。
-_Avoid_: 引用校验、格式验收混称（那是 Report Validation）
+报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。失败文本只有一个家——`EvidenceAuditFailed` 持有 `untraced / total` 与那句计数，`audit` 命令与 `done` 门禁各自追加自己的半句（登记指引 / 明细列表），两处不得再手抄。
+_Avoid_: 引用校验、格式验收混称（那是 Report Validation）、把门禁合并成单一 completion_gate（判定与对账的失败语义与修复路径不同）
+
+**Report Parse**:
+研究报告契约的唯一解析表面（`_report_parse.py`）：章节切分、参考文献字段、行内 span（code / bold / cite / conf）、围栏判定与 URL 方言。只回答「这份文本长什么样」，不回答「合不合格」——判定属 Report Validation，对账属 Evidence Audit，排版属 LaTeX/PDF 渲染器，三方共读同一份解析结果。
+_Avoid_: 各家自持的正则、把任一消费方的解析当权威
 
 **Report Validation**:
-报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
+报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；语法一律读 `Report Parse`，本模块只留判定；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
 
 **Google Scholar（间接能力）**:

@@ -10,7 +10,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from _test_helpers import make_valid_report, register_report_evidence, report_reference_urls, required_backend_cli_env
+from _test_helpers import (
+    load_module,
+    make_valid_report,
+    register_report_evidence,
+    report_reference_urls,
+    required_backend_cli_env,
+)
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "evidence.py"
 STATE_MACHINE = Path(__file__).parents[1] / "scripts" / "state_machine.py"
@@ -457,6 +463,52 @@ class EvidenceAuditTests(EvidenceCliHarness, unittest.TestCase):
         )
         result = self.run_cli("--session", "audit-other", "audit", "--report", str(report), ok=False)
         self.assertIn("UNTRACED:[1]", result.stdout)
+
+    def test_audit_gate_is_callable_as_a_unit(self) -> None:
+        """The gate is a function first and a CLI verb second: `done` calls it."""
+        evidence = load_module(SCRIPT, "evidence_gate_unit")
+        self.start_session("audit-unit")
+        report = self.write_ref_report(
+            "audit-unit.md",
+            [self.ref_line(1, "https://seen.cn/a"), self.ref_line(2, "https://fabricated.cn/ghost")],
+        )
+        self.run_cli("--session", "audit-unit", "add", "--backend", "exa", "--query", "q", "--url", "https://seen.cn/a")
+        with self.assertRaises(evidence.EvidenceAuditFailed) as ctx:
+            evidence.audit_report(evidence.StateStore(self.state_dir), "audit-unit", report)
+        failure = ctx.exception
+        self.assertEqual(failure.untraced, [(2, "https://fabricated.cn/ghost")])
+        self.assertEqual(failure.total, 2)
+        self.assertEqual(failure.detail(), "[2] https://fabricated.cn/ghost")
+        # Same class the state_machine CLI catches — otherwise `done` tracebacks.
+        self.assertIsInstance(failure, evidence.StateError)
+
+    def test_both_commands_quote_the_gate_sentence_verbatim(self) -> None:
+        """`audit` and `done` share one count sentence, not two hand-copies."""
+        evidence = load_module(SCRIPT, "evidence_gate_phrase")
+
+        def sentence(untraced: int, total: int) -> str:
+            return str(evidence.EvidenceAuditFailed([("n", "u")] * untraced, total))
+
+        self.start_session("shared-audit")
+        report = self.write_ref_report("shared-audit.md", [self.ref_line(1, "https://fabricated.cn/ghost")])
+        audit = self.run_cli("--session", "shared-audit", "audit", "--report", str(report), ok=False)
+        self.assertIn(f"ERROR:{sentence(1, 1)}", audit.stderr)
+
+        self.start_session("shared-done")
+        params = json.dumps(
+            {
+                "topic": "人工智能与劳动分配",
+                "min_sources": 10,
+                "keywords_zh": ["人工智能"],
+                "keywords_en": ["artificial intelligence"],
+            },
+            ensure_ascii=False,
+        )
+        self.run_state_cli("--session", "shared-done", "set_params", params)
+        valid = Path(self.temp_dir.name) / "shared-done.md"
+        make_valid_report(valid)
+        done = self.run_state_cli("--session", "shared-done", "done", "--report", str(valid), ok=False)
+        self.assertIn(f"ERROR:{sentence(10, 10)}: [1] ", done.stderr)
 
 
 class EvidenceLedgerIntegrityTests(EvidenceCliHarness, unittest.TestCase):

@@ -229,30 +229,26 @@ class StateStore:
                 "updated_at": timestamp,
                 "history": [{"phase": "STARTED", "at": timestamp}],
             }
-            self.save(data)
+            self._save(data)
             self.set_active(session_id)
         return data
 
     def set_params(self, session_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """Set immutable research parameters for a STARTED session."""
         session_id = validate_session_id(session_id)
-        with self.write_lock(session_id):
-            data = self.load(session_id)
+        with self._transaction(session_id) as data:
             if data["phase"] != "STARTED":
                 raise StateError("parameters can only be set in STARTED phase")
             if data.get("params") is not None:
                 raise StateError("parameters already set and immutable")
-            normalized = validate_params(params)
-            data["params"] = normalized
+            data["params"] = validate_params(params)
             data["updated_at"] = now_iso()
-            self.save(data)
         return data
 
     def extend(self, session_id: str, extension: dict[str, Any]) -> dict[str, Any]:
         """Append dimensions/keywords to a session, preserving prior work."""
         session_id = validate_session_id(session_id)
-        with self.write_lock(session_id):
-            data = self.load(session_id)
+        with self._transaction(session_id) as data:
             params = data.get("params")
             if params is None:
                 raise StateError("parameters not set; run set_params first")
@@ -275,7 +271,6 @@ class StateStore:
                 data["phase"] = "EXTENDED"
                 # Re-set active session pointer since done cleared it.
                 self.set_active(session_id)
-            self.save(data)
         return data
 
     def complete(
@@ -297,8 +292,7 @@ class StateStore:
         # report" — the documented default output path (~/tri-research-reports/)
         # tripped this on every done.
         report_path = Path(report_path).expanduser()
-        with self.write_lock(session_id):
-            data = self.load(session_id)
+        with self._transaction(session_id) as data:
             if data["phase"] == "DONE":
                 raise StateError("session already completed")
             params = data.get("params")
@@ -332,14 +326,16 @@ class StateStore:
             # evidence.py imports this module at load time, so a top-level
             # import would be circular. Runs while the write lock is held
             # but only reads the ledger — no new locking of its own.
-            from evidence import audit_report, format_untraced
+            from evidence import EvidenceAuditFailed, audit_report
 
-            untraced, total = audit_report(self, session_id, report_path)
-            if untraced:
-                raise StateError(
-                    f"evidence audit failed: {len(untraced)}/{total} reference URL(s) untraced: "
-                    f"{format_untraced(untraced)}"
-                )
+            try:
+                audit_report(self, session_id, report_path)
+            except EvidenceAuditFailed as exc:
+                # The count sentence is the exception's (the `audit` command
+                # prints the same one); DONE adds the detail list so the Lead
+                # Agent can see which references to register without parsing
+                # two streams.
+                raise StateError(f"{exc}: {exc.detail()}") from exc
             # Ledger snapshot fingerprint is already inside `proof` (the
             # ledger half built by proof.build_proof), so `check` can catch
             # post-DONE ledger edits (e.g. backdated rows).
@@ -348,10 +344,10 @@ class StateStore:
             data["updated_at"] = timestamp
             data["report_validation"] = proof
             data["history"].append({"phase": "DONE", "at": timestamp})
-            self.save(data)
-            # Clear the active-session pointer only if it still points at this
-            # session. Completing B must not wipe an active pointer for A.
-            self.clear_active(session_id)
+        # Clear the active-session pointer once DONE is on disk, and only if it
+        # still points at this session. Completing B must not wipe an active
+        # pointer for A.
+        self.clear_active(session_id)
         return data
 
     def resolve_session(self, requested: str | None) -> str:
@@ -379,11 +375,30 @@ class StateStore:
         the lock file persists on disk as an empty marker and is deliberately
         NOT unlinked (deleting a locked file lets a third process lock the
         orphaned inode — a classic race).
+
+        Within this module the mutating commands go through ``_transaction``
+        instead of calling this directly; it stays public for
+        ``evidence.append_records``, which serializes ledger appends against
+        the same mutating commands without writing the state JSON itself.
         """
         with session_lock(self.state_path(session_id).with_suffix(".lock")):
             yield
 
-    def save(self, data: dict[str, Any]) -> None:
+    @contextmanager
+    def _transaction(self, session_id: str) -> Iterator[dict[str, Any]]:
+        """Locked read-modify-write of one session: mutate what you are handed.
+
+        The state only reaches disk when the body completes normally, so a
+        gate that raises (wrong phase, rejected report, failed audit) leaves
+        the previous state untouched — no half-applied transition to clean
+        up after a refusal.
+        """
+        with self.write_lock(session_id):
+            data = self.load(session_id)
+            yield data
+            self._save(data)
+
+    def _save(self, data: dict[str, Any]) -> None:
         payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
         self._atomic_write_text(self.state_path(data["session_id"]), payload)
 

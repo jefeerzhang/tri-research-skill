@@ -22,11 +22,11 @@ timeout but not retry. Missing SDK / missing key still fail immediately.
 
 Extra commands (`answer` / `contents` / `extract`) can be declared
 *managed* (see `Command.managed`): `run_managed_command` then owns their
-whole lifecycle — proxy clearing, key resolution, SDK-missing check,
-client build, `invoke`, error-JSON printing and exit codes — so each
-command body declares nothing but its SDK call and result shaping.
-Unmanaged commands keep the historical bare `(args)` contract, which is
-what backends with their own error discipline (SerpApi) rely on.
+whole lifecycle — client setup via `Backend.client()`, `invoke`, error-JSON
+printing and exit codes — so each command body declares nothing but its SDK
+call and result shaping. Unmanaged commands keep the historical bare
+`(args)` contract, which is what backends with their own error discipline
+(SerpApi) rely on.
 """
 
 from __future__ import annotations
@@ -44,13 +44,13 @@ from typing import Any, Callable, NoReturn, Sequence, TypeVar
 _T = TypeVar("_T")
 
 
-def json_error(message: str) -> None:
+def json_error(message: str) -> NoReturn:
     """Print a JSON error and exit 1 — the wrapper contract for failures."""
     print(json.dumps({"error": message}, ensure_ascii=False))
     sys.exit(1)
 
 
-def _backend_api_key(backend: Backend) -> str | None:
+def _backend_api_key(backend: Backend, cli_key: str | None = None) -> str | None:
     """Resolve a backend API key via KeyProvider (cli > env > backend .env).
 
     Function-local import: `_search_registry` imports this module at top
@@ -61,11 +61,29 @@ def _backend_api_key(backend: Backend) -> str | None:
     """
     from _search_registry import KeyProvider
 
-    return KeyProvider.resolve(None, backend.env_key, backend.env_file)
+    return KeyProvider.resolve(cli_key, backend.env_key, backend.env_file)
 
 
 class CircuitOpenError(RuntimeError):
     """Raised when a backend circuit is open; not retryable, fail-fast."""
+
+
+class ClientSetupError(RuntimeError):
+    """The SDK client could not be set up; ``str(exc)`` is the user-facing text.
+
+    Raised rather than printed so every caller keeps its own dialect (JSON
+    error + exit 1, ``{"available": false}``, a collected gap string, or a
+    bare raise) while the *conditions* stay defined in exactly one place —
+    :meth:`Backend.client`.
+    """
+
+
+class KeyMissing(ClientSetupError):
+    """No API key from cli / env / the backend's own declared ``.env``."""
+
+
+class SdkMissing(ClientSetupError):
+    """The backend's SDK module failed to import, so no client can exist."""
 
 
 class CommandError(RuntimeError):
@@ -185,14 +203,33 @@ class Backend:
     _circuit_failures: int = 0
     _circuit_opened_at: float | None = None
 
-    def client(self) -> Any:
-        """Build the SDK client, honoring the wrapper's JSON-error contract."""
-        if self.sdk is None:
-            json_error(self.missing_sdk_message)
-        api_key = _backend_api_key(self)
+    def api_key(self, *, cli_key: str | None = None) -> str:
+        """Resolve this backend's key (cli > env > its own ``.env``); raise if absent.
+
+        The half of :meth:`client` that stands alone for backends whose client
+        is only a key holder and whose real SDK dependency is touched later
+        (SerpApi: ``requests`` is needed at fetch time, not build time).
+        """
+        api_key = _backend_api_key(self, cli_key)
         if not api_key:
-            json_error(f"{self.env_key} not set")
-        return self.client_factory(api_key)
+            raise KeyMissing(f"{self.env_key} not set")
+        return api_key
+
+    def client(self, *, cli_key: str | None = None) -> Any:
+        """Set up the SDK client: SDK present -> key resolvable -> build.
+
+        The one home of that sequence in the repo; every command path
+        (search / batch_search / check / managed commands / Registry / the
+        Required gate) goes through here and translates
+        :class:`ClientSetupError` into its own output dialect. Order is load
+        bearing: the SDK check must precede ``client_factory``, otherwise a
+        missing SDK turns into a traceback instead of a documented error
+        (ADR-0002) — and an unset key cannot be fixed into a working client
+        while the SDK is still missing.
+        """
+        if self.sdk is None:
+            raise SdkMissing(self.missing_sdk_message)
+        return self.client_factory(self.api_key(cli_key=cli_key))
 
     def probe(self, client: Any) -> bool:
         """Run a trivial query; return True on success, raise on failure."""
@@ -208,7 +245,7 @@ def search_options(backend: Backend, args: argparse.Namespace) -> dict[str, Any]
     return {flag.dest: getattr(args, flag.dest) for flag in backend.flags if getattr(args, flag.dest) is not None}
 
 
-def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
+def run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
     """Run ``fn`` on a daemon thread; raise TimeoutError if it exceeds timeout.
 
     Daemon threads are required: a worker-pool shutdown(wait=True) would
@@ -297,7 +334,7 @@ def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
     for attempt in range(max_attempts):
         _circuit_allow(backend)
         try:
-            value = _run_with_timeout(fn, call_timeout)
+            value = run_with_timeout(fn, call_timeout)
         except CircuitOpenError:
             raise
         except (SystemExit, KeyboardInterrupt):
@@ -320,18 +357,17 @@ def invoke(backend: Backend, fn: Callable[[], _T]) -> _T:
 
 def check(backend: Backend) -> None:
     """Availability probe: always prints JSON, never a traceback."""
-    if backend.sdk is None:
-        print(json.dumps({"available": False, "error": backend.missing_sdk_message}))
-        return
-    api_key = _backend_api_key(backend)
-    if not api_key:
-        print(json.dumps({"available": False, "error": f"{backend.env_key} not set"}))
+    try:
+        client = backend.client()
+    except Exception as exc:
+        # Broad on purpose: a ClientSetupError carries its own user-facing
+        # text, and a client_factory that raises must still print
+        # {"available": false} instead of the traceback `check` promises
+        # never to emit.
+        print(json.dumps({"available": False, "error": str(exc)}))
         return
     try:
-        ok = _run_with_timeout(
-            lambda: backend.probe(backend.client_factory(api_key)),
-            backend.call_timeout,
-        )
+        ok = run_with_timeout(lambda: backend.probe(client), backend.call_timeout)
     except Exception as exc:
         print(json.dumps({"available": False, "error": str(exc)}))
         return
@@ -348,9 +384,38 @@ def clear_proxy_vars() -> None:
         os.environ.pop(_p, None)
 
 
+def wants_no_proxy(args: argparse.Namespace) -> bool:
+    """Read the global ``--no-proxy`` flag.
+
+    ``getattr`` default: backends declare ``--no-proxy`` as a global flag, but
+    a bare ``Namespace`` (tests, programmatic callers) need not carry it.
+    """
+    return bool(getattr(args, "no_proxy", False))
+
+
 def _maybe_clear_proxy(args: argparse.Namespace) -> None:
-    if getattr(args, "no_proxy", False):
+    if wants_no_proxy(args):
         clear_proxy_vars()
+
+
+# ---------------------------------------------------------------------------
+# Result truncation — the limits both search lanes share
+# ---------------------------------------------------------------------------
+
+SNIPPET_LIMIT = 500
+CONTENT_LIMIT = 5000
+
+
+def truncate(text: str | None, limit: int) -> str:
+    """Clip a result field to ``limit`` characters; missing or empty becomes "".
+
+    The single home of the limits: a backend that hard-coded its own width
+    made the same result read differently depending on which lane fetched it
+    (CLI vs Registry), and the metadata in the output then lied about it.
+    """
+    if not text:
+        return ""
+    return text[:limit]
 
 
 def search(backend: Backend, args: argparse.Namespace) -> None:
@@ -358,7 +423,10 @@ def search(backend: Backend, args: argparse.Namespace) -> None:
     if backend.search_handler is not None:
         backend.search_handler(backend, args)
         return
-    client = backend.client()
+    try:
+        client = backend.client()
+    except ClientSetupError as exc:
+        json_error(str(exc))
     try:
         output = invoke(
             backend,
@@ -376,7 +444,12 @@ def batch_search(backend: Backend, args: argparse.Namespace) -> None:
     if backend.batch_search_handler is not None:
         backend.batch_search_handler(backend, args)
         return
-    client = backend.client()
+    try:
+        client = backend.client()
+    except ClientSetupError as exc:
+        # Decided once, before the loop: a missing key is not a query outcome,
+        # and N per-query error dicts with a 0 exit code hid it.
+        json_error(str(exc))
     all_results: dict[str, Any] = {}
     for query in args.query:
         try:
@@ -408,17 +481,14 @@ def _emit_command_error(command: Command, args: argparse.Namespace, message: str
 def run_managed_command(backend: Backend, command: Command, args: argparse.Namespace) -> None:
     """Skeleton-owned lifecycle for a managed extra command.
 
-    Order is load bearing: proxy -> key -> SDK -> client -> invoke. The
-    SDK check must precede ``client_factory``, otherwise a missing SDK
-    turns into a traceback instead of the documented JSON contract.
+    Order is load bearing: proxy first, then :meth:`Backend.client` (which
+    checks the SDK before ``client_factory`` — ADR-0002), then the call.
     """
     _maybe_clear_proxy(args)
-    api_key = _backend_api_key(backend)
-    if not api_key:
-        _emit_command_error(command, args, f"{backend.env_key} not set")
-    if backend.sdk is None:
-        _emit_command_error(command, args, backend.missing_sdk_message)
-    client = backend.client_factory(api_key)
+    try:
+        client = backend.client()
+    except ClientSetupError as exc:
+        _emit_command_error(command, args, str(exc))
     try:
         output = invoke(backend, lambda: command.run(client, args))
     except (SystemExit, KeyboardInterrupt):

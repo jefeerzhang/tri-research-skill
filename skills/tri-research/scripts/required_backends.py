@@ -29,7 +29,8 @@ if str(_SCRIPT_DIR) not in sys.path:
 _SERPAPI_SCRIPTS = _SCRIPT_DIR.parents[1] / "serpapi" / "scripts"
 
 from _common import StateError  # noqa: E402
-from _search_cli import _run_with_timeout  # noqa: E402
+import _search_cli  # noqa: E402
+from _search_cli import run_with_timeout  # noqa: E402
 from _search_registry import KeyProvider  # noqa: E402
 
 EXA_ENV_KEY = "EXA_API_KEY"
@@ -41,7 +42,7 @@ EXA_VERIFY = "python scripts/exa_search.py check"
 SCIVERSE_ENV_KEY = "SCIVERSE_API_TOKEN"
 SCIVERSE_SDK = "sciverse"
 SCIVERSE_APPLY = "https://sciverse.space/docs#auth"
-SCIVERSE_VERIFY = 'python -c "from sciverse import AgentToolsClient; print(\'ok\')"'
+SCIVERSE_VERIFY = "python -c \"from sciverse import AgentToolsClient; print('ok')\""
 
 SERPAPI_ENV_KEY = "SERPAPI_KEY"
 SERPAPI_APPLY = "https://serpapi.com/dashboard"
@@ -80,16 +81,17 @@ def _get_serpapi_backend():
 def _serpapi_gap() -> str | None:
     """Return a gap string if SerpApi is not Key + probe ready, else None."""
     backend = _get_serpapi_backend()
-    key = KeyProvider.resolve(None, SERPAPI_ENV_KEY, backend.env_file)
-    if not key:
-        return f"SerpApi: {SERPAPI_ENV_KEY} not set"
-    if backend.sdk is None:
-        return f"SerpApi: {backend.missing_sdk_message}"
+    try:
+        # Same setup rules as every other lane (SDK before key, ADR-0002);
+        # the gate's dialect is a collected gap string, not a raised failure.
+        client = backend.client()
+    except _search_cli.ClientSetupError as exc:
+        return f"SerpApi: {exc}"
     try:
         # Wrap in the shared timeout helper so the probe runs under the same
         # timeout semantics as ``_search_cli.check`` / ``REGISTRY.check``
         # (Windows has no SIGALRM; the requests timeout alone is not enough).
-        ok = _run_with_timeout(lambda: backend.probe(backend.client_factory(key)), backend.call_timeout)
+        ok = run_with_timeout(lambda: backend.probe(client), backend.call_timeout)
     except Exception as exc:  # noqa: BLE001 — probe failure surfaces as a gap
         return f"SerpApi: probe failed: {exc}"
     if not ok:
