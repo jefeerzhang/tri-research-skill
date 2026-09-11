@@ -11,20 +11,17 @@ ever raised one without the other).
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from tri_research_runtime.errors import StateError  # noqa: E402, F401  — re-export (ADR-0015)
 
 MIN_REPORT_SOURCES = 10
-
-
-class StateError(RuntimeError):
-    """A state-machine / evidence-ledger operation failed.
-
-    Lives in this leaf module so both execution forms of state_machine.py
-    (as ``__main__`` and as the ``state_machine`` module imported by
-    evidence.py) share ONE class: a StateError raised inside evidence must
-    be caught by state_machine's ``except StateError`` even when it
-    imported state_machine a second time under its module name.
-    """
 
 
 def source_threshold(value: str) -> int:

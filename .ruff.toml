@@ -1,6 +1,6 @@
 # Ruff configuration for tri-research-skill
-# Scope: skills/tri-research/scripts, skills/tri-research/tests,
-#        skills/serpapi/scripts.
+# Scope: skills/tri-research/scripts, skills/tri-research/src,
+#        skills/tri-research/tests, skills/serpapi/scripts.
 # Rules enabled: E (pycodestyle errors) + F (pyflakes) only — minimal-noise
 # baseline. Add more rule families (D / N / W / UP) deliberately, never
 # silently.
@@ -27,3 +27,6 @@ ignore = [
 # and wildcard imports in helpers.
 "skills/*/tests/*.py" = ["E501"]
 "skills/*/tests/_test_helpers.py" = ["E501", "F401", "F403"]
+# Compatibility shims re-export the runtime package.
+"skills/tri-research/scripts/_search_cli.py" = ["F401", "F403"]
+"skills/tri-research/src/tri_research_runtime/__init__.py" = ["F401"]

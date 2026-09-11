@@ -55,6 +55,9 @@ class SkillContractTests(unittest.TestCase):
         marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
         self.assertEqual(v, marketplace["metadata"]["version"], "marketplace.json metadata.version 漂移")
 
+        pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn(f'version = "{v}"', pyproject, "pyproject.toml runtime 版本漂移")
+
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         rel = re.search(r"^##\s+\[([^\]]+)\]\s+-\s+\d{4}-\d{2}-\d{2}\s*$", changelog, re.MULTILINE)
         self.assertIsNotNone(rel, "CHANGELOG 缺少已发布版本条目")
@@ -585,6 +588,41 @@ class SkillContractTests(unittest.TestCase):
             len(validator.USAGE_ROSTER),
             "citations SKILL must not independently enumerate USAGE_ROSTER",
         )
+
+    def test_adr_0015_shared_runtime_package(self) -> None:
+        """ADR-0015：可安装 runtime 包；serpapi 走包 import；熔断是进程级。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0015-共享运行时打包.md").read_text(encoding="utf-8")
+        for phrase in (
+            "tri_research_runtime",
+            "pip install",
+            "npx skills add",
+            "KeyProvider",
+            "StateError",
+            "process-level",
+            "CITATION_TEXT_LIMIT",
+            "EXTRACT_CONTENT_LIMIT",
+            "剩余",
+            "被拒",
+            "scripts/",
+        ):
+            self.assertIn(phrase, adr)
+
+        context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+        self.assertIn("**Shared Runtime**", context)
+        self.assertIn("tri_research_runtime", context)
+
+        self.assertIn("ADR-0015", self.skill)
+        self.assertIn("pip install -e .", self.root_readme)
+        adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        self.assertIn("tri_research_runtime", adapters)
+        self.assertIn("pip install -e .", adapters)
+
+        serpapi_skill = (ROOT.parent / "serpapi" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("tri_research_runtime", serpapi_skill)
+        self.assertNotIn("待 ADR-0015", serpapi_skill)
+
+        pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn("tri-research-runtime", pyproject)
 
 
 if __name__ == "__main__":

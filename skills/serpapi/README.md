@@ -99,7 +99,7 @@ python serpapi_cli.py engines
 ## 文件结构
 
 - `SKILL.md` — 技能说明、触发条件、API key 指南、安全边界
-- `scripts/serpapi_cli.py` — 自包含 SerpApi 后端实现（doc / search / batch_search / export / engines + key/proxy 处理），与 `tri-research/scripts/_search_cli.py` 共享 CLI 骨架
+- `scripts/serpapi_cli.py` — SerpApi 后端实现；CLI 骨架 import `tri_research_runtime`（ADR-0015）
 - `.env.example` — key 模板（实际 key 请用环境变量，不要落盘）
 
 ## 验证与测试

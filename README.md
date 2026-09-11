@@ -76,6 +76,8 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill serpapi
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill research-subagent
 ```
 
+共享骨架是 `tri_research_runtime`（ADR-0015）。`npx skills add` 不装 Python wheel；仓内开发可 `pip install -e .`。未 pip 时 serpapi 回退兄弟 skill 的 `src/`。
+
 ### 配置搜索后端
 
 Tri Research 依赖多个搜索后端，其中 **AnySearch / SciVerse / Exa / SerpApi 为必选**（AnySearch 为 `recommended`，匿名可用但建议配置；SerpApi 为 Key + 探活，见 ADR-0007）：
@@ -222,6 +224,7 @@ tri-research-skill/
 |   |   |-- SKILL.md               # 完整工作流 + 搜索源规范
 |   |   |-- CHANGELOG.md
 |   |   |-- test-prompts.json
+|   |   |-- src/tri_research_runtime/  # 可安装共享运行时（ADR-0015）
 |   |   |-- scripts/
 |   |   |   |-- state_machine.py   # 两步状态机
 |   |   |   |-- state_machine.sh   # Unix 兼容包装
@@ -230,9 +233,9 @@ tri-research-skill/
 |   |   |   |-- render_tex.py      # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
 |   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
-|   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / SerpApi）
-|   |   |   |-- _search_cli.py     # 搜索 CLI 共享骨架（后端注册表）
-|   |   |   |-- _common.py         # 共享常量
+|   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily）
+|   |   |   |-- _search_cli.py     # 再导出 shim → tri_research_runtime.search_cli
+|   |   |   |-- _common.py         # 共享常量（StateError 再导出）
 |   |   |-- references/
 |   |   |-- tests/                 # unittest 合约 + 验收测试（数量以 discover 输出为准）
 |   |-- research-subagent/         # 子代理 skill

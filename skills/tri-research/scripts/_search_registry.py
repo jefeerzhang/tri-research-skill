@@ -10,27 +10,27 @@ return SearchResult lists, not raw SDK dicts. Caller learns one shape.
 
 from __future__ import annotations
 
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
 # Reuse skeleton mechanism (invoke / circuit / run_with_timeout / Flag) — do
-# not duplicate. Registry is policy; _search_cli is mechanism.
+# not duplicate. Registry is policy; search_cli is mechanism. KeyProvider is
+# re-exported from tri_research_runtime (ADR-0015).
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import _runtime  # noqa: F401, E402 — puts src/ on sys.path
 import _search_cli  # noqa: E402
 from _search_cli import CONTENT_LIMIT, SNIPPET_LIMIT, truncate  # noqa: E402
+from tri_research_runtime.key_provider import KeyProvider  # noqa: E402, F401
+from tri_research_runtime.key_provider import key_from_env_file as _key_from_env_file  # noqa: E402, F401
 
 # ---------------------------------------------------------------------------
 # SearchResult — saturated small interface (B)
 # ---------------------------------------------------------------------------
-
-# Truncation limits live in _search_cli: the CLI lane and this lane must clip
-# result fields to the same widths, so neither may declare its own number.
 
 
 @dataclass(frozen=True)
@@ -95,55 +95,6 @@ def _to_search_result(raw: dict[str, Any]) -> SearchResult:
         published_date=str(published) if published else None,
         engine_meta=engine_meta,
     )
-
-
-# ---------------------------------------------------------------------------
-# KeyProvider — cli > env > .env seam
-# ---------------------------------------------------------------------------
-
-
-def _key_from_env_file(env_path: Path, env_key: str) -> str | None:
-    try:
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                key, sep, value = line.partition("=")
-                if sep and key.strip() == env_key:
-                    return value.strip().strip('"').strip("'")
-    except FileNotFoundError:
-        pass
-    return None
-
-
-class KeyProvider:
-    """Resolve API key with priority cli > env > the caller-declared .env.
-
-    Per spec C1 grill; the .env location is handed in by the caller
-    (``Backend.env_file``) — layout knowledge lives with each backend,
-    not here (ADR-0004).
-    """
-
-    @staticmethod
-    def resolve(
-        cli_key: str | None,
-        env_key: str,
-        env_file: Path | None = None,
-    ) -> str | None:
-        if cli_key:
-            return cli_key
-        env = os.environ.get(env_key)
-        if env:
-            return env
-        # The caller declares where its own .env lives (Backend.env_file);
-        # this module knows nothing about any skill's directory layout
-        # (ADR-0004).
-        if env_file is not None:
-            v = _key_from_env_file(env_file, env_key)
-            if v:
-                return v
-        return None
 
 
 # ---------------------------------------------------------------------------

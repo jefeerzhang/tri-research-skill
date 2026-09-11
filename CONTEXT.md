@@ -45,8 +45,12 @@ _Avoid_: 宿主 MCP、把 AnySearch/SciVerse 画进 Registry 总线、把 SciVer
 _Avoid_: 把 WebSearch 与 Tavily 画等号、把 Host 算进 Machine / Registry、宿主 MCP
 
 **Delivery Unit**:
-开跑一次 Research Session 的最小安装集合：`tri-research` + `serpapi` 两个 skill（`research-subagent` 推荐，`citations` 可选）。只装 `tri-research` 不足以 `state_machine start`（SerpApi 是 `required`，代码住在兄弟 skill）。两 skill 的 scripts 路径耦合仍在，待 ADR-0015。见 ADR-0012 D1。
-_Avoid_: 单技能安装即就绪、把 serpapi 写成可省略的辅助 skill、把路径耦合当成已解耦
+开跑一次 Research Session 的最小安装集合：`tri-research` + `serpapi` 两个 skill（`research-subagent` 推荐，`citations` 可选）。只装 `tri-research` 不足以 `state_machine start`（SerpApi 是 `required`，代码住在兄弟 skill）。共享骨架走 `tri_research_runtime`（ADR-0015）；Evidence Ledger / Registry 与 `required_backends` 的兄弟 `scripts/` 路径仍在。见 ADR-0012 D1。
+_Avoid_: 单技能安装即就绪、把 serpapi 写成可省略的辅助 skill、把路径耦合当成已解耦、把 npx skills add 当成会装 runtime wheel
+
+**Shared Runtime**:
+可安装包 `tri_research_runtime`（发行名 `tri-research-runtime`），导出 Machine Backend 骨架：`Backend` / `KeyProvider` / `StateError` 与 CLI 错误族、截断上限、`invoke`（进程级熔断）。源码随 `tri-research` skill 的 `src/` 走；仓内 `pip install -e .`。`npx skills add` 不装 wheel。serpapi 先 import 包，失败再找兄弟 skill 的 `src/`。Evidence Ledger 与 Registry 仍住 skill `scripts/`。
+_Avoid_: 把 runtime 包当成六源总线、把 npx 安装当成 pip、把进程级熔断当成跨进程共享
 
 **Managed Command**:
 由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责顺序（代理清理 → 经 `Backend.client()` 装配 → `invoke`（超时 / 重试 / 熔断）→ 错误 JSON 打印与退出码）；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。

@@ -24,7 +24,7 @@ SerpApi returns structured JSON for Google and 100+ other search engines, handli
 
 ## 当被 tri-research 引用时升为 required，不可回退
 
-本 skill 可单独使用。一旦被 `tri-research` 引用（ADR-0012 D1），SerpApi 升为 `required` Search Backend：`state_machine start` 前必须 Key 可解析 + 轻量探活成功，失败不建会话。不得把「未安装 / 无 key / 探活失败」回退成其他搜索源来开跑，也不得把本 skill 写成「非默认 / 可省略的辅助」。单独调用时缺 key 仍拒绝执行、不静默顶替；路径耦合（import `tri-research/scripts/_search_cli`）仍在，待 ADR-0015。
+本 skill 可单独使用。一旦被 `tri-research` 引用（ADR-0012 D1），SerpApi 升为 `required` Search Backend：`state_machine start` 前必须 Key 可解析 + 轻量探活成功，失败不建会话。不得把「未安装 / 无 key / 探活失败」回退成其他搜索源来开跑，也不得把本 skill 写成「非默认 / 可省略的辅助」。单独调用时缺 key 仍拒绝执行、不静默顶替。共享骨架 import `tri_research_runtime`（ADR-0015）：已 `pip install -e .` 则无需路径；否则需兄弟 skill `tri-research/src`。Evidence Ledger / Registry 仍读兄弟 `scripts/`。
 
 ## API key
 

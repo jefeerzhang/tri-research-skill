@@ -213,7 +213,9 @@ class LedgerBindSharedHelperTests(unittest.TestCase):
         self.assertNotIn("append_seen_hits", source)
 
     def test_default_search_paths_call_shared_helper(self) -> None:
-        source = (SCRIPT_DIR / "_search_cli.py").read_text(encoding="utf-8")
+        source = (Path(__file__).parents[1] / "src" / "tri_research_runtime" / "search_cli.py").read_text(
+            encoding="utf-8"
+        )
         self.assertGreaterEqual(source.count("bind_successful_search_to_ledger("), 3)
 
 
