@@ -285,12 +285,9 @@ class StateStore:
         must match the confirmed ``params.min_sources``.
         """
         session_id = validate_session_id(session_id)
-        # Expand `~/…` once, at the boundary: proof.build_proof already
-        # expanduser()s internally, but the Evidence Audit below reads the
-        # report through report_reference_urls, which does not. Passing the raw
-        # `~/…` made validation succeed while audit died on "cannot read
-        # report" — the documented default output path (~/tri-research-reports/)
-        # tripped this on every done.
+        # Expand `~/…` once, at the boundary. The DONE facade also
+        # expanduser()s, so Evidence Audit and structural validation share
+        # the same path even if a caller skips this line.
         report_path = Path(report_path).expanduser()
         with self._transaction(session_id) as data:
             if data["phase"] == "DONE":
@@ -301,35 +298,24 @@ class StateStore:
             confirmed_min_sources = params["min_sources"]
             if min_sources is not None and min_sources != confirmed_min_sources:
                 raise StateError(f"--min-sources does not match confirmed min_sources ({confirmed_min_sources})")
-            try:
-                # build_proof fuses the report half (validate_report) with the
-                # ledger half (evidence) behind the proof facade; the evidence
-                # audit below is a *separate* hard gate over traceability.
-                # Note: ProofError is not raised on this path — only by
-                # require_complete / verify_integrity (check). Ledger failures
-                # here are Ledger*Error (ReportValidationError subclass) and
-                # flatten to StateError like report validation failures; marker
-                # mapping lives on the verify path, not complete().
-                from proof import build_proof  # local: proof -> evidence -> state_machine
+            from evidence import EvidenceAuditFailed
+            from proof import build_proof  # local: proof -> evidence -> state_machine
 
+            try:
+                # Single DONE facade: validate + ledger fingerprint + audit.
+                # EvidenceAuditFailed is not a ReportValidationError (ADR-0014);
+                # complete() still appends the detail half-sentence. Marker
+                # mapping for INTEGRITY lives on the verify path, not here.
                 proof = build_proof(
                     self,
                     session_id,
                     report_path,
                     confirmed_min_sources,
                     expected_topic=params["topic"],
+                    audit=True,
                 )
             except ReportValidationError as exc:
                 raise StateError(str(exc)) from exc
-            # Evidence Audit hard gate: every reference URL in the report
-            # must trace to the session's evidence ledger. Imported lazily:
-            # evidence.py imports this module at load time, so a top-level
-            # import would be circular. Runs while the write lock is held
-            # but only reads the ledger — no new locking of its own.
-            from evidence import EvidenceAuditFailed, audit_report
-
-            try:
-                audit_report(self, session_id, report_path)
             except EvidenceAuditFailed as exc:
                 # The count sentence is the exception's (the `audit` command
                 # prints the same one); DONE adds the detail list so the Lead
@@ -351,6 +337,12 @@ class StateStore:
         return data
 
     def resolve_session(self, requested: str | None) -> str:
+        """Resolve a session id: explicit ``--session`` wins.
+
+        Omitting ``--session`` falls back to the ``active-session`` pointer.
+        Parallel sessions must pass ``--session`` on every command — a later
+        ``start`` overwrites the pointer (ADR-0014).
+        """
         if requested:
             return validate_session_id(requested)
         if not self.active_file.exists():
@@ -496,7 +488,10 @@ def _verify_integrity_line(data: dict[str, Any], store: StateStore) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, default=default_state_dir())
-    parser.add_argument("--session", help="Session id")
+    parser.add_argument(
+        "--session",
+        help="Session id (omit only for the active-session pointer; parallel sessions must pass this)",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("start")

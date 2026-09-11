@@ -21,7 +21,7 @@
 | `validate_report`：七章、引用闭环、URL、报告级中英、源使用行     | 来源内容核验、声明-来源匹配、红队    |
 | `evidence.py audit`：引用 URL 逐条溯源台账；台账指纹进 INTEGRITY | （来源真实性仍靠推荐流程抽查）       |
 | 报告 SHA-256 写入 `report_validation`                            | 置信标签、大纲适配、综合子代理       |
-|                                                                  | `citations` 软复核                   |
+|                                                                  | `citations` 解释 `validate_report` 输出 |
 |                                                                  | 机制图嵌入（drawio）· 渲染 LaTeX/PDF |
 
 ## 能力边界

@@ -106,6 +106,75 @@ class ProofModuleTests(unittest.TestCase):
         with self.assertRaises(self.proof.ProofMissingError):
             self.proof.verify_integrity(proof, self.store, self._session())
 
+    def test_ledger_errors_are_evidence_errors_not_report_validation(self) -> None:
+        """ADR-0014 / P1-6：台账指纹失败不得挂在 ReportValidationError 下。"""
+        for name in ("LedgerIntegrityError", "LedgerMissingError", "LedgerTamperedError"):
+            cls = getattr(self.evidence, name)
+            self.assertTrue(
+                issubclass(cls, self.evidence.EvidenceError),
+                f"{name} must hang under EvidenceError",
+            )
+            self.assertFalse(
+                any(base.__name__ == "ReportValidationError" for base in cls.__mro__),
+                f"{name} must not inherit ReportValidationError",
+            )
+
+    def test_build_proof_without_audit_skips_traceability_gate(self) -> None:
+        report = self.tmp_path / "no-audit.md"
+        make_valid_report(report)
+        proof = self.proof.build_proof(
+            self.store,
+            self._session(),
+            report,
+            10,
+            expected_topic="人工智能与劳动分配",
+            audit=False,
+        )
+        self.assertIn("sha256", proof)
+        self.assertIn("evidence_sha256", proof)
+
+    def test_build_proof_with_audit_rejects_untraced_references(self) -> None:
+        report = self.tmp_path / "need-audit.md"
+        make_valid_report(report)
+        with self.assertRaises(Exception) as ctx:
+            self.proof.build_proof(
+                self.store,
+                self._session(),
+                report,
+                10,
+                expected_topic="人工智能与劳动分配",
+                audit=True,
+            )
+        # Dual-load: catch by name, not the separately loaded evidence copy.
+        self.assertEqual(type(ctx.exception).__name__, "EvidenceAuditFailed")
+
+    def test_build_proof_with_audit_passes_when_ledger_covers_report(self) -> None:
+        report = self._report()
+        proof = self.proof.build_proof(
+            self.store,
+            self._session(),
+            report,
+            10,
+            expected_topic="人工智能与劳动分配",
+            audit=True,
+        )
+        self.assertIn("evidence_sha256", proof)
+        self.assertGreater(proof["evidence_lines"], 0)
+
+
+class DoneFacadeSourceTests(unittest.TestCase):
+    """ADR-0014 / P1-7：complete() 只调门面，不散落第二次报告解析。"""
+
+    def test_complete_calls_build_proof_with_audit_and_not_audit_report(self) -> None:
+        source = (SCRIPTS_DIR / "state_machine.py").read_text(encoding="utf-8")
+        start = source.index("    def complete(")
+        end = source.index("    def resolve_session(")
+        body = source[start:end]
+        self.assertIn("build_proof(", body)
+        self.assertIn("audit=True", body)
+        self.assertNotIn("audit_report(", body)
+        self.assertNotIn("validate_and_build_proof(", body)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,17 +43,24 @@ from state_machine import (  # noqa: E402
     default_state_dir,
     validate_session_id,
 )
-from validate_report import (  # noqa: E402
-    ReportValidationError,
-    sha256_bytes,
-)
+from validate_report import sha256_bytes  # noqa: E402
 
 KIND_SEEN = "seen"
 KIND_USER_PROVIDED = "user_provided"
 RECORD_KINDS = (KIND_SEEN, KIND_USER_PROVIDED)
 
 
-class LedgerIntegrityError(ReportValidationError):
+class EvidenceError(RuntimeError):
+    """Evidence Ledger failures distinct from Report Validation.
+
+    Ledger fingerprint MISSING / MISMATCH is not a report-format problem.
+    Callers catching ``ReportValidationError`` must not swallow a broken
+    ledger (ADR-0014). ``EvidenceAuditFailed`` stays a ``StateError`` so
+    the state-machine CLI keeps catching it.
+    """
+
+
+class LedgerIntegrityError(EvidenceError):
     """Ledger half of the DONE proof verification failed."""
 
 
@@ -339,8 +346,9 @@ def verify_ledger_integrity(proof: dict[str, Any], ledger_path: Path) -> None:
     ``validate_report.verify_proof_integrity``: reads raw bytes with the
     same recipe as fingerprint-building. Raises LedgerMissingError when
     the file cannot be read and LedgerTamperedError when its bytes no
-    longer match — both subclass ReportValidationError so callers already
-    handling that base type keep working.
+    longer match — both subclass EvidenceError, not ReportValidationError
+    (ADR-0014). The proof facade translates them into ProofMissingError /
+    ProofTamperedError.
     """
     expected_sha = proof.get("evidence_sha256")
     if not expected_sha:
@@ -356,7 +364,10 @@ def verify_ledger_integrity(proof: dict[str, Any], ledger_path: Path) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", type=Path, default=None)
-    parser.add_argument("--session", help="Session id (defaults to the active session)")
+    parser.add_argument(
+        "--session",
+        help="Session id (defaults to the active-session pointer; parallel sessions must pass this explicitly)",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     add_parser = subparsers.add_parser("add", help="Append records to the ledger")
