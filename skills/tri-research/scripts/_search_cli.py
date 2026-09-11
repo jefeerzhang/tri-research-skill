@@ -38,6 +38,7 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Mapping, Sequence as AbcSequence
 from pathlib import Path
 from typing import Any, Callable, NoReturn, Sequence, TypeVar
 
@@ -418,6 +419,53 @@ def truncate(text: str | None, limit: int) -> str:
     return text[:limit]
 
 
+def _add_ledger_session_flags(parser: argparse.ArgumentParser) -> None:
+    """``--session`` binds a successful search to the Evidence Ledger (ADR-0010)."""
+    parser.add_argument(
+        "--session",
+        default=None,
+        help="Research Session id; on success, append seen rows to the Evidence Ledger (ADR-0010)",
+    )
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        default=None,
+        help="State directory used with --session (TRI_RESEARCH_STATE_DIR / temp if omitted)",
+    )
+
+
+def bind_successful_search_to_ledger(
+    backend: Backend,
+    args: argparse.Namespace,
+    hits_by_query: Mapping[str, AbcSequence[Any]],
+) -> None:
+    """After a successful search/batch, optionally append ``seen`` rows (ADR-0010).
+
+    No-op without ``--session``. With ``--session``, a ledger write failure
+    fails the CLI (JSON error + exit 1): do not return success with a missing
+    ledger. Custom ``search_handler`` / ``batch_search_handler`` (SerpApi)
+    must call this themselves — the default path cannot see their result lists.
+    """
+    session = getattr(args, "session", None)
+    if not session:
+        return
+    try:
+        from evidence import StateStore, append_seen_hits, default_state_dir
+
+        state_dir = getattr(args, "state_dir", None)
+        store = StateStore(Path(state_dir) if state_dir is not None else default_state_dir())
+        append_seen_hits(
+            store,
+            session,
+            backend=backend.name,
+            hits_by_query=hits_by_query,
+        )
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        json_error(f"evidence ledger write failed: {exc}")
+
+
 def search(backend: Backend, args: argparse.Namespace) -> None:
     _maybe_clear_proxy(args)
     if backend.search_handler is not None:
@@ -436,6 +484,11 @@ def search(backend: Backend, args: argparse.Namespace) -> None:
         print(json.dumps({"error": str(exc), "query": args.query}, ensure_ascii=False))
         sys.exit(1)
     output["query"] = args.query
+    bind_successful_search_to_ledger(
+        backend,
+        args,
+        {args.query: output.get(backend.results_key, [])},
+    )
     print(json.dumps(output, ensure_ascii=False))
 
 
@@ -451,15 +504,19 @@ def batch_search(backend: Backend, args: argparse.Namespace) -> None:
         # and N per-query error dicts with a 0 exit code hid it.
         json_error(str(exc))
     all_results: dict[str, Any] = {}
+    hits_by_query: dict[str, list[Any]] = {}
     for query in args.query:
         try:
             output = invoke(
                 backend,
                 lambda q=query: backend.search(client, q, search_options(backend, args)),
             )
-            all_results[query] = output.get(backend.results_key, [])
+            results = output.get(backend.results_key, [])
+            all_results[query] = results
+            hits_by_query[query] = results
         except Exception as exc:
             all_results[query] = {"error": str(exc)}
+    bind_successful_search_to_ledger(backend, args, hits_by_query)
     print(json.dumps(all_results, ensure_ascii=False))
 
 
@@ -521,6 +578,9 @@ def build_parser(backend: Backend) -> argparse.ArgumentParser:
         batch_p.add_argument("--query", action="append", required=True, help="Query (can repeat)")
         for flag in backend.flags:
             flag.add_to(batch_p)
+
+    _add_ledger_session_flags(search_p)
+    _add_ledger_session_flags(batch_p)
 
     for command in backend.commands:
         command_p = subparsers.add_parser(command.name, help=command.help)

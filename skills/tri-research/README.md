@@ -62,8 +62,8 @@
   → 源检测 + 检索计划确认
   → state_machine.py start
   → state_machine.py set_params：冻结 topic、双语关键词、min_sources
-  → 并行搜索（可选 1-6 子代理）
-  → （每波后）evidence.py add 登记台账
+  → 并行搜索（可选 1-6 子代理；Exa/Tavily/SerpApi 带 `--session` 自动入账）
+  → External 源与用户资料用 evidence.py add 登记（ADR-0010）
   → （推荐）结果确认 / 质量门 / 核验 / Gap-Fill
   → 主导综合撰写最终报告
   → validate_report.py 验收（硬门禁）
