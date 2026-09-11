@@ -45,6 +45,7 @@ from validate_report import (  # noqa: E402
 from evidence import (  # noqa: E402
     LedgerMissingError,
     LedgerTamperedError,
+    audit_report,
     evidence_path,
     ledger_fingerprint,
     verify_ledger_integrity,
@@ -83,6 +84,7 @@ def build_proof(
     min_sources: int,
     *,
     expected_topic: str,
+    audit: bool = False,
 ) -> dict[str, Any]:
     """Build a complete ``report_validation`` proof in one call.
 
@@ -90,9 +92,18 @@ def build_proof(
     min_sources / topic / validated_at) with the ledger half
     (``evidence``: evidence_lines / evidence_sha256). Callers no longer
     merge two modules' outputs; they get the finished contract.
+
+    When ``audit=True`` (the DONE path), also runs Evidence Audit against
+    the same expanded report path so orchestration does not parse the
+    report a second time. ``EvidenceAuditFailed`` propagates unchanged so
+    ``complete()`` can still append its detail half-sentence. Default
+    ``False`` keeps library / test callers that only need the fingerprint.
     """
+    report_path = Path(report_path).expanduser()
     proof = validate_and_build_proof(report_path, min_sources, expected_topic=expected_topic)
     proof.update(ledger_fingerprint(store, session_id))
+    if audit:
+        audit_report(store, session_id, report_path)
     return proof
 
 

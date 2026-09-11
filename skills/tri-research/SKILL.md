@@ -32,7 +32,7 @@ version: "6.9.0"
 
 ### 推荐流程（非硬门禁）
 
-质量门自检、来源内容核验、Gap-Fill、红队自批判、置信标签、声明-来源匹配、用户确认闸门、`citations` 软复核、机制图 / PDF 交付（见「可选交付」）。提高证据质量，**不写入验收器**。
+质量门自检、来源内容核验、Gap-Fill、红队自批判、置信标签、声明-来源匹配、用户确认闸门、`citations` 软层（解释 `validate_report` 输出，不另维护规则；ADR-0014）、机制图 / PDF 交付（见「可选交付」）。提高证据质量，**不写入验收器**。
 
 ## 研究流程
 
@@ -54,6 +54,8 @@ version: "6.9.0"
 python scripts/state_machine.py --session <session-id> start
 python scripts/state_machine.py --session <session-id> set_params '{"topic":"主题","min_sources":10,"keywords_zh":["..."],"keywords_en":["..."]}'
 ```
+
+并行会话（同时开两个以上 Research Session）时，**每一条** `state_machine` / `evidence` / Machine 检索命令都必须显式 `--session <id>`（ADR-0014）。`active-session` 指针只服务单会话回退；后一次 `start` 会覆盖它，省略 `--session` 会打到错误会话。
 
 `start` 会机器检查 Exa（`EXA_API_KEY` + `exa-py`）与 SciVerse（`SCIVERSE_API_TOKEN` + `sciverse`），并对 SerpApi 解析 `SERPAPI_KEY` + 做一次轻量探活；未配置或探活失败则 `ERROR:` 退出、不建会话——须先按「首次使用引导」配齐再开跑。
 

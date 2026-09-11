@@ -541,6 +541,51 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("## Host 能力", adapters)
         self.assertIn("ADR-0013", adapters)
 
+    def test_adr_0014_control_plane_polish(self) -> None:
+        """ADR-0014：异常分类、DONE 门面、citations 软层、并行必须 --session。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0014-DONE门面与active-session身份.md").read_text(encoding="utf-8")
+        for phrase in (
+            "EvidenceError",
+            "ReportValidationError",
+            "build_proof",
+            "audit=True",
+            "citations",
+            "validate_report",
+            "--session",
+            "active-session",
+            "P1-6",
+            "P1-7",
+            "被拒",
+        ):
+            self.assertIn(phrase, adr)
+
+        context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+        self.assertIn("**Evidence Error**", context)
+        self.assertIn("**Active Session Pointer**", context)
+        self.assertIn("ReportValidationError", context)
+        self.assertIn("并行", context)
+
+        self.assertIn("ADR-0014", self.skill)
+        self.assertIn("并行会话", self.skill)
+        self.assertIn("--session", self.skill)
+        self.assertIn("active-session", self.skill)
+
+        citations = (ROOT.parent / "citations" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("validate_report.py", citations)
+        validator = load_module(ROOT / "scripts" / "validate_report.py", "validate_report_citations_contract")
+        listed_headings = sum(1 for heading in validator.REQUIRED_HEADINGS if heading in citations)
+        self.assertLess(
+            listed_headings,
+            len(validator.REQUIRED_HEADINGS),
+            "citations SKILL must not independently enumerate all required chapters",
+        )
+        listed_sources = sum(1 for name in validator.USAGE_ROSTER if name in citations)
+        self.assertLess(
+            listed_sources,
+            len(validator.USAGE_ROSTER),
+            "citations SKILL must not independently enumerate USAGE_ROSTER",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

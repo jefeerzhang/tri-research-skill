@@ -61,8 +61,16 @@ Evidence Ledger 的单条记录，只可能是两种 kind 之一：`seen`（搜�
 _Avoid_: 引用记录、采纳标记（adopted）混称
 
 **Evidence Audit**:
-报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。失败文本只有一个家——`EvidenceAuditFailed` 持有 `untraced / total` 与那句计数，`audit` 命令与 `done` 门禁各自追加自己的半句（登记指引 / 明细列表），两处不得再手抄。
+报告参考文献对 Evidence Ledger 的溯源对账：每条引用 URL 经统一归一化后必须在台账中命中（`user_provided` 与 `seen` 同等资格），作为 `done` 的硬门禁，untraced 即失败。失败文本只有一个家——`EvidenceAuditFailed` 持有 `untraced / total` 与那句计数，`audit` 命令与 `done` 门禁各自追加自己的半句（登记指引 / 明细列表），两处不得再手抄。`done` 经 `proof.build_proof(..., audit=True)` 一次门面跑完结构验收、台账指纹与本对账，编排层不得再散落第二次报告解析（ADR-0014）。
 _Avoid_: 引用校验、格式验收混称（那是 Report Validation）、把门禁合并成单一 completion_gate（判定与对账的失败语义与修复路径不同）
+
+**Evidence Error**:
+Evidence Ledger 完整性失败的基类（`LedgerIntegrityError` → `LedgerMissingError` / `LedgerTamperedError`）。台账指纹 MISSING / MISMATCH **不是** Report Validation：不得继承 `ReportValidationError`。`proof.verify_integrity` 仍把台账半区译成 `ProofMissingError` / `ProofTamperedError`（`marker` 不变）。溯源失败仍是 `EvidenceAuditFailed`（`StateError`）。
+_Avoid_: 把台账 INTEGRITY 失败当成报告格式错误、把 Ledger*Error 挂回 ReportValidationError
+
+**Active Session Pointer**:
+状态目录下的 `active-session` 文件，记录最近一次 `start` 的 `session_id`，供省略 `--session` 时回退。并行 Research Session **必须**在每条 `state_machine` / `evidence` / Machine 检索命令上显式传 `--session`；后一次 `start` 会覆盖指针，省略即打到错误会话。指针写入已有原子替换；不加第二把锁（与 per-session `write_lock` 嵌套有锁序反转风险，ADR-0014）。
+_Avoid_: 全局当前任务、把指针当并行会话身份、用锁代替显式 `--session`
 
 **Report Parse**:
 研究报告契约的唯一解析表面（`_report_parse.py`）：章节切分、参考文献字段、行内 span（code / bold / cite / conf）、围栏判定与 URL 方言。只回答「这份文本长什么样」，不回答「合不合格」——判定属 Report Validation，对账属 Evidence Audit，排版属 LaTeX/PDF 渲染器，三方共读同一份解析结果。
