@@ -454,16 +454,17 @@ class SkillContractTests(unittest.TestCase):
             "Host",
             "SearchBackendRegistry",
             "程序化 seam",
-            "不是 Lead",
+            "不是** Lead",
             "AnySearch",
             "SciVerse",
             "WebSearch",
             "Exa",
             "SerpApi",
             "Tavily",
+            "标成「宿主 MCP」",
+            "被拒",
         ):
             self.assertIn(phrase, adr)
-        self.assertNotIn("宿主 MCP", adr)
 
         context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("**Machine Backend**", context)
