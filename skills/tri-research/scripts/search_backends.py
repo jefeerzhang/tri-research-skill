@@ -70,6 +70,7 @@ class ExaBackend(_search_cli.Backend):
     sdk = exa_py
     missing_sdk_message = "exa-py not installed"
     env_key = "EXA_API_KEY"
+    requirement = _search_cli.BackendRequirementLevel.REQUIRED
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
     requirement = _search_cli.BackendRequirementLevel.REQUIRED
     apply_url = "https://dashboard.exa.ai/api-keys"
@@ -182,6 +183,7 @@ class TavilyBackend(_search_cli.Backend):
     sdk = TavilyClient
     missing_sdk_message = "tavily-python not installed"
     env_key = "TAVILY_API_KEY"
+    requirement = _search_cli.BackendRequirementLevel.OPTIONAL
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
     requirement = _search_cli.BackendRequirementLevel.OPTIONAL
     apply_url = "https://app.tavily.com/home"

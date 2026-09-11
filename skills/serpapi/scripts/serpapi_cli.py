@@ -387,6 +387,7 @@ class SerpApiBackend(_search_cli.Backend):
     sdk = requests
     missing_sdk_message = "requests not installed"
     env_key = "SERPAPI_KEY"
+    requirement = _search_cli.BackendRequirementLevel.REQUIRED
     # This skill's own .env, declared here so KeyProvider needs no layout
     # knowledge (ADR-0004) — the only place this file names the path.
     env_file = Path(__file__).resolve().parents[1] / ".env"
@@ -408,6 +409,19 @@ class SerpApiBackend(_search_cli.Backend):
     def probe(self, client: Any) -> bool:
         _serpapi_fetch("google", "test", None, None, 1, client.api_key)
         return True
+
+    def readiness(self) -> list[str]:
+        gaps = super().readiness()
+        if gaps:
+            return gaps
+        try:
+            ok = _search_cli._run_with_timeout(
+                lambda: self.probe(self.client_factory(load_key())),
+                self.call_timeout,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return [f"{self.name}: probe failed: {exc}"]
+        return [] if ok else [f"{self.name}: probe failed"]
 
     def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
         data = _serpapi_fetch(

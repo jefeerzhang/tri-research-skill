@@ -160,6 +160,36 @@ class RequiredBackendsGateTests(unittest.TestCase):
         self.assertIn("sciverse SDK not installed", msg)
         self.assertIn("SERPAPI_KEY not set", msg)
 
+    def test_backend_requirement_contract_is_declarative(self) -> None:
+        cli = load_module(SCRIPTS_DIR / "_search_cli.py", "search_cli_requirement_contract")
+        self.assertEqual([level.value for level in cli.BackendRequirementLevel], ["required", "recommended", "optional"])
+        backend = cli.Backend()
+        self.assertEqual(backend.requirement, cli.BackendRequirementLevel.OPTIONAL)
+        self.assertEqual(backend.readiness(), [])
+
+    def test_declared_required_backends_are_collected_through_readiness(self) -> None:
+        cli = load_module(SCRIPTS_DIR / "_search_cli.py", "search_cli_required_collection")
+        required = cli.BackendRequirementLevel.REQUIRED
+        ready = mock.Mock(name="ready")
+        ready.name = "Ready"
+        ready.requirement = required
+        ready.readiness.return_value = []
+        broken = mock.Mock(name="broken")
+        broken.name = "Broken"
+        broken.requirement = required
+        broken.readiness.return_value = ["Broken: unavailable"]
+        with mock.patch.object(self.rb, "declared_backends", return_value=[ready, broken]):
+            with mock.patch.object(self.rb, "_sciverse_readiness", return_value=[]):
+                with self.assertRaises(self.rb.StateError) as ctx:
+                    self.rb.require_required_backends()
+        self.assertIn("Broken: unavailable", str(ctx.exception))
+
+    def test_machine_backends_declare_requirement_levels(self) -> None:
+        backends = load_module(SCRIPTS_DIR / "search_backends.py", "search_backends_requirement_contract")
+        cli = load_module(SCRIPTS_DIR / "_search_cli.py", "search_cli_requirement_levels")
+        self.assertEqual(backends.EXA_BACKEND.requirement, cli.BackendRequirementLevel.REQUIRED)
+        self.assertEqual(backends.TAVILY_BACKEND.requirement, cli.BackendRequirementLevel.OPTIONAL)
+
 
 class RequiredDescriptorsDataDrivenTests(unittest.TestCase):
     """Adding or changing ``requirement`` is a data change, not a walker edit."""
