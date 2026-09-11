@@ -39,6 +39,7 @@ import sys
 import threading
 import time
 from collections.abc import Mapping, Sequence as AbcSequence
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, NoReturn, Sequence, TypeVar
 
@@ -63,6 +64,20 @@ def _backend_api_key(backend: Backend, cli_key: str | None = None) -> str | None
     from _search_registry import KeyProvider
 
     return KeyProvider.resolve(cli_key, backend.env_key, backend.env_file)
+
+
+class BackendRequirementLevel(StrEnum):
+    """Executable three-tier necessity (CONTEXT.md ``BackendRequirementLevel``).
+
+    The Required gate walks descriptors whose ``requirement`` is
+    ``REQUIRED`` (ADR-0011). ``RECOMMENDED`` / ``OPTIONAL`` are declared on
+    the same field so promoting a backend is a data change, not a new
+    branch in ``require_required_backends``.
+    """
+
+    REQUIRED = "required"
+    RECOMMENDED = "recommended"
+    OPTIONAL = "optional"
 
 
 class CircuitOpenError(RuntimeError):
@@ -192,6 +207,15 @@ class Backend:
     # env-only. KeyProvider reads only what it is handed — no skill-layout
     # knowledge anywhere (ADR-0004).
     env_file: Path | None = None
+    # Necessity + start-gate shape live on the Backend, not BackendSpec
+    # (Spec is Registry identity only; a second copy would drift, ADR-0008).
+    requirement: BackendRequirementLevel = BackendRequirementLevel.OPTIONAL
+    # ADR-0007 narrow exception: only SerpApi probes at start. Exa / Tavily
+    # stay K+S (or unused, for optional) with no start-time network call.
+    start_probe: bool = False
+    apply_url: str = ""
+    verify_cmd: str = ""
+    configure_hint: str = ""
     search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     batch_search_handler: Callable[[Any, argparse.Namespace], None] | None = None
     search_args_builder: Callable[[argparse.ArgumentParser], None] | None = None
@@ -231,6 +255,27 @@ class Backend:
         if self.sdk is None:
             raise SdkMissing(self.missing_sdk_message)
         return self.client_factory(self.api_key(cli_key=cli_key))
+
+    def readiness(self) -> list[str]:
+        """Gap strings for the Required gate; empty means this backend is ready.
+
+        Assembly judgment is ``client()`` (SDK → key → build). Backends with
+        ``start_probe`` then reuse ``probe`` under the same timeout as
+        ``check``. The gate's dialect is a collected gap list, not a raise.
+        """
+        try:
+            client = self.client()
+        except ClientSetupError as exc:
+            return [f"{self.name}: {exc}"]
+        if not self.start_probe:
+            return []
+        try:
+            ok = run_with_timeout(lambda: self.probe(client), self.call_timeout)
+        except Exception as exc:  # noqa: BLE001 — probe failure surfaces as a gap
+            return [f"{self.name}: probe failed: {exc}"]
+        if not ok:
+            return [f"{self.name}: probe failed"]
+        return []
 
     def probe(self, client: Any) -> bool:
         """Run a trivial query; return True on success, raise on failure."""

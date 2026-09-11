@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Required Backend gate: Exa + SciVerse (K+S) and SerpApi (Key + probe) must be
-ready before a Research Session starts.
+"""Required Backend gate: walk ``requirement=required`` descriptors before start.
 
-- Exa / SciVerse: K+S check — Key resolvable via KeyProvider, and the SDK
-  importable. No network probe (ADR-0006).
-- SerpApi: Key resolvable via KeyProvider **plus** a lightweight live probe
-  (reuse ``SerpApiBackend.probe``). This narrowly reopens ADR-0006's rejection
-  of a start-time network probe for SerpApi only (see the ADR that evolves it).
+Machine Web Backends (Exa / Tavily / SerpApi) declare ``requirement`` and
+``readiness()`` on ``Backend``. SciVerse is an academic SDK path, not a Web
+Backend: it is a ``SciVerseReadiness`` descriptor on the **same** list, and
+must not be registered into ``SearchBackendRegistry`` (ADR-0006).
 
-Called from ``StateStore.start_session``. No user/env escape hatch — tests patch
-this module's ``require_required_backends`` or supply stub SDKs + keys (for
-SerpApi, a stub ``requests`` on PYTHONPATH so the probe passes offline).
+- Exa: K+S via ``Backend.client()`` (same assembly as every other lane).
+- SciVerse: K+S via KeyProvider + SDK import (no client to assemble).
+- SerpApi: ``client()`` plus ``start_probe`` (ADR-0007 narrow exception).
+- Tavily stays ``optional``; AnySearch ``recommended`` stays documentation-only.
+
+Called from ``StateStore.start_session``. No user/env escape hatch — tests
+patch this module's ``require_required_backends`` or supply stub SDKs + keys
+(for SerpApi, a stub ``requests`` on PYTHONPATH so the probe passes offline).
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import importlib.util
 import os
 import sys
 from pathlib import Path
+from typing import Protocol
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
@@ -29,26 +33,53 @@ if str(_SCRIPT_DIR) not in sys.path:
 _SERPAPI_SCRIPTS = _SCRIPT_DIR.parents[1] / "serpapi" / "scripts"
 
 from _common import StateError  # noqa: E402
-import _search_cli  # noqa: E402
-from _search_cli import run_with_timeout  # noqa: E402
+from _search_cli import BackendRequirementLevel  # noqa: E402
 from _search_registry import KeyProvider  # noqa: E402
 
-EXA_ENV_KEY = "EXA_API_KEY"
-EXA_ENV_FILE = _SCRIPT_DIR.parent / ".env"
-EXA_SDK = "exa_py"
-EXA_APPLY = "https://dashboard.exa.ai/api-keys"
-EXA_VERIFY = "python scripts/exa_search.py check"
-
-SCIVERSE_ENV_KEY = "SCIVERSE_API_TOKEN"
-SCIVERSE_SDK = "sciverse"
-SCIVERSE_APPLY = "https://sciverse.space/docs#auth"
-SCIVERSE_VERIFY = "python -c \"from sciverse import AgentToolsClient; print('ok')\""
-
-SERPAPI_ENV_KEY = "SERPAPI_KEY"
-SERPAPI_APPLY = "https://serpapi.com/dashboard"
-SERPAPI_VERIFY = "python skills/serpapi/scripts/serpapi_cli.py check"
-
 _serpapi_backend = None  # cached lazily so tests can patch the getter
+
+
+class ReadinessDescriptor(Protocol):
+    """Shared surface for Machine backends and SciVerseReadiness."""
+
+    name: str
+    requirement: BackendRequirementLevel
+    apply_url: str
+    verify_cmd: str
+    configure_hint: str
+
+    def readiness(self) -> list[str]: ...
+
+
+class SciVerseReadiness:
+    """Academic-SDK readiness; not a Web Backend (ADR-0006 / ADR-0011)."""
+
+    name = "SciVerse"
+    requirement = BackendRequirementLevel.REQUIRED
+    env_key = "SCIVERSE_API_TOKEN"
+    sdk_module = "sciverse"
+    apply_url = "https://sciverse.space/docs#auth"
+    verify_cmd = "python -c \"from sciverse import AgentToolsClient; print('ok')\""
+    configure_hint = (
+        f"pip install sciverse && export {env_key}=<token> ({apply_url})"
+    )
+
+    def readiness(self) -> list[str]:
+        gaps: list[str] = []
+        if not KeyProvider.resolve(None, self.env_key, _sciverse_env_file()):
+            gaps.append(f"{self.name}: {self.env_key} not set")
+        if not _sdk_importable(self.sdk_module):
+            gaps.append(f"{self.name}: {self.sdk_module} SDK not installed")
+        return gaps
+
+
+SCIVERSE_READINESS = SciVerseReadiness()
+
+# Aliases so older tests can name env keys; canonical homes are the descriptors.
+EXA_ENV_KEY = "EXA_API_KEY"
+SCIVERSE_ENV_KEY = SCIVERSE_READINESS.env_key
+SCIVERSE_SDK = SCIVERSE_READINESS.sdk_module
+SERPAPI_ENV_KEY = "SERPAPI_KEY"
 
 
 def _sdk_importable(module_name: str) -> bool:
@@ -78,54 +109,35 @@ def _get_serpapi_backend():
     return _serpapi_backend
 
 
-def _serpapi_gap() -> str | None:
-    """Return a gap string if SerpApi is not Key + probe ready, else None."""
-    backend = _get_serpapi_backend()
-    try:
-        # Same setup rules as every other lane (SDK before key, ADR-0002);
-        # the gate's dialect is a collected gap string, not a raised failure.
-        client = backend.client()
-    except _search_cli.ClientSetupError as exc:
-        return f"SerpApi: {exc}"
-    try:
-        # Wrap in the shared timeout helper so the probe runs under the same
-        # timeout semantics as ``_search_cli.check`` / ``REGISTRY.check``
-        # (Windows has no SIGALRM; the requests timeout alone is not enough).
-        ok = run_with_timeout(lambda: backend.probe(client), backend.call_timeout)
-    except Exception as exc:  # noqa: BLE001 — probe failure surfaces as a gap
-        return f"SerpApi: probe failed: {exc}"
-    if not ok:
-        return "SerpApi: probe failed"
-    return None
+def _machine_backends():
+    from search_backends import EXA_BACKEND, TAVILY_BACKEND
+
+    return (EXA_BACKEND, TAVILY_BACKEND, _get_serpapi_backend())
 
 
-def _collect_gaps() -> list[str]:
-    gaps: list[str] = []
-    if not KeyProvider.resolve(None, EXA_ENV_KEY, EXA_ENV_FILE):
-        gaps.append(f"Exa: {EXA_ENV_KEY} not set")
-    if not _sdk_importable(EXA_SDK):
-        gaps.append(f"Exa: {EXA_SDK} SDK not installed")
-    if not KeyProvider.resolve(None, SCIVERSE_ENV_KEY, _sciverse_env_file()):
-        gaps.append(f"SciVerse: {SCIVERSE_ENV_KEY} not set")
-    if not _sdk_importable(SCIVERSE_SDK):
-        gaps.append(f"SciVerse: {SCIVERSE_SDK} SDK not installed")
-    serpapi_gap = _serpapi_gap()
-    if serpapi_gap:
-        gaps.append(serpapi_gap)
-    return gaps
+def iter_readiness_descriptors() -> tuple[ReadinessDescriptor, ...]:
+    """Machine Web Backends + SciVerseReadiness, in one iteration list."""
+    return (*_machine_backends(), SCIVERSE_READINESS)
+
+
+def iter_required_descriptors() -> tuple[ReadinessDescriptor, ...]:
+    return tuple(
+        d for d in iter_readiness_descriptors() if d.requirement == BackendRequirementLevel.REQUIRED
+    )
+
+
+def _guide(descriptors: tuple[ReadinessDescriptor, ...]) -> str:
+    parts = [f"{d.name}: {d.configure_hint}, verify: {d.verify_cmd}" for d in descriptors]
+    return "Configure before start — " + "; ".join(parts)
 
 
 def require_required_backends() -> None:
-    """Raise StateError if Exa / SciVerse (K+S) or SerpApi (Key + probe) not ready."""
-    gaps = _collect_gaps()
+    """Raise StateError if any required descriptor reports a readiness gap."""
+    required = iter_required_descriptors()
+    gaps: list[str] = []
+    for descriptor in required:
+        gaps.extend(descriptor.readiness())
     if not gaps:
         return
     detail = "; ".join(gaps)
-    guide = (
-        f"Configure before start — "
-        f"Exa: pip install exa-py && export {EXA_ENV_KEY}=<key> ({EXA_APPLY}), verify: {EXA_VERIFY}; "
-        f"SciVerse: pip install sciverse && export {SCIVERSE_ENV_KEY}=<token> ({SCIVERSE_APPLY}), "
-        f"verify: {SCIVERSE_VERIFY}; "
-        f"SerpApi: export {SERPAPI_ENV_KEY}=<key> ({SERPAPI_APPLY}), verify: {SERPAPI_VERIFY}"
-    )
-    raise StateError(f"required backends not ready: {detail}. {guide}")
+    raise StateError(f"required backends not ready: {detail}. {_guide(required)}")

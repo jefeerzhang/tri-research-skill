@@ -24,7 +24,7 @@ Read this reference only when concrete tool names, install paths, or rendering b
 
 **重要：Runtime WebSearch 与 Tavily 是两个独立的源。** **Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `tavily-python` SDK 调用，CLI 封装见 `tri-research/scripts/tavily_search.py`，**仅 Lead Agent**），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
 
-**重要：Exa / SciVerse 是 `required` K+S 硬门禁**（Lead + 子代理），**SerpApi 是 `required` Key + 探活硬门禁**（仅 Lead）：`state_machine start` 前 Exa / SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 `SERPAPI_KEY` 可解析 + 轻量探活成功（ADR-0007），均无用户降级逃逸。Exa：`pip install exa-py` + `EXA_API_KEY`（`scripts/exa_search.py`）；SciVerse：`pip install sciverse` + `SCIVERSE_API_TOKEN`（仅 Python SDK，禁止 MCP）；SerpApi：`export SERPAPI_KEY=<key>`（`skills/serpapi/scripts/serpapi_cli.py`，无需额外 SDK）。分级见 `CONTEXT.md` 的 `BackendRequirementLevel`（ADR-0001 / ADR-0006 / ADR-0007）。Google Scholar 是 SerpApi 的间接能力，非独立后端。
+**重要：Exa / SciVerse 是 `required` K+S 硬门禁**（Lead + 子代理），**SerpApi 是 `required` Key + 探活硬门禁**（仅 Lead）：`state_machine start` 前按描述符 `requirement` 字段遍历（ADR-0011）。Exa / SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 `SERPAPI_KEY` 可解析 + 轻量探活成功（ADR-0007），均无用户降级逃逸。Exa 就绪与 `Backend.client()` 同一装配判断。Exa：`pip install exa-py` + `EXA_API_KEY`（`scripts/exa_search.py`）；SciVerse：`pip install sciverse` + `SCIVERSE_API_TOKEN`（仅 Python SDK，禁止 MCP；`SciVerseReadiness` 描述符，**不是** Registry 中的 Web Backend）；SerpApi：`export SERPAPI_KEY=<key>`（`skills/serpapi/scripts/serpapi_cli.py`，无需额外 SDK）。分级见 `CONTEXT.md` 的 `BackendRequirementLevel`（ADR-0001 / ADR-0006 / ADR-0007 / ADR-0011）。Google Scholar 是 SerpApi 的间接能力，非独立后端。
 
 **重要：检索成功与 Evidence Ledger 因果绑定（ADR-0010）。** Lead 研究主路径调用 Exa / Tavily / SerpApi 的 `search` / `batch_search` 时必须传 `--session`：成功即追加 `seen` 行，台账写入失败则 CLI 非零退出。无 `--session` 的裸搜不是研究主路径。AnySearch / SciVerse / WebSearch 本波不改外部包，仍用 `evidence.py add` 标准模板登记。Audit 算法仍是 ADR-0005。
 
@@ -62,6 +62,28 @@ asyncio.run(main())
 ```
 
 返回的 `hit` dict 含 `title` / `doc_id`（SHA-256 论文唯一稳定标识）/ `score` / `author` / `abstract` / `chunk`，**无** `year` / `url` / DOI 字段（DOI 需从 `read_content` 输出的 markdown 文本中用正则解析）。**禁止**用 `mcp__sciverse__*` 工具（实测 Proma 子会话不继承）也**禁止**走 `npx sciverse-mcp-server` 启动 stdio MCP server（v6.0.0 已弃用）。
+
+## WebBackend 扩展清单
+
+新增仓内 Machine Web Backend（走 `_search_cli.Backend` + `SearchBackendRegistry`）时：
+
+1. 子类 `Backend`，实现 `probe` / `search`，申报 `env_key` / `env_file` / `sdk` / `client_factory`。
+2. 设 `requirement`（`BackendRequirementLevel`）。`start_probe=True` 仅用于 SerpApi 式「Key + start 探活」（ADR-0007）；Exa 式 K+S 保持默认 `False`。
+3. 设 `apply_url` / `verify_cmd` / `configure_hint`，供 Required 门禁错误 guide 拼装——不要在 `required_backends` 再手抄一份。
+4. `readiness()` 默认转 `Backend.client()`；禁止再并行手写 KeyProvider + `find_spec`。
+5. `REGISTRY.register(BackendSpec(name=..., backend=...))`。`requirement` 住在 Backend 上，不复制到 Spec。
+6. 研究主路径 `search` / `batch_search` 接 `--session`（ADR-0010）。
+7. **不要**把 SciVerse 一类学术 SDK 路径注册进 Registry（下节 ExternalTool）。
+
+## ExternalTool 扩展清单
+
+新增非 Web Backend 的外部工具（如 SciVerse）且需要进 Required 门禁时：
+
+1. **禁止** `REGISTRY.register` 成 Web Backend（ADR-0006）。
+2. 实现与 Machine Backend 同形的就绪描述符：`name` / `requirement` / `readiness()` / `configure_hint` / `verify_cmd`（见 `SciVerseReadiness`）。
+3. 挂到 `required_backends.iter_readiness_descriptors()` 同一列表；`requirement=required` 由 walker 自动纳入 `start` 硬门禁，无需改 `require_required_backends` 正文。
+4. 就绪判断不得发明第二套 key/SDK 规则：有 `Backend.client()` 就转它；没有客户端可装配的才在描述符内做 K+S。
+5. AnySearch `recommended` 本波仍文档-only，不要为黄字提醒硬接外部 CLI。
 
 ## Fetch and render policy
 

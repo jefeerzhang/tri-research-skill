@@ -23,7 +23,7 @@ version: "6.9.0"
 
 ### 硬门禁（代码强制）
 
-1. Required Backend：`start` 前 Exa + SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 Key 可解析 + 轻量探活成功（ADR-0007，仅 SerpApi 允许 start 探活）；任一失败不建会话、无降级逃逸
+1. Required Backend：`start` 前按描述符 `requirement=required` 机器检查（ADR-0011）：Exa + SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 Key 可解析 + 轻量探活成功（ADR-0007，仅 SerpApi 允许 start 探活）；任一失败不建会话、无降级逃逸
 2. 两步状态机：`start` → `set_params` →（搜索与撰写）→ `done --report <path>`；只前进不后退；可选 `add_dimensions` 追加
 3. `set_params` 冻结 `topic`、`min_sources`（≥10）、非空 `keywords_zh` / `keywords_en`
 4. `done` 前 `validate_report.py` 必须通过：七章齐全、H1 含确认主题、参考文献 ≥ min_sources 且编号连续、正文 `[N]` 闭环、每条含合法唯一 http(s) URL + `层级:` + `来源:`、报告级中英证据、执行情况「搜索源使用」行点名六源（AnySearch / SciVerse / Exa / SerpApi / Tavily / WebSearch；Tavily 可写 `0/跳过`，不得省略；ADR-0009）
@@ -136,7 +136,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 ## 搜索源
 
-六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch），分级定义见 `CONTEXT.md` 的 `BackendRequirementLevel`：
+六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch），分级定义见 `CONTEXT.md` 的 `BackendRequirementLevel`（机器可执行，ADR-0011）：
 
 | 源                    | 使用者              | 用途                                                 | 必要性                                         |
 | --------------------- | ------------------- | ---------------------------------------------------- | ---------------------------------------------- |
@@ -147,7 +147,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 | **SerpApi**           | Lead Agent          | Google Scholar（间接）与垂直 SERP                    | **必选** (`required`，Key + 探活)              |
 | **Runtime WebSearch** | Lead Agent          | 通用补充（宿主内置抽象，不等于 Tavily）              | 可选 (`optional`)                              |
 
-硬门禁：`required`（Exa / SciVerse）在 `state_machine start` 前机器强制（缺 Key 或 SDK → `StateError`，无用户降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前机器强制（Key 可解析 + 轻量探活成功，ADR-0007）。`recommended`（AnySearch）缺失 → 黄字提醒但允许匿名；`optional` 不可用 → 静默跳过，单源失败不阻断。Exa / SciVerse / SerpApi / AnySearch 为**必选搜索源**（AnySearch 为 `recommended` 允许匿名）。
+硬门禁：`required`（Exa / SciVerse）在 `state_machine start` 前机器强制（缺 Key 或 SDK → `StateError`，无用户降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前机器强制（Key 可解析 + 轻量探活成功，ADR-0007）。档位由描述符 `requirement` 字段驱动（ADR-0011），不是门禁里手抄的名单。`recommended`（AnySearch）缺失 → 黄字提醒但允许匿名；`optional` 不可用 → 静默跳过，单源失败不阻断。Exa / SciVerse / SerpApi / AnySearch 为**必选搜索源**（AnySearch 为 `recommended` 允许匿名）。
 
 > **Scholar 不是独立后端**：Google Scholar 是 SerpApi 的**间接**能力（`--engine google_scholar`），SerpApi 与 Google Scholar 不可混为一谈。仅人文社科主题约定 Lead 至少跑一轮 `google_scholar`；STEM 主题不强制，避免烧 SerpApi 配额.
 

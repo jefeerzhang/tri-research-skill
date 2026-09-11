@@ -1,7 +1,9 @@
 """Required Backend gate (Exa + SciVerse K+S; SerpApi Key + probe).
 
 Seam: ``require_required_backends`` and ``StateStore.start_session`` behavior
-when the gate fails (no session / active pointer written).
+when the gate fails (no session / active pointer written). ADR-0011: the
+gate walks ``requirement=required`` descriptors; changing a backend's
+``requirement`` field is enough to include or exclude it.
 """
 
 from __future__ import annotations
@@ -14,6 +16,8 @@ from unittest import mock
 from _test_helpers import load_module, patch_required_backends
 
 import _search_cli  # noqa: E402 — _test_helpers puts scripts/ on sys.path
+from _search_cli import BackendRequirementLevel  # noqa: E402
+from search_backends import EXA_BACKEND, TAVILY_BACKEND  # noqa: E402
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
@@ -34,6 +38,11 @@ class _FakeSerpApiBackend(_search_cli.Backend):
     sdk = object()  # truthy → treat as "requests" installed
     missing_sdk_message = "requests not installed"
     call_timeout = 60.0
+    requirement = BackendRequirementLevel.REQUIRED
+    start_probe = True
+    apply_url = "https://serpapi.com/dashboard"
+    verify_cmd = "python skills/serpapi/scripts/serpapi_cli.py check"
+    configure_hint = f"export {env_key}=<key> ({apply_url})"
 
     def __init__(self, probe_return: bool = True, probe_error: Exception | None = None, sdk: object = object()) -> None:
         self._probe_return = probe_return
@@ -55,6 +64,12 @@ class RequiredBackendsGateTests(unittest.TestCase):
         self._serpapi_patch = mock.patch.object(self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend())
         self._serpapi_patch.start()
         self.addCleanup(self._serpapi_patch.stop)
+        # Exa readiness now goes through Backend.client(); without a real
+        # exa_py the singleton's sdk is None. Pin a dummy so key-only tests
+        # are not short-circuited by SdkMissing.
+        self._exa_sdk_patch = mock.patch.object(EXA_BACKEND, "sdk", object())
+        self._exa_sdk_patch.start()
+        self.addCleanup(self._exa_sdk_patch.stop)
 
     def test_ready_when_keys_and_sdks_present(self) -> None:
         with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
@@ -133,16 +148,86 @@ class RequiredBackendsGateTests(unittest.TestCase):
         self.assertIn("SerpApi: requests not installed", str(ctx.exception))
 
     def test_lists_all_gaps_in_one_error(self) -> None:
-        with mock.patch.object(self.rb.KeyProvider, "resolve", return_value=None):
-            with mock.patch.object(self.rb, "_sdk_importable", return_value=False):
-                with self.assertRaises(self.rb.StateError) as ctx:
-                    self.rb.require_required_backends()
+        with mock.patch.object(EXA_BACKEND, "sdk", None):
+            with mock.patch.object(self.rb.KeyProvider, "resolve", return_value=None):
+                with mock.patch.object(self.rb, "_sdk_importable", return_value=False):
+                    with self.assertRaises(self.rb.StateError) as ctx:
+                        self.rb.require_required_backends()
         msg = str(ctx.exception)
-        self.assertIn("EXA_API_KEY not set", msg)
-        self.assertIn("exa_py SDK not installed", msg)
+        # Exa goes through client(): SDK missing short-circuits before the key.
+        self.assertIn("exa-py not installed", msg)
         self.assertIn("SCIVERSE_API_TOKEN not set", msg)
         self.assertIn("sciverse SDK not installed", msg)
         self.assertIn("SERPAPI_KEY not set", msg)
+
+
+class RequiredDescriptorsDataDrivenTests(unittest.TestCase):
+    """Adding or changing ``requirement`` is a data change, not a walker edit."""
+
+    def setUp(self) -> None:
+        self.rb = load_module(SCRIPTS_DIR / "required_backends.py", "required_backends_data_driven")
+        self._serpapi_patch = mock.patch.object(self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend())
+        self._serpapi_patch.start()
+        self.addCleanup(self._serpapi_patch.stop)
+
+    def test_required_names_are_exa_serpapi_sciverse(self) -> None:
+        names = tuple(d.name for d in self.rb.iter_required_descriptors())
+        self.assertEqual(names, ("Exa", "SerpApi", "SciVerse"))
+
+    def test_tavily_is_on_the_list_but_optional(self) -> None:
+        all_names = tuple(d.name for d in self.rb.iter_readiness_descriptors())
+        self.assertIn("Tavily", all_names)
+        self.assertEqual(TAVILY_BACKEND.requirement, BackendRequirementLevel.OPTIONAL)
+        self.assertNotIn("Tavily", tuple(d.name for d in self.rb.iter_required_descriptors()))
+
+    def test_anysearch_is_not_a_machine_descriptor(self) -> None:
+        names = {d.name for d in self.rb.iter_readiness_descriptors()}
+        self.assertNotIn("AnySearch", names)
+
+    def test_sciverse_is_not_in_the_registry(self) -> None:
+        from _search_registry import REGISTRY
+
+        self.assertNotIn("sciverse", [n.lower() for n in REGISTRY.list_backends()])
+        self.assertIn("SciVerse", tuple(d.name for d in self.rb.iter_required_descriptors()))
+        self.assertIs(self.rb.iter_required_descriptors()[-1], self.rb.SCIVERSE_READINESS)
+
+    def test_promoting_optional_backend_joins_the_gate(self) -> None:
+        original = TAVILY_BACKEND.requirement
+        original_sdk = TAVILY_BACKEND.sdk
+        TAVILY_BACKEND.requirement = BackendRequirementLevel.REQUIRED
+        TAVILY_BACKEND.sdk = None
+        try:
+            self.assertIn("Tavily", tuple(d.name for d in self.rb.iter_required_descriptors()))
+            with mock.patch.object(EXA_BACKEND, "sdk", object()):
+                with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
+                    with mock.patch.object(self.rb, "_sdk_importable", return_value=True):
+                        with self.assertRaises(self.rb.StateError) as ctx:
+                            self.rb.require_required_backends()
+            self.assertIn("Tavily", str(ctx.exception))
+        finally:
+            TAVILY_BACKEND.requirement = original
+            TAVILY_BACKEND.sdk = original_sdk
+
+    def test_demoting_required_backend_leaves_the_gate(self) -> None:
+        original = EXA_BACKEND.requirement
+        EXA_BACKEND.requirement = BackendRequirementLevel.OPTIONAL
+        try:
+            names = tuple(d.name for d in self.rb.iter_required_descriptors())
+            self.assertNotIn("Exa", names)
+        finally:
+            EXA_BACKEND.requirement = original
+
+    def test_exa_readiness_delegates_to_client(self) -> None:
+        with mock.patch.object(EXA_BACKEND, "client", side_effect=_search_cli.KeyMissing("EXA_API_KEY not set")):
+            gaps = EXA_BACKEND.readiness()
+        self.assertEqual(gaps, ["Exa: EXA_API_KEY not set"])
+
+    def test_gate_source_does_not_hand_roll_exa_ks(self) -> None:
+        source = (SCRIPTS_DIR / "required_backends.py").read_text(encoding="utf-8")
+        self.assertNotIn("ALLOW_DEGRADED", source)
+        self.assertNotIn("EXA_SDK", source)
+        self.assertNotIn('find_spec("exa_py")', source)
+        self.assertIn("iter_required_descriptors", source)
 
 
 class StartSessionGateTests(unittest.TestCase):

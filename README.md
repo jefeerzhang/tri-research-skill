@@ -145,7 +145,7 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 | **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP              | **必选** (`required`，Key + 探活)                      | 250 次/月免费                                     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 通用补充（宿主内置抽象，**不**等于 Tavily）    | 可选 (`optional`)                                      | 宿主提供                                          | 无需申请（宿主内置）                   |
 
-**硬门禁：** `required`（Exa / SciVerse）在 `state_machine start` 前机器强制（Key + SDK，缺则 `ERROR:`，无降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前 Key 可解析 + 轻量探活成功（ADR-0007）；`recommended`（AnySearch）缺失仅黄字提醒但允许匿名；`optional` 源静默跳过，单源失败不阻断。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
+**硬门禁：** `required`（Exa / SciVerse）在 `state_machine start` 前机器强制（Key + SDK，缺则 `ERROR:`，无降级逃逸，ADR-0006）；SerpApi（`required`）在 `start` 前 Key 可解析 + 轻量探活成功（ADR-0007）；档位由描述符 `requirement` 字段驱动（ADR-0011）。`recommended`（AnySearch）缺失仅黄字提醒但允许匿名；`optional` 源静默跳过，单源失败不阻断。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。必要性分级见 `CONTEXT.md` 的 `BackendRequirementLevel`。
 
 ## 状态机
 

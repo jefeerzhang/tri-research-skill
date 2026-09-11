@@ -9,7 +9,7 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。分级见 `BackendRequirementLevel`。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。必要性由 `Backend.requirement` 申报，就绪判定走 `Backend.readiness()`（与 `client()` 同一装配判断；SerpApi 另 `start_probe`）。分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:
@@ -29,8 +29,8 @@ _Avoid_: key loader、env helper 混称
 _Avoid_: backend config 泛称
 
 **BackendRequirementLevel**:
-Search Backend 的三档必要性分级，决定缺 key/SDK 时的编排行为：`required`（Exa / SciVerse：K+S——Key 可解析且 SDK 可 import；SerpApi：Key 可解析 + 轻量探活成功，见 ADR-0007）在 Research Session `start` 前由机器强制，缺失/探活失败则 `StateError`、无用户降级逃逸；`recommended` 缺失仅黄字提醒但允许匿名降级；`optional` 缺失静默跳过。
-_Avoid_: 必选/可选二分、优先级混称、文档-only 约束
+Search Backend 的三档必要性分级，以可执行枚举住在 `_search_cli.BackendRequirementLevel`（ADR-0011）：`required`（Exa / SciVerse：K+S——Key 可解析且 SDK 可 import；SerpApi：Key 可解析 + 轻量探活成功，见 ADR-0007）在 Research Session `start` 前由 `require_required_backends` 按描述符 `requirement` 字段强制，缺失/探活失败则 `StateError`、无用户降级逃逸；`recommended` 缺失仅黄字提醒但允许匿名降级（本波仍文档-only）；`optional` 缺失静默跳过。改档只改字段，不改 walker 正文。
+_Avoid_: 必选/可选二分、优先级混称、文档-only 约束、在门禁里手抄各家常量
 
 **Managed Command**:
 由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责顺序（代理清理 → 经 `Backend.client()` 装配 → `invoke`（超时 / 重试 / 熔断）→ 错误 JSON 打印与退出码）；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
@@ -61,5 +61,5 @@ _Avoid_: report check 泛称
 _Avoid_: 把 SerpApi 与 Google Scholar 混为一谈（接了 SerpApi ≠ 补了 Scholar）、把 Evidence/`来源:` 改名 "Google Scholar"
 
 **SciVerse（学术 SDK 路径）**:
-学术书目与语义检索的唯一 SD 路径（Python SDK `AgentToolsClient`，禁止 MCP），承担「学术面」。**不是** OpenAlex 的代名词——即使底层可能复用 OpenAlex 类覆盖，术语上不得把 SciVerse 改名为 OpenAlex。
-_Avoid_: SciVerse 与 OpenAlex 混称
+学术书目与语义检索的唯一 SD 路径（Python SDK `AgentToolsClient`，禁止 MCP），承担「学术面」。**不是** OpenAlex 的代名词——即使底层可能复用 OpenAlex 类覆盖，术语上不得把 SciVerse 改名为 OpenAlex。Required 门禁通过 `SciVerseReadiness` 描述符挂到与 Machine 后端同一轮询列表，**不是** Search Backend，不得注册进 `SearchBackendRegistry`（ADR-0006 / ADR-0011）。
+_Avoid_: SciVerse 与 OpenAlex 混称、把 SciVerse 当成 Web Backend / 塞进 Registry
