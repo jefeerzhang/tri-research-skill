@@ -370,6 +370,11 @@ class SerpApiBackend(_search_cli.Backend):
     # This skill's own .env, declared here so KeyProvider needs no layout
     # knowledge (ADR-0004) — the only place this file names the path.
     env_file = Path(__file__).resolve().parents[1] / ".env"
+    requirement = _search_cli.BackendRequirementLevel.REQUIRED
+    start_probe = True  # ADR-0007: Key + live probe at start; Exa/SciVerse do not
+    apply_url = "https://serpapi.com/dashboard"
+    verify_cmd = "python skills/serpapi/scripts/serpapi_cli.py check"
+    configure_hint = f"export {env_key}=<key> ({apply_url})"
     client_factory = staticmethod(_serpapi_make_client)
     call_timeout = 60.0
     global_flags = [

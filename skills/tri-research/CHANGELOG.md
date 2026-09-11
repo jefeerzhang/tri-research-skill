@@ -7,10 +7,12 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Added
 
 - **检索成功路径与证据台账因果绑定（ADR-0010 / W1）**：Exa / Tavily / SerpApi 的 `search` / `batch_search` 支持 `--session`；成功后经共享 helper 调用现有 `evidence.append_records` 追加 `seen` 行（backend / query / url / title / ts）。台账写入失败则 CLI 非零退出（用户锁定 fail-closed）。无 `--session` 保持裸搜。AnySearch / SciVerse / WebSearch 本波仅 SKILL 标准登记模板，不改外部包。不改 `audit_report` 算法（仍 ADR-0005）。回归：`tests/test_search_ledger_bind.py` + skill 合约钉子。
+- **BackendRequirementLevel 可执行化（ADR-0011 / W2）**：三档必要性成为 `_search_cli.BackendRequirementLevel` 枚举；Exa / Tavily / SerpApi 在 `Backend` 上申报 `requirement` + `readiness()`（装配判断与 `client()` 共用 `require_setup`；SerpApi `start_probe`）；SciVerse 以 `SciVerseReadiness` 挂同一轮询列表，不进 Registry。`runtime-adapters.md` 增 WebBackend / ExternalTool 扩展清单。回归：`tests/test_required_backends.py` 数据驱动用例 + skill 合约钉子。
 
 ### Changed
 
 - **源覆盖硬门禁单一名单（ADR-0009 / R-A）**：执行情况「搜索源使用」行的点名名单以 `validate_report.USAGE_ROSTER` 为唯一机器真源，六源全点名（AnySearch / SciVerse / Exa / SerpApi / Tavily / WebSearch）。Tavily 仍为 `optional`，未用须写 `0/跳过`，不得省略。废「五名称为验收必填 / Tavily 可并入说明」与把 Exa 写成 optional 的过时注释。合约测试钉住 SKILL 硬门禁源名与代码元组不得漂移。不升 `required` 档、不改 SerpApi 安装捆绑、不改证据自动入账。
+- **Required 门禁改为描述符 walker**：`require_required_backends` 只遍历 `iter_required_descriptors()`，不再手抄 Exa / SciVerse / SerpApi 常量；改 `requirement` 即改门禁成员。Exa 不再并行 KeyProvider + `find_spec`。Tavily 仍 `optional`；AnySearch `recommended` 本波仍文档-only。无 `ALLOW_DEGRADED`。
 
 ## [6.9.0] - 2026-09-06
 

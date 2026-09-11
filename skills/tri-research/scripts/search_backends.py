@@ -71,6 +71,10 @@ class ExaBackend(_search_cli.Backend):
     missing_sdk_message = "exa-py not installed"
     env_key = "EXA_API_KEY"
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
+    requirement = _search_cli.BackendRequirementLevel.REQUIRED
+    apply_url = "https://dashboard.exa.ai/api-keys"
+    verify_cmd = "python scripts/exa_search.py check"
+    configure_hint = f"pip install exa-py && export {env_key}=<key> ({apply_url})"
     # staticmethod: a plain lambda in the class body would be descriptor-bound
     # to the instance, so client_factory(api_key) would receive 2 arguments.
     client_factory = staticmethod(_exa_make_client)
@@ -179,6 +183,10 @@ class TavilyBackend(_search_cli.Backend):
     missing_sdk_message = "tavily-python not installed"
     env_key = "TAVILY_API_KEY"
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
+    requirement = _search_cli.BackendRequirementLevel.OPTIONAL
+    apply_url = "https://app.tavily.com/home"
+    verify_cmd = "python scripts/tavily_search.py check"
+    configure_hint = f"pip install tavily-python && export {env_key}=<key> ({apply_url})"
     # staticmethod: a plain lambda in the class body would be descriptor-bound
     # to the instance, so client_factory(api_key) would receive 2 arguments.
     client_factory = staticmethod(_tavily_make_client)

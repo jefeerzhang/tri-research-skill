@@ -17,3 +17,4 @@ ADR-0001 将 Exa / SciVerse 定为 `required` 但刻意文档-only，约束力�
 - Exa：沿用 `skills/tri-research/.env` 作为 `env_file`（与 Exa Backend 一致）。
 - 文档须删除 Required 降级逃逸措辞；合约测试钉住。
 - 测试：`tests/test_required_backends.py`；CLI 子进程经 `_test_helpers.required_backend_cli_env` 注入假 key + stub SDK。
+- **部分被 ADR-0011 演进**：门禁语义（Exa / SciVerse K+S、无逃逸、SciVerse 不进 Registry）不变；实现改为遍历 `requirement=required` 描述符，Exa 就绪走 `Backend.client()` 而不再并行 KeyProvider + `find_spec`。

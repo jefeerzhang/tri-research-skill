@@ -37,7 +37,7 @@
 | **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP 补强                                     | **必选** | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 宿主内置抽象能力（实现不固定，**不等于** Tavily）                          | 可选     | 无需申请（宿主内置）                   |
 
-硬门禁：Exa / SciVerse（`required`）必须在 `state_machine start` 前配齐 Key + SDK，SerpApi（`required`）必须 Key 可解析 + 轻量探活成功，否则会话无法创建（ADR-0006 / ADR-0007，无降级逃逸）。AnySearch（`recommended`）支持匿名访问；可选源不可用 → 静默跳过。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。
+硬门禁：Exa / SciVerse（`required`）必须在 `state_machine start` 前配齐 Key + SDK，SerpApi（`required`）必须 Key 可解析 + 轻量探活成功，否则会话无法创建（ADR-0006 / ADR-0007 / ADR-0011，无降级逃逸）。档位由描述符 `requirement` 字段驱动。AnySearch（`recommended`）支持匿名访问；可选源不可用 → 静默跳过。Google Scholar 是 SerpApi 的间接能力，**不是**独立后端。
 
 ## 适用场景
 

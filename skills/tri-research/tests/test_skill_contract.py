@@ -374,6 +374,26 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("ADR-0010", self.readme)
         self.assertIn("ADR-0010", (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8"))
 
+    def test_adr_0011_requirement_level_is_executable(self) -> None:
+        """ADR-0011：档位可执行；runtime-adapters 钉住 WebBackend / ExternalTool 清单。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0011-BackendRequirementLevel可执行化.md").read_text(encoding="utf-8")
+        self.assertIn("SciVerseReadiness", adr)
+        self.assertIn("ALLOW_DEGRADED", adr)
+        self.assertIn("SearchBackendRegistry", adr)
+        self.assertIn("REGISTRY.register", adr)
+
+        adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        self.assertIn("## WebBackend 扩展清单", adapters)
+        self.assertIn("## ExternalTool 扩展清单", adapters)
+        self.assertIn("iter_readiness_descriptors", adapters)
+        self.assertIn("SciVerseReadiness", adapters)
+
+        self.assertIn("ADR-0011", self.skill)
+        self.assertIn("requirement=required", self.skill)
+        gate = (ROOT / "scripts" / "required_backends.py").read_text(encoding="utf-8")
+        self.assertIn("iter_required_descriptors", gate)
+        self.assertNotIn("ALLOW_DEGRADED", gate)
+
 
 if __name__ == "__main__":
     unittest.main()
