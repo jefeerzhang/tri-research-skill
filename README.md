@@ -65,8 +65,15 @@ Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**�
 
 ### 安装
 
+开跑一次 Research Session 的最小安装是 **`tri-research` + `serpapi`**（ADR-0012 D1）。只装 `tri-research` 不足以 `state_machine start`。`research-subagent` 推荐（并行检索）；`citations` 可选。
+
+`npx skills add` 一次只装一个 skill，两条命令都要跑（不会自动装伴生 skill）：
+
 ```bash
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
+npx skills add https://github.com/jefeerzhang/tri-research-skill --skill serpapi
+# 推荐
+npx skills add https://github.com/jefeerzhang/tri-research-skill --skill research-subagent
 ```
 
 ### 配置搜索后端
@@ -230,7 +237,7 @@ tri-research-skill/
 |   |   |-- tests/                 # unittest 合约 + 验收测试（数量以 discover 输出为准）
 |   |-- research-subagent/         # 子代理 skill
 |   |   `-- SKILL.md
-|   |-- serpapi/                   # SerpApi 辅助 skill
+|   |-- serpapi/                   # SerpApi 伴生 skill（required，ADR-0012 D1）
 |   `-- citations/                 # 引用复核 skill（可选）
 ```
 

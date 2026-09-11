@@ -32,6 +32,10 @@ _Avoid_: backend config 泛称
 Search Backend 的三档必要性分级，以可执行枚举住在 `_search_cli.BackendRequirementLevel`（ADR-0011）：`required`（Exa / SciVerse：K+S——Key 可解析且 SDK 可 import；SerpApi：Key 可解析 + 轻量探活成功，见 ADR-0007）在 Research Session `start` 前由 `require_required_backends` 按描述符 `requirement` 字段强制，缺失/探活失败则 `StateError`、无用户降级逃逸；`recommended` 缺失仅黄字提醒但允许匿名降级（本波仍文档-only）；`optional` 缺失静默跳过。改档只改字段，不改 walker 正文。
 _Avoid_: 必选/可选二分、优先级混称、文档-only 约束、在门禁里手抄各家常量
 
+**Delivery Unit**:
+开跑一次 Research Session 的最小安装集合：`tri-research` + `serpapi` 两个 skill（`research-subagent` 推荐，`citations` 可选）。只装 `tri-research` 不足以 `state_machine start`（SerpApi 是 `required`，代码住在兄弟 skill）。两 skill 的 scripts 路径耦合仍在，待 ADR-0015。见 ADR-0012 D1。
+_Avoid_: 单技能安装即就绪、把 serpapi 写成可省略的辅助 skill、把路径耦合当成已解耦
+
 **Managed Command**:
 由 `_search_cli` 骨架**全权接管执行流程**的一类 extra 命令（当前：Exa `answer` / `contents`、Tavily `extract`）。骨架负责顺序（代理清理 → 经 `Backend.client()` 装配 → `invoke`（超时 / 重试 / 熔断）→ 错误 JSON 打印与退出码）；命令体只声明「用 client 发起哪一次 SDK 调用」并返回待打印结果，失败时抛带 echo 标记（`query` / `url`）的错误。与未托管命令（如 SerpApi 的 `doc` / `engines` / `export`，各自保留 `(args)` 签名与错误契约）通过 `Command` 上的 opt-in 开关区分。
 _Avoid_: 托管任务、wrapped command、managed handler 混称

@@ -91,8 +91,15 @@
 
 ## 安装
 
+开跑一次 Research Session 的最小安装是 **`tri-research` + `serpapi`**（ADR-0012 D1）。只装 `tri-research` 不足以 `state_machine start`。`research-subagent` 推荐。
+
+`npx skills add` 一次只装一个 skill，两条命令都要跑：
+
 ```bash
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill tri-research
+npx skills add https://github.com/jefeerzhang/tri-research-skill --skill serpapi
+# 推荐
+npx skills add https://github.com/jefeerzhang/tri-research-skill --skill research-subagent
 ```
 
 **必选（`start` 硬门禁）**：`EXA_API_KEY` + `exa-py`，`SCIVERSE_API_TOKEN` + `sciverse`，`SERPAPI_KEY`（探活成功）。
