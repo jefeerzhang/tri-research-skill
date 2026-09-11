@@ -5,8 +5,23 @@ import re
 import unittest
 from pathlib import Path
 
+from _test_helpers import load_module
+
 ROOT = Path(__file__).parents[1]
 REPO_ROOT = ROOT.parents[1]
+
+# 产品锁（2026-09-11 R-A）：点名名单恰好这六源，不得增删改名。
+LOCKED_USAGE_ROSTER = (
+    "AnySearch",
+    "SciVerse",
+    "Exa",
+    "SerpApi",
+    "Tavily",
+    "WebSearch",
+)
+SOURCE_NAME_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(name) for name in LOCKED_USAGE_ROSTER) + r")\b"
+)
 
 
 class SkillContractTests(unittest.TestCase):
@@ -76,7 +91,65 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("SciVerse", self.skill)
         self.assertIn("Exa", self.skill)
         self.assertIn("SerpApi", self.skill)
+        self.assertIn("Tavily", self.skill)
         self.assertIn("WebSearch", self.skill)
+
+    def test_usage_roster_hard_gate_cannot_drift(self) -> None:
+        """ADR-0009 R-A：SKILL 硬门禁点名名单与 validate_report.USAGE_ROSTER 不得漂移。
+
+        一侧改名/删名（文档六源、代码五源曾是审计 P0-1）必须让 CI 红。
+        """
+        validator = load_module(ROOT / "scripts" / "validate_report.py", "validate_report_contract")
+        roster = tuple(validator.USAGE_ROSTER)
+        self.assertEqual(roster, LOCKED_USAGE_ROSTER)
+        self.assertIs(validator.REQUIRED_SOURCE_BACKENDS, validator.USAGE_ROSTER)
+
+        gate_line = next(
+            (ln for ln in self.skill.splitlines() if "搜索源使用" in ln and "点名" in ln),
+            "",
+        )
+        self.assertTrue(gate_line, "SKILL 硬门禁缺少「搜索源使用」点名条款")
+        named = frozenset(SOURCE_NAME_RE.findall(gate_line))
+        self.assertEqual(
+            named,
+            frozenset(LOCKED_USAGE_ROSTER),
+            f"SKILL 硬门禁源名与 USAGE_ROSTER 漂移: {gate_line}",
+        )
+        self.assertIn("0/跳过", gate_line)
+        self.assertIn("ADR-0009", gate_line)
+
+        report_format = (ROOT / "references" / "report-format.md").read_text(encoding="utf-8")
+        self.assertNotIn("五名称", report_format)
+        self.assertNotIn("Tavily 可并入说明", report_format)
+        format_usage = next(
+            (ln for ln in report_format.splitlines() if "搜索源使用" in ln),
+            "",
+        )
+        self.assertTrue(format_usage, "report-format.md 缺少搜索源使用行")
+        self.assertEqual(
+            frozenset(SOURCE_NAME_RE.findall(format_usage)),
+            frozenset(LOCKED_USAGE_ROSTER),
+            f"report-format 搜索源使用行与 USAGE_ROSTER 漂移: {format_usage}",
+        )
+
+        readme_usage = next(
+            (ln for ln in self.readme.splitlines() if "搜索源使用行" in ln),
+            "",
+        )
+        self.assertTrue(readme_usage, "skill README 缺少搜索源使用行")
+        self.assertEqual(
+            frozenset(SOURCE_NAME_RE.findall(readme_usage)),
+            frozenset(LOCKED_USAGE_ROSTER),
+            f"skill README 搜索源使用行与 USAGE_ROSTER 漂移: {readme_usage}",
+        )
+
+        adr = (REPO_ROOT / "docs" / "adr" / "0009-源覆盖硬门禁单一名单.md").read_text(encoding="utf-8")
+        self.assertIn("R-A", adr)
+        for name in LOCKED_USAGE_ROSTER:
+            self.assertIn(name, adr)
+
+        self.assertNotIn("五名称", self.skill)
+        self.assertNotIn("五名称", self.readme)
 
     def test_exa_is_required_tier_across_docs(self) -> None:
         """ADR-0001 把 Exa 提升为 required；各处文档表格/引导不得再标可选。

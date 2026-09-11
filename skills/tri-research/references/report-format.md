@@ -29,7 +29,7 @@
 | 项目 | 说明 |
 |------|------|
 | 执行流程 | 源检测 → 计划确认 → 搜索 → 综合撰写 → 验证 |
-| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / WebSearch: N（Tavily 可并入说明；上列五名称为验收必填） |
+| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / Tavily: N / WebSearch: N（六源全点名；Tavily 可写 0/跳过，不得省略） |
 | 覆盖质量 | 中文 N / 英文 N / … |
 | 维度覆盖 | … |
 | 耗时 | … | 报告位置 | ~/tri-research-reports/DEEP_RESEARCH_*.md |

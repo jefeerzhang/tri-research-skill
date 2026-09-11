@@ -2,6 +2,12 @@
 
 All notable changes to the Tri Research Skill will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **源覆盖硬门禁单一名单（ADR-0009 / R-A）**：执行情况「搜索源使用」行的点名名单以 `validate_report.USAGE_ROSTER` 为唯一机器真源，六源全点名（AnySearch / SciVerse / Exa / SerpApi / Tavily / WebSearch）。Tavily 仍为 `optional`，未用须写 `0/跳过`，不得省略。废「五名称为验收必填 / Tavily 可并入说明」与把 Exa 写成 optional 的过时注释。合约测试钉住 SKILL 硬门禁源名与代码元组不得漂移。不升 `required` 档、不改 SerpApi 安装捆绑、不改证据自动入账。
+
 ## [6.9.0] - 2026-09-06
 
 ### Added

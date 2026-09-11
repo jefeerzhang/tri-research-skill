@@ -29,14 +29,18 @@ MIN_ENGLISH_WORDS_PER_ENTRY = 3
 # 报告级英文门槛随报告规模缩放：真实报告（min_sources ≥ 10）要求至少 3 条
 # 判定的真实英文条目（len // 3，下限 1）；小样本按比例放宽。
 MIN_ENGLISH_ENTRIES = 3
-# 执行情况「搜索源使用」行必须点名的后端（含可选源 Exa：未用也要写 0/跳过）
-REQUIRED_SOURCE_BACKENDS = (
+# 执行情况「搜索源使用」行必须点名的后端（ADR-0009 / R-A：六源全点名。
+# optional 源未用也要写 0/跳过，不得省略该名。Exa 是 required，不是 optional。）
+USAGE_ROSTER = (
     "AnySearch",
     "SciVerse",
     "Exa",
     "SerpApi",
+    "Tavily",
     "WebSearch",
 )
+REQUIRED_SOURCE_BACKENDS = USAGE_ROSTER  # 向后兼容别名
+
 SOURCE_USAGE_ROW_RE = re.compile(r"(?m)^\|?\s*搜索源使用\s*\|?\s*(.+?)\s*\|?\s*$")
 # 契约要求的章节名（不含 "## " 前缀）：章节边界由 _report_parse 的锚定切分
 # 决定，这里只列名单。
@@ -140,7 +144,7 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
             # formats, and \b would wrongly treat CJK as a word char.
             missing_backends = [
                 name
-                for name in REQUIRED_SOURCE_BACKENDS
+                for name in USAGE_ROSTER
                 if not re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", usage_cell)
             ]
             if missing_backends:

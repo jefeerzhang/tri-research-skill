@@ -53,7 +53,7 @@ _Avoid_: 引用校验、格式验收混称（那是 Report Validation）、把�
 _Avoid_: 各家自持的正则、把任一消费方的解析当权威
 
 **Report Validation**:
-报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等），`validate → errors[]` 为其 test surface；语法一律读 `Report Parse`，本模块只留判定；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
+报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等；「搜索源使用」点名名单见 ADR-0009：六源全点名，Tavily 可写 `0/跳过`），`validate → errors[]` 为其 test surface；语法一律读 `Report Parse`，本模块只留判定；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
 
 **Google Scholar（间接能力）**:
