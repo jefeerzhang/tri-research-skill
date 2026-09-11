@@ -14,3 +14,4 @@
 - **重开条件**：出现第二个程序化消费方（Lead Agent 直接 import `REGISTRY` 而非调 CLI）时，才值得做「CLI 内部走 Registry」的全量收编；届时以 `search_raw`（git 历史）为保形摆渡。
 - 已知限制（本次未动）：`Registry.register` 原地修改共享 Backend 实例的 override，两条 seam 共享可变状态；出现跨 seam 干扰时再处理。
 - 测试：`tests/test_backend_key_resolution.py` 钉住 client / check 的 KeyProvider 委托与错误形状。
+- **部分被 ADR-0013 演进**：Registry 非 Lead 主路径、非六源总线，写入架构叙事与 CONTEXT Avoid；本 ADR 的 CLI vs Registry 错误契约分界仍然有效。

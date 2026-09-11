@@ -52,6 +52,8 @@
 
 ![tri-research 运行架构图](../../assets/tri-research-runtime-architecture.png)
 
+检索按三类能力接入（ADR-0013）：Machine CLI（Exa / Tavily / SerpApi）、External Tool（AnySearch CLI/HTTP · SciVerse SDK）、Host（WebSearch）。`SearchBackendRegistry` 只是测试/library 的程序化 seam，不是 Lead 主路径，也不是六源总线。
+
 交互式版本（节点搜索、聚焦、上下游路径追踪、PNG/SVG 导出）见 [assets/tri-research-architecture.html](../../assets/tri-research-architecture.html)；图的 typed JSON 规格在同目录 `tri-research-architecture.json`，由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验（9/9 项检查）。
 
 ## 工作流

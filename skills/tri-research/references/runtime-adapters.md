@@ -20,7 +20,7 @@ Read this reference only when concrete tool names, install paths, or rendering b
 | `RENDER`           | Playwright MCP                                                                                                                  | Playwright MCP           | Playwright                            |
 | `DISPATCH`         | `Task(...)`                                                                                                                     | `delegate_to_agent(...)` | collaboration subagent mechanism      |
 
-**重要：v6.3.0 SKILL.md 列出 6 个搜索后端**：AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch。
+**重要：六源是点名名单，不是一条 Registry 总线（ADR-0013）。** 能力类分三路：Machine Backend（Exa / Tavily / SerpApi，仓内 `_search_cli`；Registry 仅程序化 seam）/ External Tool（AnySearch CLI/HTTP · SciVerse Python SDK，禁止 MCP）/ Host（Runtime WebSearch）。点名名单仍是 AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch（ADR-0009）。
 
 **重要：Runtime WebSearch 与 Tavily 是两个独立的源。** **Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `tavily-python` SDK 调用，CLI 封装见 `tri-research/scripts/tavily_search.py`，**仅 Lead Agent**），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
 
@@ -84,6 +84,14 @@ asyncio.run(main())
 3. 挂到 `required_backends.iter_readiness_descriptors()` 同一列表；`requirement=required` 由 walker 自动纳入 `start` 硬门禁，无需改 `require_required_backends` 正文。
 4. 就绪判断不得发明第二套 key/SDK 规则：有 `Backend.client()` 就转它；没有客户端可装配的才在描述符内做 K+S。
 5. AnySearch `recommended` 本波仍文档-only，不要为黄字提醒硬接外部 CLI。
+
+## Host 能力
+
+Runtime WebSearch 是宿主内置检索（Host），不是 Machine Backend，也不是 External Tool：
+
+1. **不要**注册进 Registry，**不要**画成 MCP。
+2. 仅 Lead 调用；与 Tavily 独立配置、独立降级、独立计费。
+3. 台账仍走 `evidence.py add --backend WebSearch`（ADR-0010；无 `--session` 自动入账）。
 
 ## Fetch and render policy
 
