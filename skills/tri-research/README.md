@@ -81,7 +81,7 @@
 4. **主要矛盾与冲突点**
 5. **未来研究方向**
 6. **参考文献** — 单行格式，必须含 `层级:` `来源:` `URL:`
-7. **执行情况** — 含搜索源使用行（AnySearch/SciVerse/Exa/SerpApi/WebSearch）
+7. **执行情况** — 含搜索源使用行（AnySearch/SciVerse/Exa/SerpApi/Tavily/WebSearch；Tavily 可写 0/跳过）
 
 参考文献格式示例：
 

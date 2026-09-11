@@ -130,7 +130,7 @@
     "正文引用 [N] 与参考文献一一对应且编号连续",
     "每个来源包含可访问 URL、层级、来源工具名",
     "报告级同时包含中文来源证据与英文来源证据（非逐条双语）",
-    "执行情况含搜索源使用行并点名 AnySearch/SciVerse/Exa/SerpApi/WebSearch",
+    "执行情况含搜索源使用行并点名 AnySearch/SciVerse/Exa/SerpApi/Tavily/WebSearch",
     "子代理数量符合查询类型且没有重复派发（流程要求，状态机不记账本）",
     "所有子代理在 8 分钟内完成（流程要求）",
     "只有报告写入并通过 validate_report 后，状态才进入 DONE",

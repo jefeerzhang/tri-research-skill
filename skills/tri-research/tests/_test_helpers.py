@@ -119,7 +119,7 @@ def make_valid_report(
 |------|------|
 | 执行流程 | 预检 → 搜索 → 综合 → 验证 |
 | 子代理派发 | 否 |
-| 搜索源使用 | AnySearch: {source_count}条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |
+| 搜索源使用 | AnySearch: {source_count}条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条 |
 | 耗时 | 3.0 分钟 |
 | 报告位置 | ~/tri-research-reports/{path.name} |
 """,
