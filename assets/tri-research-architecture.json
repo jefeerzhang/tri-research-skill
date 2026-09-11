@@ -6,46 +6,55 @@
     "locale": "zh-CN",
     "quality_profile": "showcase",
     "output": "tri-research-architecture.html",
-    "viewBox": [1200, 555]
+    "viewBox": [1280, 700]
   },
   "components": [
-    { "id": "user", "type": "external", "label": "用户", "sublabel": "研究主题请求", "pos": [40, 282], "size": [112, 60] },
-    { "id": "lead", "type": "backend", "label": "Lead Agent", "sublabel": "主代理 · Bash 编排 CLI", "pos": [220, 272], "size": [150, 66], "tag": "主控" },
+    { "id": "user", "type": "external", "label": "用户", "sublabel": "研究主题请求", "pos": [40, 300], "size": [112, 60] },
+    { "id": "lead", "type": "backend", "label": "Lead Agent", "sublabel": "主代理 · Bash 编排 CLI", "pos": [220, 290], "size": [150, 66], "tag": "主控" },
     { "id": "state_machine", "type": "backend", "label": "状态机", "sublabel": "state_machine.py", "pos": [220, 122], "size": [150, 62] },
     { "id": "state_dir", "type": "database", "label": "会话状态目录", "sublabel": "session JSON + active 指针", "pos": [470, 42], "size": [160, 60] },
     { "id": "validator", "type": "security", "label": "报告硬门禁", "sublabel": "validate_report.py", "pos": [470, 142], "size": [160, 66] },
     { "id": "renderer", "type": "backend", "label": "render_tex.py", "sublabel": "XeLaTeX → PDF 交付", "pos": [740, 142], "size": [150, 62] },
-    { "id": "search_cli", "type": "backend", "label": "搜索 CLI 骨架", "sublabel": "_search_cli.py · 重试/熔断", "pos": [470, 272], "size": [160, 62] },
-    { "id": "subagent", "type": "backend", "label": "research-subagent", "sublabel": "检索子代理", "pos": [470, 372], "size": [160, 62] },
-    { "id": "evidence", "type": "database", "label": "证据台账", "sublabel": "evidence.py · append-only", "pos": [40, 412], "size": [150, 60] },
-    { "id": "exa_tavily", "type": "external", "label": "Exa · Tavily", "sublabel": "官方 SDK", "pos": [1000, 232], "size": [150, 60] },
-    { "id": "serpapi", "type": "external", "label": "SerpApi", "sublabel": "Google 等 100+ 引擎", "pos": [1000, 362], "size": [150, 60] },
-    { "id": "anysearch", "type": "external", "label": "AnySearch · SciVerse", "sublabel": "宿主 MCP 能力", "pos": [1000, 482], "size": [160, 60] }
+    { "id": "search_cli", "type": "backend", "label": "搜索 CLI 骨架", "sublabel": "_search_cli.py · Machine 入口", "pos": [470, 290], "size": [160, 62] },
+    { "id": "subagent", "type": "backend", "label": "research-subagent", "sublabel": "AnySearch · SciVerse · Exa", "pos": [470, 430], "size": [160, 62] },
+    { "id": "evidence", "type": "database", "label": "证据台账", "sublabel": "evidence.py · append-only", "pos": [40, 500], "size": [150, 60] },
+    { "id": "websearch", "type": "cloud", "label": "WebSearch", "sublabel": "Host · 宿主内置", "pos": [40, 388], "size": [150, 56] },
+    { "id": "exa", "type": "external", "label": "Exa", "sublabel": "Machine · 官方 SDK", "pos": [1020, 160], "size": [150, 56], "tag": "required" },
+    { "id": "tavily", "type": "external", "label": "Tavily", "sublabel": "Machine · 官方 SDK", "pos": [1020, 250], "size": [150, 56] },
+    { "id": "serpapi", "type": "external", "label": "SerpApi", "sublabel": "Machine · HTTP CLI", "pos": [1020, 340], "size": [150, 56], "tag": "required" },
+    { "id": "anysearch", "type": "external", "label": "AnySearch", "sublabel": "External · CLI / HTTP", "pos": [1020, 470], "size": [150, 56] },
+    { "id": "sciverse", "type": "external", "label": "SciVerse", "sublabel": "External · Python SDK", "pos": [1020, 560], "size": [150, 56], "tag": "required" }
   ],
   "boundaries": [
     { "kind": "region", "label": "tri-research 技能包（本地 Python CLI）", "wraps": ["lead", "state_machine", "state_dir", "validator", "renderer", "search_cli", "subagent", "evidence"], "pad": 10 },
-    { "kind": "security-group", "label": "DONE 硬门禁", "wraps": ["state_machine", "state_dir", "validator"], "pad": 14 }
+    { "kind": "security-group", "label": "DONE 硬门禁", "wraps": ["state_machine", "state_dir", "validator"], "pad": 14 },
+    { "kind": "region", "label": "Host", "wraps": ["websearch"], "pad": 10 },
+    { "kind": "region", "label": "Machine Backend", "wraps": ["exa", "tavily", "serpapi"], "pad": 10 },
+    { "kind": "region", "label": "External Tool", "wraps": ["anysearch", "sciverse"], "pad": 10 }
   ],
   "connections": [
-    { "from": "user", "to": "lead", "label": "研究主题 / min_sources", "variant": "emphasis", "labelDy": 54 },
+    { "from": "user", "to": "lead", "label": "研究主题 / min_sources", "variant": "emphasis", "labelAt": [180, 268] },
     { "from": "lead", "to": "state_machine", "label": "start · set_params · done" },
     { "from": "state_machine", "to": "state_dir", "label": "原子写 + 文件锁", "labelAt": [420, 96] },
-    { "from": "state_machine", "to": "validator", "label": "done：报告校验", "variant": "security", "labelAt": [410, 180] },
-    { "from": "state_machine", "to": "evidence", "label": "done：URL 溯源对账", "variant": "security", "fromSide": "left", "toSide": "left", "via": [[15, 153], [15, 442]], "labelAt": [110, 153] },
+    { "from": "state_machine", "to": "validator", "label": "done：报告校验", "variant": "security", "labelAt": [410, 198] },
+    { "from": "state_machine", "to": "evidence", "label": "done：URL 溯源对账", "variant": "security", "fromSide": "left", "toSide": "left", "via": [[15, 153], [15, 530]], "labelAt": [110, 153] },
     { "from": "validator", "to": "state_dir", "label": "DONE proof + SHA-256 指纹" },
     { "from": "validator", "to": "renderer", "label": "验收通过 → 渲染交付" },
-    { "from": "lead", "to": "search_cli", "label": "tavily_search.py" },
+    { "from": "lead", "to": "search_cli", "label": "Machine CLI", "labelDy": -28 },
+    { "from": "lead", "to": "websearch", "label": "宿主 web_search", "fromSide": "left", "toSide": "right", "labelAt": [215, 372] },
     { "from": "lead", "to": "subagent", "label": "委派检索任务", "variant": "dashed", "fromSide": "bottom" },
     { "from": "subagent", "to": "search_cli", "label": "exa_search.py" },
-    { "from": "search_cli", "to": "exa_tavily", "label": "SDK（重试 + 熔断）", "variant": "emphasis" },
+    { "from": "search_cli", "to": "exa", "label": "SDK（重试 + 熔断）", "variant": "emphasis" },
+    { "from": "search_cli", "to": "tavily", "label": "SDK" },
     { "from": "search_cli", "to": "serpapi", "label": "HTTP /search" },
-    { "from": "subagent", "to": "anysearch", "label": "MCP 工具调用", "variant": "dashed" },
-    { "from": "lead", "to": "evidence", "label": "add：登记 URL", "fromSide": "bottom", "toSide": "top", "via": [[295, 380], [115, 380]] },
-    { "from": "subagent", "to": "evidence", "label": "登记检索结果", "variant": "dashed" }
+    { "from": "subagent", "to": "anysearch", "label": "CLI / HTTP", "variant": "dashed", "labelAt": [820, 448] },
+    { "from": "subagent", "to": "sciverse", "label": "Python SDK", "variant": "dashed", "labelAt": [820, 560] },
+    { "from": "lead", "to": "evidence", "label": "add：登记 URL", "fromSide": "bottom", "toSide": "right", "via": [[295, 530]], "labelAt": [400, 370] },
+    { "from": "subagent", "to": "evidence", "label": "登记检索结果", "variant": "dashed", "labelAt": [250, 580] }
   ],
   "cards": [
     { "dot": "cyan", "title": "控制层（两步状态机）", "items": ["STARTED → DONE 两阶段，参数一经 set_params 即冻结", "active-session 指针 + 跨进程文件锁防并发写", "done 后清除指针；add_dimensions 重开为 EXTENDED"] },
     { "dot": "rose", "title": "机器可验证硬门禁", "items": ["done = validate_report 结构/引用/双语校验 + SHA-256 指纹", "每条参考文献 URL 必须在证据台账命中，untraced 即失败", "DONE 后改报告或补台账，check 触发 INTEGRITY:MISMATCH"] },
-    { "dot": "emerald", "title": "检索层（六源并行）", "items": ["主代理走 tavily_search.py，子代理走 exa_search.py", "共享骨架提供超时/重试/熔断与统一 JSON 错误契约", "Exa / SciVerse / SerpApi 为 required（start 门禁），AnySearch 为 recommended 可匿名降级；「搜索源使用」须点名六源（Tavily 可写 0/跳过）"] }
+    { "dot": "emerald", "title": "检索层（三类能力，非 Registry 总线）", "items": ["Machine：Exa / Tavily / SerpApi（Lead 走 _search_cli；Registry 仅程序化 seam）", "External：AnySearch CLI/HTTP · SciVerse Python SDK（禁止 MCP）；Host：WebSearch 仅 Lead", "required = Exa + SciVerse + SerpApi（start 门禁）；子代理 = AnySearch / SciVerse / Exa"] }
   ]
 }

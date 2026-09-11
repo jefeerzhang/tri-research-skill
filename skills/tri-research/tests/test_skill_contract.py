@@ -443,6 +443,103 @@ class SkillContractTests(unittest.TestCase):
             for phrase in forbidden:
                 self.assertNotIn(phrase, blob, msg=f"{name} still allows conflicting install wording: {phrase!r}")
 
+    def test_adr_0013_retrieval_topology(self) -> None:
+        """ADR-0013：三类能力 + Registry 非 Lead 主路径；架构图禁止 MCP 误标。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0013-检索拓扑三类能力与Registry非主路径.md").read_text(
+            encoding="utf-8"
+        )
+        for phrase in (
+            "Machine Backend",
+            "External Tool",
+            "Host",
+            "SearchBackendRegistry",
+            "程序化 seam",
+            "不是 Lead",
+            "AnySearch",
+            "SciVerse",
+            "WebSearch",
+            "Exa",
+            "SerpApi",
+            "Tavily",
+        ):
+            self.assertIn(phrase, adr)
+        self.assertNotIn("宿主 MCP", adr)
+
+        context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+        self.assertIn("**Machine Backend**", context)
+        self.assertIn("**External Tool**", context)
+        self.assertIn("**Host**", context)
+        self.assertIn("不是** Lead Agent 主路径", context)
+        self.assertIn("不是** 六源统一总线", context)
+        self.assertIn("六源 Registry 总线", context)
+        self.assertIn("宿主 MCP", context)  # Avoid 词必须出现
+        registry = next(
+            (blk for blk in context.split("**") if blk.startswith("SearchBackendRegistry")),
+            "",
+        )
+        self.assertTrue(registry, "CONTEXT 缺少 SearchBackendRegistry 词条")
+        avoid = context.split("**SearchBackendRegistry**", 1)[1].split("**SearchResult**", 1)[0]
+        self.assertIn("_Avoid_", avoid)
+        self.assertIn("六源 Registry 总线", avoid)
+        self.assertIn("Lead 主路径", avoid)
+
+        arch_path = REPO_ROOT / "assets" / "tri-research-architecture.json"
+        arch = json.loads(arch_path.read_text(encoding="utf-8"))
+        blob = json.dumps(arch, ensure_ascii=False)
+        self.assertNotIn("宿主 MCP", blob)
+        self.assertNotIn("MCP 工具", blob)
+        self.assertNotIn("mcp__", blob.lower())
+
+        labels = {c["id"]: c for c in arch["components"]}
+        self.assertIn("exa", labels)
+        self.assertIn("tavily", labels)
+        self.assertIn("serpapi", labels)
+        self.assertIn("anysearch", labels)
+        self.assertIn("sciverse", labels)
+        self.assertIn("websearch", labels)
+        self.assertNotIn("registry", labels)
+        self.assertNotEqual(labels["anysearch"]["id"], labels["sciverse"]["id"])
+        self.assertIn("CLI", labels["anysearch"]["sublabel"])
+        self.assertIn("SDK", labels["sciverse"]["sublabel"])
+        self.assertIn("Host", labels["websearch"]["sublabel"])
+        self.assertNotIn("MCP", labels["anysearch"].get("sublabel", ""))
+        self.assertNotIn("MCP", labels["sciverse"].get("sublabel", ""))
+
+        edges = {(c["from"], c["to"]): c for c in arch["connections"]}
+        self.assertIn(("lead", "websearch"), edges)
+        self.assertIn(("lead", "search_cli"), edges)
+        self.assertIn(("subagent", "anysearch"), edges)
+        self.assertIn(("subagent", "sciverse"), edges)
+        self.assertIn(("subagent", "search_cli"), edges)
+        self.assertIn(("search_cli", "exa"), edges)
+        self.assertIn(("search_cli", "serpapi"), edges)
+        self.assertIn(("search_cli", "tavily"), edges)
+        self.assertNotIn(("subagent", "serpapi"), edges)
+        self.assertNotIn(("subagent", "tavily"), edges)
+        self.assertNotIn(("subagent", "websearch"), edges)
+        for conn in arch["connections"]:
+            self.assertNotIn("MCP", conn.get("label", ""))
+
+        cards = " ".join(item for card in arch["cards"] for item in [card["title"], *card["items"]])
+        self.assertIn("Exa", cards)
+        self.assertIn("SciVerse", cards)
+        self.assertIn("SerpApi", cards)
+        self.assertIn("required", cards)
+        self.assertIn("Machine", cards)
+        self.assertIn("External", cards)
+        self.assertIn("Host", cards)
+        self.assertIn("Registry", cards)
+
+        html = (REPO_ROOT / "assets" / "tri-research-architecture.html").read_text(encoding="utf-8")
+        self.assertNotIn("宿主 MCP", html)
+        self.assertNotIn("MCP 工具调用", html)
+
+        self.assertIn("不是统一六源 Registry 总线", self.root_readme)
+        self.assertIn("ADR-0013", self.readme)
+        adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        self.assertIn("## Host 能力", adapters)
+        self.assertIn("ADR-0013", adapters)
+
 
 if __name__ == "__main__":
     unittest.main()

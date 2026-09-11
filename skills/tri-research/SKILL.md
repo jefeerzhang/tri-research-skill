@@ -120,7 +120,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 5. Exa / Tavily / SerpApi 的 `search` / `batch_search` 已在 CLI 内对超时、连接、429、5xx 做重试与熔断；配置错误立即失败；`required` 源（Exa / SerpApi）耗尽后按 required 纪律处理（不再静默跳过），可选源耗尽后按可选源静默跳过，Agent 侧不再套一层重试
 6. **研究主路径必须把检索成功写入 Evidence Ledger**（ADR-0010）：
    - **Machine 后端（Exa / Tavily / SerpApi）**：Lead 调用 `search` / `batch_search` 时**必须**传 `--session <id>`。成功后 CLI 自动追加 `seen` 行（backend / query / url / title / ts）；台账写入失败则 CLI **非零退出**（不得带着未入账结果继续）。无 `--session` 的裸搜仅供测试/临时探活，**不是研究主路径**。
-   - **External（AnySearch / SciVerse / WebSearch）**：本波不改外部包；Lead 按标准模板登记（子代理发现由 Lead 汇总）：
+   - **External Tool（AnySearch / SciVerse）与 Host（WebSearch）**：不改外部包/宿主工具；Lead 按标准模板登记（子代理发现由 Lead 汇总）：
 
    ```bash
    python scripts/evidence.py --session <id> add --backend AnySearch --query "<query>" --url <u1> --url <u2>

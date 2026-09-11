@@ -37,7 +37,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 ![tri-research 运行架构图](assets/tri-research-runtime-architecture.png)
 
-运行时组件与硬门禁链路：Lead Agent 编排两步状态机（STARTED → DONE），检索层经共享 CLI 骨架接六源并行，`done` 必须同时通过 `validate_report.py` 报告校验与证据台账 URL 溯源对账，才能交付并渲染 PDF。
+运行时组件与硬门禁链路：Lead Agent 编排两步状态机（STARTED → DONE）。检索是三类能力，不是统一六源 Registry 总线——Machine CLI（Exa / Tavily / SerpApi，Lead 走 `_search_cli`）、External Tool（AnySearch CLI/HTTP 与 SciVerse Python SDK）、Host（Runtime WebSearch，仅 Lead）。`done` 必须同时通过 `validate_report.py` 报告校验与证据台账 URL 溯源对账，才能交付并渲染 PDF。
 
 交互式版本（节点搜索、上下游路径追踪、PNG/SVG 导出）见 [assets/tri-research-architecture.html](assets/tri-research-architecture.html)；图的 typed JSON 规格在同目录 `tri-research-architecture.json`，由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验（9/9 项检查）。
 
