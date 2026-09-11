@@ -19,9 +19,7 @@ LOCKED_USAGE_ROSTER = (
     "Tavily",
     "WebSearch",
 )
-SOURCE_NAME_RE = re.compile(
-    r"\b(?:" + "|".join(re.escape(name) for name in LOCKED_USAGE_ROSTER) + r")\b"
-)
+SOURCE_NAME_RE = re.compile(r"\b(?:" + "|".join(re.escape(name) for name in LOCKED_USAGE_ROSTER) + r")\b")
 
 
 class SkillContractTests(unittest.TestCase):
@@ -190,7 +188,11 @@ class SkillContractTests(unittest.TestCase):
             if not blob:
                 continue
             for line in blob.splitlines():
-                if "SerpApi" in line and "|" in line and any(t in line for t in ("必选", "可选", "required", "optional")):
+                if (
+                    "SerpApi" in line
+                    and "|" in line
+                    and any(t in line for t in ("必选", "可选", "required", "optional"))
+                ):
                     self.assertTrue(
                         ("必选" in line or "required" in line) and not ("可选" in line or "optional" in line),
                         msg=f"{name}: SerpApi 档位漂移（应为必选/required）: {line}",
@@ -350,6 +352,27 @@ class SkillContractTests(unittest.TestCase):
         # v6.3.1：Tavily 为六源之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa
         self.assertIn("Tavily", self.skill)
         self.assertNotIn("Tavily", self.subagent)
+
+    def test_adr_0010_session_ledger_bind_is_documented(self) -> None:
+        """ADR-0010：研究主路径必须 --session；External 登记模板不得失踪。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0010-检索成功路径与证据台账因果绑定.md").read_text(encoding="utf-8")
+        self.assertIn("ADR-0005", adr)
+        self.assertIn("台账写入失败则 CLI 非零退出", adr)
+        self.assertIn("--session", adr)
+
+        self.assertIn("ADR-0010", self.skill)
+        self.assertIn("必须", self.skill)
+        self.assertIn("--session", self.skill)
+        self.assertIn("不是研究主路径", self.skill)
+        for backend in ("AnySearch", "SciVerse", "WebSearch"):
+            self.assertIn(
+                f"add --backend {backend}",
+                self.skill,
+                msg=f"missing External registration template for {backend}",
+            )
+        self.assertIn("台账写入失败", self.skill)
+        self.assertIn("ADR-0010", self.readme)
+        self.assertIn("ADR-0010", (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -19,9 +19,11 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "serpapi_cli.py"
@@ -269,6 +271,114 @@ class CliNoKeyTests(unittest.TestCase):
         with redirect_stdout(buf):
             MODULE._search_cli.run(MODULE.SERPAPI_BACKEND, ["doc"])
         self.assertIn("serpapi_cli.py", buf.getvalue())
+
+
+class SerpApiSessionLedgerBindTests(unittest.TestCase):
+    """ADR-0010: SerpApi search/batch with --session writes seen rows via the shared helper."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state_dir = Path(self.tmp.name) / "state"
+        self.saved_key = os.environ.get("SERPAPI_KEY")
+        os.environ["SERPAPI_KEY"] = "test-serpapi-key"
+
+    def tearDown(self) -> None:
+        if self.saved_key is None:
+            os.environ.pop("SERPAPI_KEY", None)
+        else:
+            os.environ["SERPAPI_KEY"] = self.saved_key
+        self.tmp.cleanup()
+
+    def _start(self, session: str) -> None:
+        tri_tests = Path(__file__).resolve().parents[2] / "tri-research" / "tests"
+        if str(tri_tests) not in sys.path:
+            sys.path.insert(0, str(tri_tests))
+        from _test_helpers import required_backend_cli_env
+
+        state_machine = Path(__file__).parents[2] / "tri-research" / "scripts" / "state_machine.py"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(state_machine),
+                "--state-dir",
+                str(self.state_dir),
+                "--session",
+                session,
+                "start",
+            ],
+            capture_output=True,
+            text=True,
+            env=required_backend_cli_env(),
+        )
+        if result.returncode != 0:
+            self.fail(f"start failed: {result.stderr}")
+
+    def _ledger(self, session: str) -> list[dict]:
+        path = (self.state_dir / f"{session}.evidence.jsonl").resolve()
+        if not path.is_file():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def test_search_with_session_writes_seen_from_organic_link(self) -> None:
+        self._start("serp-bind")
+
+        def fake_fetch(*_args, **_kwargs):
+            return {"organic_results": [{"title": "Paper", "link": "https://scholar.example/p"}]}
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = fake_fetch
+        buf = io.StringIO()
+        code = 0
+        try:
+            with redirect_stdout(buf):
+                try:
+                    code = int(
+                        MODULE._search_cli.run(
+                            MODULE.SERPAPI_BACKEND,
+                            [
+                                "search",
+                                "--query",
+                                "labor",
+                                "--json",
+                                "--session",
+                                "serp-bind",
+                                "--state-dir",
+                                str(self.state_dir),
+                            ],
+                        )
+                        or 0
+                    )
+                except SystemExit as exc:
+                    code = int(exc.code or 0)
+        finally:
+            MODULE._serpapi_fetch = original
+
+        self.assertEqual(code, 0, buf.getvalue())
+        records = self._ledger("serp-bind")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["backend"], "SerpApi")
+        self.assertEqual(records[0]["url"], "https://scholar.example/p")
+        self.assertEqual(records[0]["title"], "Paper")
+        self.assertEqual(records[0]["query"], "labor")
+
+    def test_search_without_session_does_not_write_ledger(self) -> None:
+        self._start("serp-bare")
+
+        def fake_fetch(*_args, **_kwargs):
+            return {"organic_results": [{"title": "Paper", "link": "https://scholar.example/p"}]}
+
+        original = MODULE._serpapi_fetch
+        MODULE._serpapi_fetch = fake_fetch
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                MODULE._search_cli.run(
+                    MODULE.SERPAPI_BACKEND,
+                    ["search", "--query", "labor", "--json"],
+                )
+        finally:
+            MODULE._serpapi_fetch = original
+        self.assertEqual(self._ledger("serp-bare"), [])
 
 
 if __name__ == "__main__":

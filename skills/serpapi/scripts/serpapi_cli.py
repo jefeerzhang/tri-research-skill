@@ -224,6 +224,7 @@ def _serpapi_print_human(data: dict[str, Any]) -> None:
 def _serpapi_cmd_search(backend: Any, args: Any) -> None:
     api_key = resolve_key(backend, args)
     data = _serpapi_fetch_cli(args.engine, args.query, args.hl, args.gl, args.num, api_key, args.since, backend=backend)
+    _search_cli.bind_successful_search_to_ledger(backend, args, {args.query: data.get("organic_results", [])})
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -241,6 +242,7 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
     # (`output.get("results", [])`). The two CLIs' batch shapes differ, so a
     # consumer spanning both must handle list vs {"results": [...]}.
     all_results: dict[str, Any] = {}
+    hits_by_query: dict[str, list[Any]] = {}
     for query in args.query:
         try:
             data = _serpapi_invoke_fetch(
@@ -253,9 +255,12 @@ def _serpapi_cmd_batch_search(backend: Any, args: Any) -> None:
                 api_key,
                 args.since,
             )
-            all_results[query] = {"results": data.get("organic_results", [])}
+            organic = data.get("organic_results", [])
+            all_results[query] = {"results": organic}
+            hits_by_query[query] = organic
         except Exception as exc:
             all_results[query] = {"error": str(exc)}
+    _search_cli.bind_successful_search_to_ledger(backend, args, hits_by_query)
     print(json.dumps(all_results, ensure_ascii=False))
 
 

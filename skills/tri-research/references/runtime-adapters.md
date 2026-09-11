@@ -26,6 +26,8 @@ Read this reference only when concrete tool names, install paths, or rendering b
 
 **重要：Exa / SciVerse 是 `required` K+S 硬门禁**（Lead + 子代理），**SerpApi 是 `required` Key + 探活硬门禁**（仅 Lead）：`state_machine start` 前 Exa / SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 `SERPAPI_KEY` 可解析 + 轻量探活成功（ADR-0007），均无用户降级逃逸。Exa：`pip install exa-py` + `EXA_API_KEY`（`scripts/exa_search.py`）；SciVerse：`pip install sciverse` + `SCIVERSE_API_TOKEN`（仅 Python SDK，禁止 MCP）；SerpApi：`export SERPAPI_KEY=<key>`（`skills/serpapi/scripts/serpapi_cli.py`，无需额外 SDK）。分级见 `CONTEXT.md` 的 `BackendRequirementLevel`（ADR-0001 / ADR-0006 / ADR-0007）。Google Scholar 是 SerpApi 的间接能力，非独立后端。
 
+**重要：检索成功与 Evidence Ledger 因果绑定（ADR-0010）。** Lead 研究主路径调用 Exa / Tavily / SerpApi 的 `search` / `batch_search` 时必须传 `--session`：成功即追加 `seen` 行，台账写入失败则 CLI 非零退出。无 `--session` 的裸搜不是研究主路径。AnySearch / SciVerse / WebSearch 本波不改外部包，仍用 `evidence.py add` 标准模板登记。Audit 算法仍是 ADR-0005。
+
 **重要：SciVerse v6.0.0 起只走 Python SDK，不走 MCP。** `mcp__sciverse__*` 工具在 Proma 协作子会话中**实测不继承父会话工具**，是不可靠通道；MCP 服务端进程（`sciverse-mcp-server` npm 包）v6.0.0 起**已弃用**。**唯一受支持的通道是 Python SDK**：`pip install sciverse` + `from sciverse import AgentToolsClient` + `SCIVERSE_API_TOKEN` 环境变量（若设 `SCIVERSE_HOME` 亦可读 `$SCIVERSE_HOME/.env`）。`~/.claude/mcp.json` 里**不应**包含 `sciverse` 段。
 
 Subagent types commonly map to `general-purpose` in Claude Code and Codex, `general` in Hermes, and `worker` in OpenCode. Detect what the host actually exposes; do not assume a listed tool exists.

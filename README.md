@@ -161,7 +161,7 @@ python scripts/state_machine.py --session <id> get_params
 
 ### 引用溯源台账
 
-每波搜索后由 Lead 登记（用户手动资料用 `--user-provided`）：
+每波搜索后，Machine 后端（Exa / Tavily / SerpApi）在 `search` / `batch_search` 上传入 `--session` 即自动写入 `seen` 行（写入失败则 CLI 失败，ADR-0010）。AnySearch / SciVerse / WebSearch 与用户资料仍用模板登记：
 
 ```bash
 python scripts/evidence.py --session <id> add --backend exa --query "AI 就业" --url <u1> --url <u2>

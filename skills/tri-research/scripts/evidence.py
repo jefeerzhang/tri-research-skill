@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -158,6 +159,61 @@ def append_records(store: StateStore, session_id: str, records: list[dict[str, A
         with path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(payload)
     return path
+
+
+def seen_records_from_hits(
+    backend: str,
+    hits_by_query: Mapping[str, Sequence[Any]],
+) -> list[dict[str, Any]]:
+    """Build ``seen`` rows from search hits without inventing a second ledger format.
+
+    Each hit may spell the URL as ``url`` (Exa / Tavily) or ``link`` (SerpApi
+    organic). Invalid / non-http(s) URLs are skipped so a junk SERP row cannot
+    fail a successful search; an empty return means there was nothing to write.
+    """
+    timestamp = now_iso()
+    name = backend.strip()
+    records: list[dict[str, Any]] = []
+    for query, items in hits_by_query.items():
+        q = str(query).strip()
+        if not name or not q:
+            continue
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            raw = item.get("url") or item.get("link") or ""
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            try:
+                url = validate_url(raw)
+            except StateError:
+                continue
+            record: dict[str, Any] = {
+                "kind": KIND_SEEN,
+                "ts": timestamp,
+                "backend": name,
+                "query": q,
+                "url": url,
+            }
+            title = item.get("title")
+            if isinstance(title, str) and title.strip():
+                record["title"] = title.strip()
+            records.append(record)
+    return records
+
+
+def append_seen_hits(
+    store: StateStore,
+    session_id: str,
+    *,
+    backend: str,
+    hits_by_query: Mapping[str, Sequence[Any]],
+) -> Path | None:
+    """Append ``seen`` hits for one search/batch success. No-op when nothing to write."""
+    records = seen_records_from_hits(backend, hits_by_query)
+    if not records:
+        return None
+    return append_records(store, session_id, records)
 
 
 def load_records(path: Path) -> list[dict[str, Any]]:

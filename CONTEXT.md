@@ -37,7 +37,7 @@ _Avoid_: 必选/可选二分、优先级混称、文档-only 约束
 _Avoid_: 托管任务、wrapped command、managed handler 混称
 
 **Evidence Ledger**:
-会话级 append-only 证据流水账，记录研究会话中每波搜索见过的 URL 及其出处（backend / query），与会话状态文件并列存放、以 `session_id` 标识；只追加不修改，是 Evidence Audit 的对账依据。
+会话级 append-only 证据流水账，记录研究会话中每波搜索见过的 URL 及其出处（backend / query），与会话状态文件并列存放、以 `session_id` 标识；只追加不修改，是 Evidence Audit 的对账依据。Machine 后端（Exa / Tavily / SerpApi）在 `search` / `batch_search` 传入 `--session` 时于成功路径自动追加 `seen` 行，写入失败则 CLI 失败（ADR-0010）；无 `--session` 保持裸搜。
 _Avoid_: 搜索日志、引用缓存、结果收藏混称
 
 **Evidence Record**:

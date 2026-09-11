@@ -118,10 +118,14 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 3. 高价值 URL → `extract`（禁止 `--format`）
 4. 结果不足：同义改写再搜一轮 → 仍不足标注「证据薄弱」，**不降门槛凑数**
 5. Exa / Tavily / SerpApi 的 `search` / `batch_search` 已在 CLI 内对超时、连接、429、5xx 做重试与熔断；配置错误立即失败；`required` 源（Exa / SerpApi）耗尽后按 required 纪律处理（不再静默跳过），可选源耗尽后按可选源静默跳过，Agent 侧不再套一层重试
-6. **每波检索结束后立即登记台账**（Lead 统一登记；子代理发现由 Lead 汇总）：
+6. **研究主路径必须把检索成功写入 Evidence Ledger**（ADR-0010）：
+   - **Machine 后端（Exa / Tavily / SerpApi）**：Lead 调用 `search` / `batch_search` 时**必须**传 `--session <id>`。成功后 CLI 自动追加 `seen` 行（backend / query / url / title / ts）；台账写入失败则 CLI **非零退出**（不得带着未入账结果继续）。无 `--session` 的裸搜仅供测试/临时探活，**不是研究主路径**。
+   - **External（AnySearch / SciVerse / WebSearch）**：本波不改外部包；Lead 按标准模板登记（子代理发现由 Lead 汇总）：
 
    ```bash
-   python scripts/evidence.py --session <id> add --backend <源> --query "<query>" --url <u1> --url <u2>
+   python scripts/evidence.py --session <id> add --backend AnySearch --query "<query>" --url <u1> --url <u2>
+   python scripts/evidence.py --session <id> add --backend SciVerse --query "<query>" --url <u1>
+   python scripts/evidence.py --session <id> add --backend WebSearch --query "<query>" --url <u1>
    python scripts/evidence.py --session <id> add --user-provided --url <u> --note "用户给的资料"
    python scripts/evidence.py --session <id> list --summary   # 按源汇总，写「搜索源使用」行照抄
    ```
@@ -171,9 +175,9 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 | `extract`         | 提取 URL 全文（禁止 `--format`） | `<cmd> extract "https://..."`                                                         |
 | `get_sub_domains` | 垂直领域子域发现                 | `<cmd> get_sub_domains --domain finance`；支持 `--domains finance,health`             |
 
-**Tavily**（可选，仅 Lead）：`python scripts/tavily_search.py search|batch_search|extract ...`；不可用 → 静默跳过。
-**Exa**（必选，所有 Agent）：`python scripts/exa_search.py search|batch_search|answer|contents ...`；类别含 `research paper` / `company` / `news` 等。
-**SerpApi**（必选，仅 Lead）：路径 `${SERPAPI_HOME}` → `${TRI_RESEARCH_HOME}/../serpapi` → `skills/serpapi/`；Google Scholar 为间接能力（`--engine google_scholar`）。
+**Tavily**（可选，仅 Lead）：`python scripts/tavily_search.py search|batch_search|extract ...`；研究主路径 `search` / `batch_search` **必须**加 `--session <id>`（ADR-0010）；不可用 → 静默跳过。
+**Exa**（必选，所有 Agent）：`python scripts/exa_search.py search|batch_search|answer|contents ...`；Lead 研究主路径 `search` / `batch_search` **必须**加 `--session <id>`；类别含 `research paper` / `company` / `news` 等。
+**SerpApi**（必选，仅 Lead）：路径 `${SERPAPI_HOME}` → `${TRI_RESEARCH_HOME}/../serpapi` → `skills/serpapi/`；`search` / `batch_search` 研究主路径**必须**加 `--session <id>`；Google Scholar 为间接能力（`--engine google_scholar`）。
 
 ### SciVerse 调用规范
 
