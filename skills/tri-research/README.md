@@ -104,6 +104,8 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill serpapi
 npx skills add https://github.com/jefeerzhang/tri-research-skill --skill research-subagent
 ```
 
+共享骨架 `tri_research_runtime`（ADR-0015）。仓内可 `pip install -e .`；`npx skills add` 不装 wheel。
+
 **必选（`start` 硬门禁）**：`EXA_API_KEY` + `exa-py`，`SCIVERSE_API_TOKEN` + `sciverse`，`SERPAPI_KEY`（探活成功）。
 可选：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`。
 
@@ -130,11 +132,12 @@ tri-research/
 ├── README.md
 ├── CHANGELOG.md
 ├── test-prompts.json
+├── src/tri_research_runtime/      # 可安装共享运行时（ADR-0015：Backend / KeyProvider / 截断上限）
 ├── scripts/
-│   ├── _common.py
+│   ├── _common.py                 # MIN_REPORT_SOURCES；StateError 再导出
 │   ├── _report_parse.py           # 报告语法单一 seam（章节 / 参考文献 / 行内 span / URL 方言）
-│   ├── _search_cli.py             # 搜索 CLI 共享骨架（client 装配 / 重试熔断 / 截断上限的单一出处）
-│   ├── _search_registry.py        # 程序化 seam：Result 归一 + KeyProvider + 后端注册表
+│   ├── _search_cli.py             # 再导出 shim → tri_research_runtime.search_cli
+│   ├── _search_registry.py        # 程序化 seam：Result 归一 + KeyProvider 再导出 + 后端注册表
 │   ├── search_backends.py         # 统一搜索后端声明（Exa + Tavily 对称骨架；SerpApi 自包含于 serpapi skill）
 │   ├── required_backends.py       # start 前的 Required Backend 硬门禁（K+S / Key+探活）
 │   ├── state_machine.py

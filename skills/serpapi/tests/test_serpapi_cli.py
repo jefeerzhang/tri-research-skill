@@ -7,7 +7,8 @@ and its value is wrongly returned as THE key.
 
 Both bugs lived in serpapi_cli's local `_key_from_env_file`, which
 candidate 5 deleted: parsing now lives solely in
-`_search_registry._key_from_env_file` (consumed via KeyProvider, reached
+`tri_research_runtime.key_provider` (re-exported as
+`_search_registry._key_from_env_file`, consumed via KeyProvider, reached
 through the shared `Backend.api_key` by serpapi_cli's `resolve_key`). These
 tests pin the shared implementation from the consumer side, keeping the
 historical bug coverage alive.
@@ -32,7 +33,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
 
-# serpapi_cli bootstrapped tri-research/scripts onto sys.path above, so the
+# serpapi_cli bootstrapped tri_research_runtime (and sibling scripts) above, so the
 # shared parser is importable here; resolve_key reaches it via Backend.api_key.
 import _search_registry  # noqa: E402
 

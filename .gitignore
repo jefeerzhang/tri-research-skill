@@ -10,3 +10,8 @@ npm-debug.log*
 
 # 临时文件（shell 调试 / 状态机临时目录）
 .tmp-*
+
+# setuptools editable install
+*.egg-info/
+build/
+dist/

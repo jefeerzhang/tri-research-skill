@@ -257,7 +257,7 @@ class TriBackendsUseManagedCommandsTests(unittest.TestCase):
         out = body(_Client(), argparse.Namespace(query="q"))
         self.assertEqual(out["query"], "q")
         self.assertEqual(out["answer"], "A")
-        self.assertEqual(len(out["citations"][0]["text"]), 1000)
+        self.assertEqual(len(out["citations"][0]["text"]), _search_cli.CITATION_TEXT_LIMIT)
 
     def test_contents_body_truncates_text(self) -> None:
         class _Page:
@@ -272,7 +272,16 @@ class TriBackendsUseManagedCommandsTests(unittest.TestCase):
         body = self.commands_by_name(self.backends.EXA_BACKEND)["contents"].run
         out = body(_Client(), argparse.Namespace(url="https://x.dev"))
         self.assertIsInstance(out, list)  # success payload stays a bare list
-        self.assertEqual(len(out[0]["text"]), 5000)
+        self.assertEqual(len(out[0]["text"]), _search_cli.CONTENT_LIMIT)
+
+    def test_extract_body_truncates_content(self) -> None:
+        class _Client:
+            def extract(self, urls, extract_depth=None):
+                return {"results": [{"url": "U", "title": "T", "content": "z" * 25000}]}
+
+        body = self.commands_by_name(self.backends.TAVILY_BACKEND)["extract"].run
+        out = body(_Client(), argparse.Namespace(url="https://x.dev", depth="advanced"))
+        self.assertEqual(len(out["content"]), _search_cli.EXTRACT_CONTENT_LIMIT)
 
     def test_extract_body_raises_domain_error_when_empty(self) -> None:
         class _Client:

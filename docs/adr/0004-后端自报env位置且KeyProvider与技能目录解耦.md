@@ -15,5 +15,5 @@
 - 新增后端只需在自己的 `Backend` 上声明 `env_file`，不改公共代码。
 - **行为收窄**：`SERPAPI_KEY` 碰巧写在 `skills/tri-research/.env` 不再被 serpapi 捞到（旧实现意外捎带）；各后端只认自家 `.env`。
 - ADR-0003 的「sibling 候选路径」机制被本方案整体取代（含其修复）；`test_backend_key_resolution` 的兄弟路径钉子同步替换为「env_file 申报与生效」钉子。
-- 剩余耦合（本次有意不动）：serpapi → tri-research scripts 的 import 路径；待打包重构时处理。
+- **剩余耦合（本次有意不动，ADR-0015 已解骨架 import）**：Evidence Ledger / Registry 仍住 skill scripts；`required_backends` 仍懒加载兄弟 serpapi。
 - 测试：`tests/test_backend_key_resolution.py`（env_file 端到端生效、三后端均已申报、resolve 源码无布局知识）。

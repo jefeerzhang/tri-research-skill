@@ -25,12 +25,32 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Make the tri-research `_search_cli` skeleton importable regardless of cwd.
-_TRI_RESEARCH_SCRIPTS = Path(__file__).resolve().parents[2] / "tri-research" / "scripts"
-if str(_TRI_RESEARCH_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_TRI_RESEARCH_SCRIPTS))
+# Make the shared runtime importable: pip wheel first, else sibling skill src
+# (npx skills layout). Evidence Ledger / Registry still live in the sibling
+# scripts dir — remaining layout contract, ADR-0015.
+_TRI_RESEARCH = Path(__file__).resolve().parents[2] / "tri-research"
+_TRI_RESEARCH_SRC = _TRI_RESEARCH / "src"
+_TRI_RESEARCH_SCRIPTS = _TRI_RESEARCH / "scripts"
 
-import _search_cli  # noqa: E402
+
+def _ensure_runtime() -> None:
+    try:
+        import tri_research_runtime  # noqa: F401
+    except ImportError:
+        if not (_TRI_RESEARCH_SRC / "tri_research_runtime").is_dir():
+            raise ImportError(
+                "tri_research_runtime is not installed. From the repo: pip install -e . "
+                "npx skills add does not install the wheel; keep the tri-research skill "
+                "as a sibling of this skill (ADR-0015)."
+            ) from None
+        if str(_TRI_RESEARCH_SRC) not in sys.path:
+            sys.path.insert(0, str(_TRI_RESEARCH_SRC))
+    if _TRI_RESEARCH_SCRIPTS.is_dir() and str(_TRI_RESEARCH_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(_TRI_RESEARCH_SCRIPTS))
+
+
+_ensure_runtime()
+import tri_research_runtime.search_cli as _search_cli  # noqa: E402
 
 try:
     import requests

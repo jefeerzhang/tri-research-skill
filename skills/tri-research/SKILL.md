@@ -155,7 +155,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 ### 首次使用引导
 
-交付单元（ADR-0012 D1）：须同时安装 `tri-research` 与 `serpapi` 两个 skill；只装前者不足以 `state_machine start`。`research-subagent` 推荐。
+交付单元（ADR-0012 D1）：须同时安装 `tri-research` 与 `serpapi` 两个 skill；只装前者不足以 `state_machine start`。`research-subagent` 推荐。共享骨架 `tri_research_runtime`（ADR-0015）；仓内可 `pip install -e .`。
 
 研究开始前检测各源可用性并汇总。**Exa / SciVerse / SerpApi 未配齐或探活失败则 `start` 直接失败**——须先安装 SDK、申请 Key 并写入环境变量（或 `.env` / `$SCIVERSE_HOME/.env`）。`recommended` / `optional` 未装 → 黄字或静默跳过，不拦研究。无子代理时 Lead 直接用所有可用源搜。
 

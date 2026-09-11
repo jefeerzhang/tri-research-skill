@@ -29,6 +29,7 @@ jobs:
         run: |
           ruff check --config .ruff.toml \
             skills/tri-research/scripts \
+            skills/tri-research/src \
             skills/tri-research/tests \
             skills/serpapi/scripts
 
@@ -68,6 +69,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Install shared runtime (editable)
+        run: pip install -e .
 
       - name: Run state-machine unit tests
         run: |

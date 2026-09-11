@@ -15,10 +15,11 @@ day someone edits only one of them.
 3. The result truncation limits live once. Two lanes with their own numbers
    made the same result read differently depending on who fetched it.
 
-The `sys.path` bootstrap ritual is deliberately NOT consolidated here:
-each copy guards its own direct-script invocation (`python scripts/x.py`),
-and a shared bootstrap module would itself need the path it exists to
-provide. Only a packaging refactor (ADR-0004's deferred item) removes it.
+The `sys.path` bootstrap ritual for *same-skill* scripts is still not
+consolidated here: each copy guards its own direct-script invocation
+(``python scripts/x.py``). Cross-skill serpapi → ``_search_cli`` now goes
+through ``tri_research_runtime`` (ADR-0015); remaining sibling ``scripts/``
+is only for Evidence Ledger / Registry.
 """
 
 from __future__ import annotations
@@ -27,34 +28,35 @@ import unittest
 from pathlib import Path
 
 TRI_SCRIPTS = Path(__file__).parents[1] / "scripts"
+TRI_RUNTIME = Path(__file__).parents[1] / "src" / "tri_research_runtime"
 SERPAPI_SCRIPTS = Path(__file__).parents[2] / "serpapi" / "scripts"
 
 PROXY_TUPLE = '"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"'
-MECHANISM_MODULE = "_search_cli.py"
+MECHANISM_MODULE = TRI_RUNTIME / "search_cli.py"
 
 
 def _script_sources() -> list[tuple[str, str]]:
-    """(filename, source) for every script in both skills, incl. future files."""
-    return [
-        (path.name, path.read_text(encoding="utf-8"))
-        for script_dir in (TRI_SCRIPTS, SERPAPI_SCRIPTS)
-        for path in sorted(script_dir.glob("*.py"))
-    ]
+    """(filename, source) for every script in both skills plus the runtime pkg."""
+    sources: list[tuple[str, str]] = []
+    for script_dir in (TRI_SCRIPTS, SERPAPI_SCRIPTS, TRI_RUNTIME):
+        for path in sorted(script_dir.glob("*.py")):
+            sources.append((path.name, path.read_text(encoding="utf-8")))
+    return sources
 
 
 class ProxyClearConsolidationTests(unittest.TestCase):
     def test_proxy_tuple_defined_once_in_mechanism_module(self) -> None:
-        source = (TRI_SCRIPTS / MECHANISM_MODULE).read_text(encoding="utf-8")
+        source = MECHANISM_MODULE.read_text(encoding="utf-8")
         self.assertEqual(
             source.count(PROXY_TUPLE),
             1,
-            "the proxy env tuple must have exactly one home: _search_cli.clear_proxy_vars",
+            "the proxy env tuple must have exactly one home: search_cli.clear_proxy_vars",
         )
 
     def test_no_script_reimplements_proxy_clear(self) -> None:
         """Enumerate every script so a future file can't dodge the gate."""
         for name, source in _script_sources():
-            if name == MECHANISM_MODULE:
+            if name == MECHANISM_MODULE.name:
                 continue  # the single home, asserted separately
             self.assertNotIn(
                 PROXY_TUPLE,
@@ -75,7 +77,7 @@ class ClientBootstrapConsolidationTests(unittest.TestCase):
     FORBIDDEN_MARKERS = ("backend.client_factory(", "spec.backend.client_factory(")
 
     def test_setup_sequence_lives_in_the_mechanism_module(self) -> None:
-        source = (TRI_SCRIPTS / MECHANISM_MODULE).read_text(encoding="utf-8")
+        source = MECHANISM_MODULE.read_text(encoding="utf-8")
         for marker in self.BOOTSTRAP_MARKERS:
             self.assertEqual(
                 source.count(marker),
@@ -85,7 +87,7 @@ class ClientBootstrapConsolidationTests(unittest.TestCase):
 
     def test_no_script_builds_a_client_by_hand(self) -> None:
         for name, source in _script_sources():
-            if name == MECHANISM_MODULE:
+            if name == MECHANISM_MODULE.name:
                 markers = self.FORBIDDEN_MARKERS  # the home itself may use self.*
             else:
                 markers = (*self.BOOTSTRAP_MARKERS, *self.FORBIDDEN_MARKERS)
@@ -98,21 +100,27 @@ class ClientBootstrapConsolidationTests(unittest.TestCase):
 
 
 class ResultTruncationConsolidationTests(unittest.TestCase):
-    """One pair of limits for both search lanes."""
+    """Named limits for search lanes and managed extras (ADR-0008 / ADR-0015)."""
 
-    TRUNCATION_DECLS = ("def truncate(", "SNIPPET_LIMIT = ", "CONTENT_LIMIT = ")
-    # Only the lanes that produce search results; SerpApi's error-body clip is
+    TRUNCATION_DECLS = (
+        "def truncate(",
+        "\nSNIPPET_LIMIT = ",
+        "\nCONTENT_LIMIT = ",
+        "\nCITATION_TEXT_LIMIT = ",
+        "\nEXTRACT_CONTENT_LIMIT = ",
+    )
+    # Search-result lanes plus managed extras; SerpApi's error-body clip is
     # a message length, not a result field.
     RESULT_LANES = ("_search_registry.py", "search_backends.py")
-    RESULT_FIELD_SLICES = ("[:500]", "[:5000]")
+    RESULT_FIELD_SLICES = ("[:500]", "[:5000]", "[:1000]", "[:20000]")
 
     def test_limits_are_declared_once_in_the_mechanism_module(self) -> None:
-        source = (TRI_SCRIPTS / MECHANISM_MODULE).read_text(encoding="utf-8")
+        source = MECHANISM_MODULE.read_text(encoding="utf-8")
         for marker in self.TRUNCATION_DECLS:
             self.assertEqual(
                 source.count(marker),
                 1,
-                f"{marker!r} must have exactly one home: _search_cli (the limits are shared policy)",
+                f"{marker!r} must have exactly one home: search_cli (the limits are shared policy)",
             )
 
     def test_no_lane_recomputes_the_limits_by_hand(self) -> None:

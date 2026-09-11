@@ -106,7 +106,7 @@ def _exa_answer(client: Any, args: Any) -> dict[str, Any]:
         {
             "title": getattr(cit, "title", ""),
             "url": getattr(cit, "url", ""),
-            "text": (getattr(cit, "text", None) or "")[:1000],
+            "text": _search_cli.truncate(getattr(cit, "text", None), _search_cli.CITATION_TEXT_LIMIT),
         }
         for cit in getattr(resp, "citations", None) or []
     ]
@@ -231,7 +231,7 @@ def _tavily_extract(client: Any, args: Any) -> dict[str, Any]:
         {
             "url": p.get("url", args.url),
             "title": p.get("title", ""),
-            "content": (p.get("content") or "")[:20000],
+            "content": _search_cli.truncate(p.get("content"), _search_cli.EXTRACT_CONTENT_LIMIT),
         }
         for p in resp.get("results", [])
     ]

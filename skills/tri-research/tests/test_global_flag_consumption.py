@@ -17,7 +17,7 @@ import re
 import unittest
 from pathlib import Path
 
-SEARCH_CLI = Path(__file__).parents[1] / "scripts" / "_search_cli.py"
+SEARCH_CLI = Path(__file__).parents[1] / "src" / "tri_research_runtime" / "search_cli.py"
 
 # Command branches that go to the network. Managed extra commands inherit
 # their consumption via run_managed_command; search / batch_search consume
