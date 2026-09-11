@@ -217,10 +217,16 @@ class RequiredDescriptorsDataDrivenTests(unittest.TestCase):
         finally:
             EXA_BACKEND.requirement = original
 
-    def test_exa_readiness_delegates_to_client(self) -> None:
-        with mock.patch.object(EXA_BACKEND, "client", side_effect=_search_cli.KeyMissing("EXA_API_KEY not set")):
-            gaps = EXA_BACKEND.readiness()
-        self.assertEqual(gaps, ["Exa: EXA_API_KEY not set"])
+    def test_exa_readiness_shares_client_setup_judgment(self) -> None:
+        with mock.patch.object(EXA_BACKEND, "sdk", None):
+            self.assertEqual(EXA_BACKEND.readiness(), ["Exa: exa-py not installed"])
+        with mock.patch.object(EXA_BACKEND, "sdk", object()):
+            with mock.patch.object(self.rb.KeyProvider, "resolve", return_value=None):
+                self.assertEqual(EXA_BACKEND.readiness(), ["Exa: EXA_API_KEY not set"])
+            with mock.patch.object(EXA_BACKEND, "client_factory") as factory:
+                with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
+                    self.assertEqual(EXA_BACKEND.readiness(), [])
+                factory.assert_not_called()
 
     def test_gate_source_does_not_hand_roll_exa_ks(self) -> None:
         source = (SCRIPTS_DIR / "required_backends.py").read_text(encoding="utf-8")

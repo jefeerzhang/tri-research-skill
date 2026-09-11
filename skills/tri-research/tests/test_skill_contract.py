@@ -379,7 +379,8 @@ class SkillContractTests(unittest.TestCase):
         adr = (REPO_ROOT / "docs" / "adr" / "0011-BackendRequirementLevel可执行化.md").read_text(encoding="utf-8")
         self.assertIn("SciVerseReadiness", adr)
         self.assertIn("ALLOW_DEGRADED", adr)
-        self.assertIn("不注册进", adr)
+        self.assertIn("SearchBackendRegistry", adr)
+        self.assertIn("REGISTRY.register", adr)
 
         adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         self.assertIn("## WebBackend 扩展清单", adapters)

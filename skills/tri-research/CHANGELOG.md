@@ -7,7 +7,7 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Added
 
 - **检索成功路径与证据台账因果绑定（ADR-0010 / W1）**：Exa / Tavily / SerpApi 的 `search` / `batch_search` 支持 `--session`；成功后经共享 helper 调用现有 `evidence.append_records` 追加 `seen` 行（backend / query / url / title / ts）。台账写入失败则 CLI 非零退出（用户锁定 fail-closed）。无 `--session` 保持裸搜。AnySearch / SciVerse / WebSearch 本波仅 SKILL 标准登记模板，不改外部包。不改 `audit_report` 算法（仍 ADR-0005）。回归：`tests/test_search_ledger_bind.py` + skill 合约钉子。
-- **BackendRequirementLevel 可执行化（ADR-0011 / W2）**：三档必要性成为 `_search_cli.BackendRequirementLevel` 枚举；Exa / Tavily / SerpApi 在 `Backend` 上申报 `requirement` + `readiness()`（装配判断即 `client()`；SerpApi `start_probe`）；SciVerse 以 `SciVerseReadiness` 挂同一轮询列表，不进 Registry。`runtime-adapters.md` 增 WebBackend / ExternalTool 扩展清单。回归：`tests/test_required_backends.py` 数据驱动用例 + skill 合约钉子。
+- **BackendRequirementLevel 可执行化（ADR-0011 / W2）**：三档必要性成为 `_search_cli.BackendRequirementLevel` 枚举；Exa / Tavily / SerpApi 在 `Backend` 上申报 `requirement` + `readiness()`（装配判断与 `client()` 共用 `require_setup`；SerpApi `start_probe`）；SciVerse 以 `SciVerseReadiness` 挂同一轮询列表，不进 Registry。`runtime-adapters.md` 增 WebBackend / ExternalTool 扩展清单。回归：`tests/test_required_backends.py` 数据驱动用例 + skill 合约钉子。
 
 ### Changed
 

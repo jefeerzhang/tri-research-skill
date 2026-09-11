@@ -9,7 +9,7 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。必要性由 `Backend.requirement` 申报，就绪判定走 `Backend.readiness()`（与 `client()` 同一装配判断；SerpApi 另 `start_probe`）。分级见 `BackendRequirementLevel`。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。必要性由 `Backend.requirement` 申报，就绪判定走 `Backend.readiness()`（与 `client()` 同一套 SDK→key 装配判断，住在 `require_setup`；SerpApi 另 `start_probe`）。分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称
 
 **SearchBackendRegistry**:

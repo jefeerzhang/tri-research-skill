@@ -240,35 +240,48 @@ class Backend:
             raise KeyMissing(f"{self.env_key} not set")
         return api_key
 
+    def require_setup(self, *, cli_key: str | None = None) -> str:
+        """SDK present and key resolvable. Returns the key; does not build.
+
+        The assembly *judgment* shared by :meth:`client` and :meth:`readiness`
+        (ADR-0011). The Required gate is K+S (ADR-0006), not "SDK client
+        constructed" — constructing Exa() at ``start`` would demand a real
+        SDK class the stubs do not provide.
+        """
+        if self.sdk is None:
+            raise SdkMissing(self.missing_sdk_message)
+        return self.api_key(cli_key=cli_key)
+
     def client(self, *, cli_key: str | None = None) -> Any:
         """Set up the SDK client: SDK present -> key resolvable -> build.
 
         The one home of that sequence in the repo; every command path
         (search / batch_search / check / managed commands / Registry / the
-        Required gate) goes through here and translates
+        Required gate's SerpApi probe) goes through here and translates
         :class:`ClientSetupError` into its own output dialect. Order is load
         bearing: the SDK check must precede ``client_factory``, otherwise a
         missing SDK turns into a traceback instead of a documented error
         (ADR-0002) — and an unset key cannot be fixed into a working client
         while the SDK is still missing.
         """
-        if self.sdk is None:
-            raise SdkMissing(self.missing_sdk_message)
-        return self.client_factory(self.api_key(cli_key=cli_key))
+        return self.client_factory(self.require_setup(cli_key=cli_key))
 
     def readiness(self) -> list[str]:
         """Gap strings for the Required gate; empty means this backend is ready.
 
-        Assembly judgment is ``client()`` (SDK → key → build). Backends with
-        ``start_probe`` then reuse ``probe`` under the same timeout as
-        ``check``. The gate's dialect is a collected gap list, not a raise.
+        Assembly judgment is :meth:`require_setup` (same SDK → key rules as
+        :meth:`client`). Backends with ``start_probe`` then build a client
+        and reuse ``probe`` under the same timeout as ``check``. The gate's
+        dialect is a collected gap list, not a raise.
         """
         try:
-            client = self.client()
+            if self.start_probe:
+                client = self.client()
+            else:
+                self.require_setup()
+                return []
         except ClientSetupError as exc:
             return [f"{self.name}: {exc}"]
-        if not self.start_probe:
-            return []
         try:
             ok = run_with_timeout(lambda: self.probe(client), self.call_timeout)
         except Exception as exc:  # noqa: BLE001 — probe failure surfaces as a gap
