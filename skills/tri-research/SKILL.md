@@ -153,6 +153,8 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 
 ### 首次使用引导
 
+交付单元（ADR-0012 D1）：须同时安装 `tri-research` 与 `serpapi` 两个 skill；只装前者不足以 `state_machine start`。`research-subagent` 推荐。
+
 研究开始前检测各源可用性并汇总。**Exa / SciVerse / SerpApi 未配齐或探活失败则 `start` 直接失败**——须先安装 SDK、申请 Key 并写入环境变量（或 `.env` / `$SCIVERSE_HOME/.env`）。`recommended` / `optional` 未装 → 黄字或静默跳过，不拦研究。无子代理时 Lead 直接用所有可用源搜。
 
 | 源                    | 安装                                                         | 验证                                                             | 必要性                                                                        |
@@ -161,7 +163,7 @@ python scripts/state_machine.py --session <session-id> set_params '{"topic":"主
 | **AnySearch**         | `npx skills add anysearch-ai/anysearch-skill` → 可选 API Key | `<cmd> search "test" --max_results 1`（`<cmd>` 探测见下）        | **必选（建议配置）** (`recommended`) — https://anysearch.com/console/api-keys |
 | **SciVerse**          | `pip install sciverse` → `export SCIVERSE_API_TOKEN=<token>` | `python -c "from sciverse import AgentToolsClient; print('ok')"` | **必选** (`required`) — https://sciverse.space/docs#auth                      |
 | **Tavily**            | `pip install tavily-python` → `export TAVILY_API_KEY=<key>`  | `python scripts/tavily_search.py check`；未配置则静默跳过        | 可选                                                                          |
-| **SerpApi**           | `pip install requests` → `export SERPAPI_KEY=<key>`          | `python skills/serpapi/scripts/serpapi_cli.py check`             | **必选** (`required`) — https://serpapi.com/dashboard                         |
+| **SerpApi**           | 安装 `serpapi` skill + `pip install requests` → `export SERPAPI_KEY=<key>` | `python skills/serpapi/scripts/serpapi_cli.py check`             | **必选** (`required`) — https://serpapi.com/dashboard                         |
 | **Runtime WebSearch** | 宿主内置，无需配置                                           | —                                                                | 可选                                                                          |
 
 ### 工具调用（子代理经 Bash 调外部 CLI，独立进程不能直接用内部工具）

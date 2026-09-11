@@ -8,7 +8,7 @@ credentials:
   - name: SERPAPI_KEY
     required: true
     description: "SerpApi API key from https://serpapi.com/dashboard (free tier: 250 searches/month)."
-    storage: ".env file in skill dir, SERPAPI_KEY env var, or --api_key CLI flag"
+    storage: "--api_key CLI flag > SERPAPI_KEY env var > .env file in skill dir (KeyProvider: cli > env > .env)"
 ---
 
 ## Overview
@@ -22,11 +22,13 @@ SerpApi returns structured JSON for Google and 100+ other search engines, handli
 - Competitor/SEO monitoring, price tracking, review scraping, ad intelligence
 - Any task where a hand-written scraper would be needed but an API is cleaner
 
-**Default provider? No.** SerpApi is a supplement: when unavailable (no key, quota exhausted, network error), report it and fall back to other available search methods — never a silent interchange.
+## 当被 tri-research 引用时升为 required，不可回退
+
+本 skill 可单独使用。一旦被 `tri-research` 引用（ADR-0012 D1），SerpApi 升为 `required` Search Backend：`state_machine start` 前必须 Key 可解析 + 轻量探活成功，失败不建会话。不得把「未安装 / 无 key / 探活失败」回退成其他搜索源来开跑，也不得把本 skill 写成「非默认 / 可省略的辅助」。单独调用时缺 key 仍拒绝执行、不静默顶替；路径耦合（import `tri-research/scripts/_search_cli`）仍在，待 ADR-0015。
 
 ## API key
 
-Priority: `--api_key` flag > `.env` file (`SERPAPI_KEY`) > environment variable.
+Priority: `--api_key` flag > environment variable `SERPAPI_KEY` > skill-dir `.env`（KeyProvider，`cli > env > .env`，ADR-0004）。
 
 Guide the user in their language: register at <https://serpapi.com> (free, 250 searches/month, no credit card) → Dashboard → API Key → save to `<skill_dir>/.env` as `SERPAPI_KEY=...` or export the env var. Don't paste keys in chat — store them in `.env` instead.
 
@@ -80,6 +82,6 @@ Run `engines` for the full categorized list.
 
 - Only GET to `https://serpapi.com/search`; never write or modify external data.
 - Never delete or overwrite user files; `export` only creates/appends under `data/output/`.
-- Keys are read via `SERPAPI_KEY` (env or `.env`) or `--api_key` only — never written to logs or stdout.
-- Not the default search provider: when unavailable, stop and report — don't silently substitute other search methods.
+- Keys are read via KeyProvider (`--api_key` > env `SERPAPI_KEY` > skill-dir `.env`) — never written to logs or stdout.
+- When referenced by tri-research, SerpApi is `required`（ADR-0012）：do not fall back to other search backends to start a session. Standalone: refuse to run without a key — never silently substitute.
 - Queries go to SerpApi and bill quota per call — avoid sending private or sensitive content in queries.

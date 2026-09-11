@@ -394,6 +394,55 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("iter_required_descriptors", gate)
         self.assertNotIn("ALLOW_DEGRADED", gate)
 
+    def test_adr_0012_companion_install_contract(self) -> None:
+        """ADR-0012 D1：最小安装是 tri-research + serpapi；禁止单技能即就绪 / 可回退措辞。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0012-tri-research与serpapi交付单元契约.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("D1", adr)
+        self.assertIn("ADR-0015", adr)
+        self.assertIn("不足以", adr)
+        self.assertIn("state_machine start", adr)
+
+        pin = "不足以 `state_machine start`"
+        self.assertIn(pin, self.root_readme)
+        self.assertIn(pin, self.readme)
+        self.assertIn(pin, self.skill)
+        self.assertIn("--skill serpapi", self.root_readme)
+        self.assertIn("--skill serpapi", self.readme)
+        self.assertIn("ADR-0012", self.skill)
+        self.assertIn("research-subagent", self.root_readme)
+
+        marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        tri = next(p for p in marketplace["plugins"] if p["name"] == "tri-research")
+        self.assertEqual(tri.get("dependencies"), ["serpapi"])
+        serpapi_plugin = next(p for p in marketplace["plugins"] if p["name"] == "serpapi")
+        self.assertNotIn("辅助", serpapi_plugin["description"])
+
+        context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+        self.assertIn("**Delivery Unit**", context)
+
+        serpapi_skill = (ROOT.parent / "serpapi" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("当被 tri-research 引用时升为 required，不可回退", serpapi_skill)
+        self.assertIn("cli > env > .env", serpapi_skill)
+        forbidden = (
+            "只安装 tri-research",
+            "可回退其他搜索",
+            "fall back to other available search methods",
+            "Default provider? No",
+            "Not the default search provider",
+        )
+        docs = (
+            ("root_readme", self.root_readme),
+            ("skill_readme", self.readme),
+            ("skill", self.skill),
+            ("serpapi_skill", serpapi_skill),
+            ("marketplace", json.dumps(marketplace, ensure_ascii=False)),
+        )
+        for name, blob in docs:
+            for phrase in forbidden:
+                self.assertNotIn(phrase, blob, msg=f"{name} still allows conflicting install wording: {phrase!r}")
+
 
 if __name__ == "__main__":
     unittest.main()

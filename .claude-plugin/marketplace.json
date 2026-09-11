@@ -6,15 +6,16 @@
     "url": "https://github.com/jefeerzhang"
   },
   "metadata": {
-    "description": "多源带引用深度研究 Skill 套件（主导代理 + 子代理 + SerpApi 必选含间接 Scholar + citations 可选复核）",
+    "description": "多源带引用深度研究 Skill 套件（开跑最小安装 tri-research + serpapi；research-subagent 推荐；SerpApi 必选含间接 Scholar；citations 可选复核）",
     "version": "6.9.0"
   },
   "plugins": [
     {
       "name": "tri-research",
-      "description": "主导代理：规划 + 派发 + 综合 + 报告验收",
+      "description": "主导代理：规划 + 派发 + 综合 + 报告验收。开跑须同时安装伴生 skill serpapi（ADR-0012 D1）",
       "source": "./skills/tri-research",
-      "category": "research"
+      "category": "research",
+      "dependencies": ["serpapi"]
     },
     {
       "name": "research-subagent",
@@ -24,7 +25,7 @@
     },
     {
       "name": "serpapi",
-      "description": "辅助 Skill：中文/英文 Google 与 Google Scholar 补强",
+      "description": "Lead 必选 Search Backend：中文/英文 Google 与 Google Scholar（间接）。被 tri-research 引用时 required，不可回退（ADR-0012 D1）",
       "source": "./skills/serpapi",
       "category": "search"
     },
