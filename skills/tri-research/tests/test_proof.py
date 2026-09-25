@@ -71,6 +71,21 @@ class ProofModuleTests(unittest.TestCase):
         with self.assertRaises(self.proof.ProofError):
             self.proof.require_complete({"path": "/tmp/x.md", "sha256": "abc"}, "s1")
 
+    def test_require_complete_rejects_proof_without_ledger_fingerprint(self) -> None:
+        # Schema v4: the ledger snapshot fingerprint is mandatory. Every report
+        # field present but no evidence_lines / evidence_sha256 means the proof
+        # predates the Evidence Ledger (or the state was hand-edited) — corrupt.
+        pre_ledger = {
+            "path": "/tmp/x.md",
+            "sha256": "abc",
+            "topic": "t",
+            "min_sources": 10,
+            "validated_at": "2026-09-06T00:00:00+00:00",
+        }
+        with self.assertRaises(self.proof.ProofError) as ctx:
+            self.proof.require_complete(pre_ledger, "s1")
+        self.assertIn("evidence", str(ctx.exception))
+
     def test_verify_integrity_clean_returns_ok(self) -> None:
         report = self._report()
         proof = self.proof.build_proof(self.store, self._session(), report, 10, expected_topic="人工智能与劳动分配")
@@ -95,7 +110,9 @@ class ProofModuleTests(unittest.TestCase):
         proof = self.proof.build_proof(self.store, self._session(), report, 10, expected_topic="人工智能与劳动分配")
         ledger = self.evidence.evidence_path(self.store, self._session())
         with ledger.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write('{"kind":"seen","ts":"2026-01-01T00:00+00:00","backend":"x","query":"q","url":"https://late.example/1"}\n')
+            handle.write(
+                '{"kind":"seen","ts":"2026-01-01T00:00+00:00","backend":"x","query":"q","url":"https://late.example/1"}\n'
+            )
         with self.assertRaises(self.proof.ProofTamperedError):
             self.proof.verify_integrity(proof, self.store, self._session())
 

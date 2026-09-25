@@ -60,9 +60,7 @@ class SciVerseReadiness:
     sdk_module = "sciverse"
     apply_url = "https://sciverse.space/docs#auth"
     verify_cmd = "python -c \"from sciverse import AgentToolsClient; print('ok')\""
-    configure_hint = (
-        f"pip install sciverse && export {env_key}=<token> ({apply_url})"
-    )
+    configure_hint = f"pip install sciverse && export {env_key}=<token> ({apply_url})"
 
     def readiness(self) -> list[str]:
         gaps: list[str] = []
@@ -74,12 +72,6 @@ class SciVerseReadiness:
 
 
 SCIVERSE_READINESS = SciVerseReadiness()
-
-# Aliases so older tests can name env keys; canonical homes are the descriptors.
-EXA_ENV_KEY = "EXA_API_KEY"
-SCIVERSE_ENV_KEY = SCIVERSE_READINESS.env_key
-SCIVERSE_SDK = SCIVERSE_READINESS.sdk_module
-SERPAPI_ENV_KEY = "SERPAPI_KEY"
 
 
 def _sdk_importable(module_name: str) -> bool:
@@ -109,21 +101,53 @@ def _get_serpapi_backend():
     return _serpapi_backend
 
 
-def _machine_backends():
+class _MissingBackendReadiness:
+    """Stand-in for a Backend whose sibling skill cannot be imported.
+
+    The gate's contract is "every readiness failure is a `StateError` with the
+    `ERROR:` line"; letting `ImportError` escape `_get_serpapi_backend` would
+    print a traceback instead, and would also hide the other backends' gaps.
+    """
+
+    requirement = BackendRequirementLevel.REQUIRED
+
+    def __init__(self, name: str, reason: str, *, apply_url: str, env_key: str, verify_cmd: str) -> None:
+        self.name = name
+        self.apply_url = apply_url
+        self.verify_cmd = verify_cmd
+        self.configure_hint = f"export {env_key}=<key> ({apply_url})"
+        self._reason = reason
+
+    def readiness(self) -> list[str]:
+        return [f"{self.name}: skill not importable ({self._reason})"]
+
+
+def declared_backends() -> list:
+    """Machine Web Backends the gate knows about (SerpApi via the sibling skill)."""
     from search_backends import EXA_BACKEND, TAVILY_BACKEND
 
-    return (EXA_BACKEND, TAVILY_BACKEND, _get_serpapi_backend())
+    try:
+        serpapi = _get_serpapi_backend()
+    except ImportError as exc:
+        # The sibling skill is unimportable, so its declarations are unreadable:
+        # this is the one place that names SerpApi's key / URL / command by hand.
+        serpapi = _MissingBackendReadiness(
+            "SerpApi",
+            str(exc),
+            apply_url="https://serpapi.com/dashboard",
+            env_key="SERPAPI_KEY",
+            verify_cmd="python skills/serpapi/scripts/serpapi_cli.py check",
+        )
+    return [EXA_BACKEND, TAVILY_BACKEND, serpapi]
 
 
 def iter_readiness_descriptors() -> tuple[ReadinessDescriptor, ...]:
     """Machine Web Backends + SciVerseReadiness, in one iteration list."""
-    return (*_machine_backends(), SCIVERSE_READINESS)
+    return (*declared_backends(), SCIVERSE_READINESS)
 
 
 def iter_required_descriptors() -> tuple[ReadinessDescriptor, ...]:
-    return tuple(
-        d for d in iter_readiness_descriptors() if d.requirement == BackendRequirementLevel.REQUIRED
-    )
+    return tuple(d for d in iter_readiness_descriptors() if d.requirement == BackendRequirementLevel.REQUIRED)
 
 
 def _guide(descriptors: tuple[ReadinessDescriptor, ...]) -> str:
@@ -132,11 +156,14 @@ def _guide(descriptors: tuple[ReadinessDescriptor, ...]) -> str:
 
 
 def require_required_backends() -> None:
-    """Raise StateError if any required descriptor reports a readiness gap."""
+    """Raise StateError if any required descriptor reports a readiness gap.
+
+    The walk is data-driven (ADR-0011): ``iter_required_descriptors()`` is the
+    only membership rule, so promoting a backend is a ``requirement``
+    declaration change, not an edit here.
+    """
     required = iter_required_descriptors()
-    gaps: list[str] = []
-    for descriptor in required:
-        gaps.extend(descriptor.readiness())
+    gaps: list[str] = [gap for descriptor in required for gap in descriptor.readiness()]
     if not gaps:
         return
     detail = "; ".join(gaps)

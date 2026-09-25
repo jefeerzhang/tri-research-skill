@@ -263,7 +263,14 @@ class Backend:
         :meth:`client`). Backends with ``start_probe`` then build a client
         and reuse ``probe`` under the same timeout as ``check``. The gate's
         dialect is a collected gap list, not a raise.
+
+        Only ``required`` backends carry a start-time obligation (ADR-0011):
+        an optional / recommended one returns no gaps even when its key or SDK
+        is missing — otherwise a bare ``Backend()`` would contribute a junk
+        gap string and promoting tiers would stop being a data change.
         """
+        if self.requirement is not BackendRequirementLevel.REQUIRED:
+            return []
         try:
             if self.start_probe:
                 client = self.client()

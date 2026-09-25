@@ -127,6 +127,18 @@ class ManagedCommandSkeletonTests(unittest.TestCase):
         self.assertEqual(called["n"], 0)  # sdk checked before client build
         self.assertEqual(json.loads(out)["error"], "fake-sdk not installed")
 
+    def test_missing_sdk_is_named_before_missing_key(self) -> None:
+        # Both prerequisites absent -> the SDK wins. This lane used to check the
+        # key first; Backend.client() owns that order now (ADR-0002), so the
+        # message for a doubly-broken setup changed with the consolidation.
+        # Pinned here so no lane silently flips back to its old precedence.
+        os.environ.pop(ENV_KEY, None)
+        self.backend.sdk = None
+        ns = argparse.Namespace(query="hello", command="go")
+        out, code = _invoke_command(self.backend, _managed_command(lambda client, args: {"never": 1}), ns)
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out)["error"], "fake-sdk not installed")
+
     def test_body_failure_becomes_json_error_not_traceback(self) -> None:
         def body(client, args):
             raise RuntimeError("boom")

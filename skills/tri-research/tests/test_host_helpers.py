@@ -10,7 +10,7 @@ day someone edits only one of them.
    the edit — the same silent-drift class ADR-0002 killed for check/error
    discipline.
 2. The client-setup sequence (SDK present -> key -> build) lives once, in
-   `Backend.client()`. Six copies of it drifted before the consolidation:
+   `Backend.client()`. Eight copies of it drifted before the consolidation:
    each new command path re-decided what "unavailable" means.
 3. The result truncation limits live once. Two lanes with their own numbers
    made the same result read differently depending on who fetched it.
@@ -109,9 +109,8 @@ class ResultTruncationConsolidationTests(unittest.TestCase):
         "\nCITATION_TEXT_LIMIT = ",
         "\nEXTRACT_CONTENT_LIMIT = ",
     )
-    # Search-result lanes plus managed extras; SerpApi's error-body clip is
-    # a message length, not a result field.
-    RESULT_LANES = ("_search_registry.py", "search_backends.py")
+    # Every script is in scope: a hand-written width anywhere is the drift this
+    # gate exists to catch, so there is no lane allow-list to keep current.
     RESULT_FIELD_SLICES = ("[:500]", "[:5000]", "[:1000]", "[:20000]")
 
     def test_limits_are_declared_once_in_the_mechanism_module(self) -> None:
@@ -123,14 +122,15 @@ class ResultTruncationConsolidationTests(unittest.TestCase):
                 f"{marker!r} must have exactly one home: search_cli (the limits are shared policy)",
             )
 
-    def test_no_lane_recomputes_the_limits_by_hand(self) -> None:
-        sources = dict(_script_sources())
-        for name in self.RESULT_LANES:
+    def test_no_script_recomputes_the_limits_by_hand(self) -> None:
+        for name, source in _script_sources():
+            if name == MECHANISM_MODULE.name:
+                continue  # the home is where truncate() lives, by definition
             for literal in self.RESULT_FIELD_SLICES:
                 self.assertNotIn(
                     literal,
-                    sources[name],
-                    f"{name} must call _search_cli.truncate(value, LIMIT) instead of hard-coding {literal}",
+                    source,
+                    f"{name} must call truncate(value, LIMIT) instead of hard-coding {literal}",
                 )
 
 

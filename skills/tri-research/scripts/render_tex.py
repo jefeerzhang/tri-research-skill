@@ -28,7 +28,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from _report_parse import Section, parse_reference, parse_report  # noqa: E402
+from _report_parse import REFERENCES_TITLE, Section, parse_reference, parse_report  # noqa: E402
 
 TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
 SEP_ROW_RE = re.compile(r":?-{2,}:?")
@@ -130,7 +130,7 @@ def render_table(lines: list[str]) -> str:
 def render_section(section: Section) -> str:
     """章节 body -> LaTeX。跳过 ``![...]`` 图片行（drawio 框架图）。"""
     title, lines = section.title, section.lines
-    if title == "参考文献":
+    if title == REFERENCES_TITLE:
         if not section.references:
             raise RenderError("参考文献章节无有效条目")
         items = "\n\n".join(render_reference(r.number, r.entry) for r in section.references)
@@ -357,7 +357,7 @@ def run(args: argparse.Namespace) -> int:
     except (OSError, UnicodeDecodeError) as exc:
         raise RenderError(f"cannot read report: {exc}") from exc
     title, sections = split_sections(text)
-    if not any(section.title == "参考文献" for section in sections):
+    if not any(section.title == REFERENCES_TITLE for section in sections):
         raise RenderError(f"not a research report: no 参考文献 section in {report_path}")
     output_path = (args.output or default_output(report_path)).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)

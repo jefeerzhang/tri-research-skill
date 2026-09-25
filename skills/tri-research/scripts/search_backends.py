@@ -33,14 +33,19 @@ if str(_SCRIPT_DIR) not in sys.path:
 import _search_cli  # noqa: E402
 from _search_registry import REGISTRY, BackendSpec  # noqa: E402
 
+# `sdk is None` is the module's existing "not installed" signal (ADR-0011 turns
+# it into a readiness gap). The catch includes AttributeError on purpose: a
+# shadowed or half-broken dependency raises that at import time, and this module
+# is now loaded lazily by the Required gate — `state_machine start` must degrade
+# to a reported gap, never to a traceback.
 try:
     import exa_py
-except ImportError:
+except (ImportError, AttributeError):
     exa_py = None  # type: ignore[assignment]
 
 try:
     from tavily import TavilyClient
-except ImportError:
+except (ImportError, AttributeError):
     TavilyClient = None  # type: ignore[misc,assignment]
 
 
