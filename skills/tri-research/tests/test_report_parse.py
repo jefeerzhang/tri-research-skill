@@ -219,6 +219,8 @@ class GrammarOwnershipTests(unittest.TestCase):
         r"^\[(\d+)]\s+(.+)$",  # REFERENCE_RE：一行一条参考文献
         r"https?://\S+",  # URL_RE：贪婪匹配后还要剥尾部标点
         "``(?:(?!``).)*?``",  # 双反引号行内代码：里面的 [n] 不是引用
+        r"(?m)^(?=## )",  # SECTION_SPLIT_RE：章节从哪里断开
+        r"^#\s+(.+?)\s*$",  # H1_RE：报告标题
     )
 
     def test_grammar_literals_exist_in_parse_module(self) -> None:
