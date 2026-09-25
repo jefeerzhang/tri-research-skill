@@ -104,6 +104,12 @@ NO_KEY_HINT = "\n".join(
     )
 )
 
+# How much of an error response body to echo back. A message length, not a
+# result-field width: deliberately outside the shared SNIPPET_LIMIT /
+# CONTENT_LIMIT pair, so the truncation gate can cover every script without a
+# lane allow-list (tests/test_host_helpers.py).
+_ERROR_BODY_CHARS = 500
+
 
 def resolve_key(backend: Any, args: Any) -> str:
     """SerpApi dialect for the shared bootstrap: proxy clearing + key via Backend.
@@ -180,7 +186,7 @@ def _serpapi_fetch(
         raise SerpApiError(f"Network error: {e}\n", 3) from e
 
     if r.status_code != 200:
-        raise SerpApiError(f"HTTP {r.status_code}: {r.text[:500]}\n", 4)
+        raise SerpApiError(f"HTTP {r.status_code}: {r.text[:_ERROR_BODY_CHARS]}\n", 4)
     data = r.json()
     if "error" in data:
         raise SerpApiError(f"SerpApi error: {data['error']}\n", 5)
@@ -391,7 +397,6 @@ class SerpApiBackend(_search_cli.Backend):
     # This skill's own .env, declared here so KeyProvider needs no layout
     # knowledge (ADR-0004) — the only place this file names the path.
     env_file = Path(__file__).resolve().parents[1] / ".env"
-    requirement = _search_cli.BackendRequirementLevel.REQUIRED
     start_probe = True  # ADR-0007: Key + live probe at start; Exa/SciVerse do not
     apply_url = "https://serpapi.com/dashboard"
     verify_cmd = "python skills/serpapi/scripts/serpapi_cli.py check"
@@ -409,19 +414,6 @@ class SerpApiBackend(_search_cli.Backend):
     def probe(self, client: Any) -> bool:
         _serpapi_fetch("google", "test", None, None, 1, client.api_key)
         return True
-
-    def readiness(self) -> list[str]:
-        gaps = super().readiness()
-        if gaps:
-            return gaps
-        try:
-            ok = _search_cli._run_with_timeout(
-                lambda: self.probe(self.client_factory(load_key())),
-                self.call_timeout,
-            )
-        except Exception as exc:  # noqa: BLE001
-            return [f"{self.name}: probe failed: {exc}"]
-        return [] if ok else [f"{self.name}: probe failed"]
 
     def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
         data = _serpapi_fetch(

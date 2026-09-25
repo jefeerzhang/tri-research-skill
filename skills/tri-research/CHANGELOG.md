@@ -16,7 +16,15 @@ All notable changes to the Tri Research Skill will be documented in this file.
 ### Changed
 
 - **源覆盖硬门禁单一名单（ADR-0009 / R-A）**：执行情况「搜索源使用」行的点名名单以 `validate_report.USAGE_ROSTER` 为唯一机器真源，六源全点名（AnySearch / SciVerse / Exa / SerpApi / Tavily / WebSearch）。Tavily 仍为 `optional`，未用须写 `0/跳过`，不得省略。废「五名称为验收必填 / Tavily 可并入说明」与把 Exa 写成 optional 的过时注释。合约测试钉住 SKILL 硬门禁源名与代码元组不得漂移。不升 `required` 档、不改 SerpApi 安装捆绑、不改证据自动入账。
-- **Required 门禁改为描述符 walker**：`require_required_backends` 只遍历 `iter_required_descriptors()`，不再手抄 Exa / SciVerse / SerpApi 常量；改 `requirement` 即改门禁成员。Exa 不再并行 KeyProvider + `find_spec`。Tavily 仍 `optional`；AnySearch `recommended` 本波仍文档-only。无 `ALLOW_DEGRADED`。
+- **Required 门禁改为描述符 walker**：`require_required_backends` 只遍历 `declared_backends()` 中声明 `required` 的后端，加上 `_sciverse_readiness()` 的学术 SDK 缺口（`iter_readiness_descriptors()` / `iter_required_descriptors()` 是同一份声明的只读视图），不再手抄 Exa / SciVerse / SerpApi 常量
+- **审查修正重放（双轴 code-review）**：① 截断上限闸门去掉 `RESULT_LANES` 硬名单，改为枚举两个 skill 的 scripts 与打包运行时——任何脚本手写结果字段宽度都算越线，serpapi 错误响应体的截断长度因此常量化为 `_ERROR_BODY_CHARS`（消息长度，不进共享上限对）；② 语法闸门补上章节切分与 H1 两条字面量，`Six copies` 订正为 8 处；③ `validate_report.REQUIRED_HEADINGS` 与 `render_tex` 的两处章节判定改用 seam 公开的 `REFERENCES_TITLE`，不再手写第二份「参考文献」；④ `_report_parse` docstring 划清一处边界：`canonicalize_url` 对保留域/私有 IP 返回 `None` 属「比对键」定义，不是越层判定。
+- **删掉 `validate_report.require_complete_proof` 兼容 shim**：产品代码零调用（DONE 收据 schema 真源是 `proof.require_complete`），留着却让 `validate_report` 与 `proof` 互相 import；它独占的「缺台账指纹即视为损坏」回归迁到 `tests/test_proof.py::test_require_complete_rejects_proof_without_ledger_fingerprint`，钉在真源上。
+
+### Fixed
+
+- **`state_machine start` 在 master 上必然失败（71 例红）**：三处根因一起修。① `SerpApiBackend.readiness()` 覆写引用了两个在 PR #21 之后已不存在的名字（`_search_cli._run_with_timeout` 已改名 `run_with_timeout`、`load_key` 已并入 `resolve_key` / `Backend.api_key`），且基类在 `start_probe=True` 时早已做完同一件事——覆写不仅重复探活一次，还把每次 `start` 变成 `SerpApi: probe failed`；删掉覆写与一处重复的 `requirement` 声明。② 门禁懒加载 `search_backends` 时，测试 stub 的 `requests` 遮蔽真包，`tavily` 在类体求值 `requests.Session` 抛 `AttributeError`——stub 补上 `Session` / `exceptions` 最小面，`search_backends` 的 SDK 导入兜底同时接住 `AttributeError`（半坏的依赖按「未安装」报成缺口，而不是让 traceback 击穿门禁契约）。③ 空的 `Backend.readiness()` 会造出 `": "` 垃圾缺口，改为只有 `required` 档承担 start 前义务；并补齐测试所期望的 `declared_backends()` / `_sciverse_readiness()` 入口。
+- **兄弟技能缺失时 `start` 吐 traceback**：`_get_serpapi_backend()` 的 `ImportError` 现在兜成一条 `SerpApi: skill not importable (…)` 缺口，其余后端的检查照跑，仍走 `StateError` + `ERROR:` 行。回归：`test_serpapi_skill_not_importable_is_a_gap_not_traceback`。
+- **补记 v6.9.0 漏报的第 4 处行为收窄**：managed 命令（Exa `answer` / `contents`、Tavily `extract`）与 `Registry.search` 在「SDK 与 key 同时缺」时也改为先报 SDK（这两条路旧实现是 key 先）。加钉子 `test_missing_sdk_is_named_before_missing_key`，ADR-0008 与 GitHub Release 正文同步更正。；改 `requirement` 即改门禁成员。Exa 不再并行 KeyProvider + `find_spec`。Tavily 仍 `optional`；AnySearch `recommended` 本波仍文档-only。无 `ALLOW_DEGRADED`。
 
 ## [6.9.0] - 2026-09-06
 

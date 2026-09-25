@@ -7,6 +7,11 @@
 「这份文本长什么样」，不回答「合不合格」——判定与排版都留在调用方。
 
 依赖方向单向：本 module 只用标准库，不被 scripts/ 下任何 module 反向依赖。
+
+一处边界值得写明：`canonicalize_url` 对保留域、私有 IP、带凭据的 URL 返回
+`None`，看着像判定，其实是「比对键」定义的一部分——什么算同一个来源、什么根本
+不成其为来源，验收器与溯源对账必须共用同一个答案。本 module 依然不判断报告合
+不合格（那是 validate_report），也不判断引用有没有台账命中（那是 evidence audit）。
 """
 
 from __future__ import annotations

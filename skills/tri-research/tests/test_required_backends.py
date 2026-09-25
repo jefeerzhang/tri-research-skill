@@ -147,6 +147,22 @@ class RequiredBackendsGateTests(unittest.TestCase):
                         self.rb.require_required_backends()
         self.assertIn("SerpApi: requests not installed", str(ctx.exception))
 
+    def test_serpapi_skill_not_importable_is_a_gap_not_traceback(self) -> None:
+        # A missing / broken sibling skill is a readiness gap like any other:
+        # `start` must answer with the ERROR: line, not a ModuleNotFoundError
+        # traceback, and it must still report the other backends' checks.
+        with mock.patch.object(
+            self.rb, "_get_serpapi_backend", side_effect=ImportError("No module named 'serpapi_cli'")
+        ):
+            with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
+                with mock.patch.object(self.rb, "_sdk_importable", return_value=True):
+                    with self.assertRaises(self.rb.StateError) as ctx:
+                        self.rb.require_required_backends()
+        msg = str(ctx.exception)
+        self.assertIn("SerpApi: skill not importable", msg)
+        self.assertIn("serpapi_cli", msg)
+        self.assertIn("serpapi.com/dashboard", msg)  # the guide still names where to apply
+
     def test_lists_all_gaps_in_one_error(self) -> None:
         with mock.patch.object(EXA_BACKEND, "sdk", None):
             with mock.patch.object(self.rb.KeyProvider, "resolve", return_value=None):
@@ -162,7 +178,9 @@ class RequiredBackendsGateTests(unittest.TestCase):
 
     def test_backend_requirement_contract_is_declarative(self) -> None:
         cli = load_module(SCRIPTS_DIR / "_search_cli.py", "search_cli_requirement_contract")
-        self.assertEqual([level.value for level in cli.BackendRequirementLevel], ["required", "recommended", "optional"])
+        self.assertEqual(
+            [level.value for level in cli.BackendRequirementLevel], ["required", "recommended", "optional"]
+        )
         backend = cli.Backend()
         self.assertEqual(backend.requirement, cli.BackendRequirementLevel.OPTIONAL)
         self.assertEqual(backend.readiness(), [])

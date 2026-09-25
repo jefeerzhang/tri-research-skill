@@ -17,7 +17,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 from _common import MIN_REPORT_SOURCES, now_iso, source_threshold  # noqa: E402
-from _report_parse import Reference, citation_numbers, parse_report, section_of  # noqa: E402
+from _report_parse import REFERENCES_TITLE, Reference, citation_numbers, parse_report, section_of  # noqa: E402
 
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z]{4,}\b")
@@ -50,7 +50,7 @@ REQUIRED_HEADINGS = (
     "主要文献观点",
     "主要矛盾与冲突点",
     "未来研究方向",
-    "参考文献",
+    REFERENCES_TITLE,
     "执行情况",
 )
 
@@ -252,23 +252,6 @@ def validate_and_build_proof(
         "min_sources": min_sources,
         "validated_at": validated_at,
     }
-
-
-def require_complete_proof(proof: Any, session_id: str) -> None:
-    """Compatibility shim: full DONE schema lives in ``proof.require_complete``.
-
-    Kept so older imports / tests that still call this name keep working.
-    Lazily imports ``proof`` to avoid a load-time cycle (``proof`` already
-    imports this module). Re-raises as this module's ``ReportValidationError``
-    so importlib dual-load callers still match ``isinstance`` against the
-    loaded copy (same pattern as StateError in ``_common``).
-    """
-    from proof import ProofError, require_complete  # local: proof → validate_report
-
-    try:
-        require_complete(proof, session_id)
-    except ProofError as exc:
-        raise ReportValidationError(str(exc)) from exc
 
 
 def verify_proof_integrity(proof: dict[str, Any]) -> None:
