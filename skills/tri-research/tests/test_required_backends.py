@@ -8,6 +8,7 @@ gate walks ``requirement=required`` descriptors; changing a backend's
 
 from __future__ import annotations
 
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -61,7 +62,8 @@ class _FakeSerpApiBackend(_search_cli.Backend):
 class RequiredBackendsGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.rb = load_module(SCRIPTS_DIR / "required_backends.py", "required_backends_gate_test")
-        self._serpapi_patch = mock.patch.object(self.rb, "_get_serpapi_backend", return_value=_FakeSerpApiBackend())
+        self.serpapi = _FakeSerpApiBackend()
+        self._serpapi_patch = mock.patch.object(self.rb, "_get_serpapi_backend", return_value=self.serpapi)
         self._serpapi_patch.start()
         self.addCleanup(self._serpapi_patch.stop)
         # Exa readiness now goes through Backend.client(); without a real
@@ -79,7 +81,7 @@ class RequiredBackendsGateTests(unittest.TestCase):
     def test_missing_exa_key_raises(self) -> None:
         def resolve(_cli, env_key, _env_file=None):
             # Only Exa missing; SciVerse + SerpApi resolve ok.
-            return None if env_key == self.rb.EXA_ENV_KEY else "k"
+            return None if env_key == EXA_BACKEND.env_key else "k"
 
         with mock.patch.object(self.rb.KeyProvider, "resolve", side_effect=resolve):
             with mock.patch.object(self.rb, "_sdk_importable", return_value=True):
@@ -91,7 +93,7 @@ class RequiredBackendsGateTests(unittest.TestCase):
 
     def test_missing_sciverse_sdk_raises(self) -> None:
         def importable(name: str) -> bool:
-            return name != self.rb.SCIVERSE_SDK
+            return name != self.rb.SCIVERSE_READINESS.sdk_module
 
         with mock.patch.object(self.rb.KeyProvider, "resolve", return_value="k"):
             with mock.patch.object(self.rb, "_sdk_importable", side_effect=importable):
@@ -103,7 +105,7 @@ class RequiredBackendsGateTests(unittest.TestCase):
     def test_missing_serpapi_key_raises(self) -> None:
         def resolve(_cli, env_key, _env_file=None):
             # SerpApi key missing; Exa + SciVerse resolve ok.
-            return None if env_key == self.rb.SERPAPI_ENV_KEY else "k"
+            return None if env_key == self.serpapi.env_key else "k"
 
         with mock.patch.object(self.rb.KeyProvider, "resolve", side_effect=resolve):
             with mock.patch.object(self.rb, "_sdk_importable", return_value=True):
@@ -197,10 +199,14 @@ class RequiredBackendsGateTests(unittest.TestCase):
         broken.requirement = required
         broken.readiness.return_value = ["Broken: unavailable"]
         with mock.patch.object(self.rb, "declared_backends", return_value=[ready, broken]):
-            with mock.patch.object(self.rb, "_sciverse_readiness", return_value=[]):
+            with mock.patch.object(self.rb.SCIVERSE_READINESS, "readiness", return_value=[]):
                 with self.assertRaises(self.rb.StateError) as ctx:
                     self.rb.require_required_backends()
-        self.assertIn("Broken: unavailable", str(ctx.exception))
+        msg = str(ctx.exception)
+        self.assertIn("Broken: unavailable", msg)
+        # The guide names every required descriptor, not just the broken ones.
+        self.assertIn("Ready:", msg)
+        ready.readiness.assert_called_once()
 
     def test_machine_backends_declare_requirement_levels(self) -> None:
         backends = load_module(SCRIPTS_DIR / "search_backends.py", "search_backends_requirement_contract")
@@ -281,7 +287,12 @@ class RequiredDescriptorsDataDrivenTests(unittest.TestCase):
         self.assertNotIn("ALLOW_DEGRADED", source)
         self.assertNotIn("EXA_SDK", source)
         self.assertNotIn('find_spec("exa_py")', source)
-        self.assertIn("iter_required_descriptors", source)
+        # Pin the *call site*, not just the definition: a gate that re-filters
+        # declared_backends() by hand would keep this file's text passing while
+        # bypassing the descriptor view ADR-0011 makes authoritative.
+        gate = inspect.getsource(self.rb.require_required_backends)
+        self.assertIn("iter_required_descriptors()", gate)
+        self.assertNotIn("BackendRequirementLevel", gate)
 
 
 class StartSessionGateTests(unittest.TestCase):

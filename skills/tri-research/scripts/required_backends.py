@@ -73,12 +73,6 @@ class SciVerseReadiness:
 
 SCIVERSE_READINESS = SciVerseReadiness()
 
-# Aliases so older tests can name env keys; canonical homes are the descriptors.
-EXA_ENV_KEY = "EXA_API_KEY"
-SCIVERSE_ENV_KEY = SCIVERSE_READINESS.env_key
-SCIVERSE_SDK = SCIVERSE_READINESS.sdk_module
-SERPAPI_ENV_KEY = "SERPAPI_KEY"
-
 
 def _sdk_importable(module_name: str) -> bool:
     return importlib.util.find_spec(module_name) is not None
@@ -117,7 +111,7 @@ class _MissingBackendReadiness:
 
     requirement = BackendRequirementLevel.REQUIRED
 
-    def __init__(self, name: str, reason: str, apply_url: str, env_key: str, verify_cmd: str) -> None:
+    def __init__(self, name: str, reason: str, *, apply_url: str, env_key: str, verify_cmd: str) -> None:
         self.name = name
         self.apply_url = apply_url
         self.verify_cmd = verify_cmd
@@ -135,19 +129,16 @@ def declared_backends() -> list:
     try:
         serpapi = _get_serpapi_backend()
     except ImportError as exc:
+        # The sibling skill is unimportable, so its declarations are unreadable:
+        # this is the one place that names SerpApi's key / URL / command by hand.
         serpapi = _MissingBackendReadiness(
             "SerpApi",
             str(exc),
-            "https://serpapi.com/dashboard",
-            SERPAPI_ENV_KEY,
-            "python skills/serpapi/scripts/serpapi_cli.py check",
+            apply_url="https://serpapi.com/dashboard",
+            env_key="SERPAPI_KEY",
+            verify_cmd="python skills/serpapi/scripts/serpapi_cli.py check",
         )
     return [EXA_BACKEND, TAVILY_BACKEND, serpapi]
-
-
-def _sciverse_readiness() -> list[str]:
-    """SciVerse gaps: an academic SDK descriptor, not a Web Backend (ADR-0006)."""
-    return SCIVERSE_READINESS.readiness()
 
 
 def iter_readiness_descriptors() -> tuple[ReadinessDescriptor, ...]:
@@ -167,15 +158,13 @@ def _guide(descriptors: tuple[ReadinessDescriptor, ...]) -> str:
 def require_required_backends() -> None:
     """Raise StateError if any required descriptor reports a readiness gap.
 
-    The walk is data-driven (ADR-0011): it asks ``declared_backends()`` which
-    backends declare ``required`` and adds SciVerse through its own descriptor,
-    so promoting a backend is a declaration change, not an edit here.
+    The walk is data-driven (ADR-0011): ``iter_required_descriptors()`` is the
+    only membership rule, so promoting a backend is a ``requirement``
+    declaration change, not an edit here.
     """
-    required_backends = [d for d in declared_backends() if d.requirement == BackendRequirementLevel.REQUIRED]
-    gaps: list[str] = [gap for descriptor in required_backends for gap in descriptor.readiness()]
-    gaps.extend(_sciverse_readiness())
+    required = iter_required_descriptors()
+    gaps: list[str] = [gap for descriptor in required for gap in descriptor.readiness()]
     if not gaps:
         return
     detail = "; ".join(gaps)
-    guide_source = (*required_backends, SCIVERSE_READINESS)
-    raise StateError(f"required backends not ready: {detail}. {_guide(guide_source)}")
+    raise StateError(f"required backends not ready: {detail}. {_guide(required)}")
