@@ -8,6 +8,7 @@ package under ``src/tri_research_runtime``; serpapi locates that sibling
 
 from __future__ import annotations
 
+from tri_research_runtime.clock import now_iso
 from tri_research_runtime.errors import (
     CircuitOpenError,
     ClientSetupError,
@@ -49,6 +50,7 @@ __all__ = (
     "StateError",
     "invoke",
     "key_from_env_file",
+    "now_iso",
     "run",
     "truncate",
 )

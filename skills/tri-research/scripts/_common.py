@@ -1,23 +1,29 @@
-"""Shared constants and helpers for the tri-research scripts.
+"""Report source floor shared by the tri-research CLIs (candidate 5).
 
-This module exists so that state_machine.py and validate_report.py
-do not each define their own MIN_REPORT_SOURCES and source_threshold.
-Both files import from here. Keeping a single source of truth prevents
-the two implementations from drifting apart (which previously caused the
-two thresholds to be set independently — a real footgun if a maintainer
-ever raised one without the other).
+This module owns exactly two facts, plus one explicit facade:
+
+1. ``MIN_REPORT_SOURCES`` — the floor a Research Session's ``min_sources`` must
+   clear (CONTEXT.md: Report Validation). ``state_machine.py`` and
+   ``validate_report.py`` both read it here, so the two thresholds cannot be
+   raised independently — which is what used to happen before this module.
+2. ``source_threshold`` — the argparse type built on that floor.
+3. ``StateError`` — a re-export facade so callers need not carry the package
+   path (ADR-0015). The class itself lives in ``tri_research_runtime.errors``.
+
+Not here, deliberately:
+
+- Timestamps. ``now_iso`` moved to ``tri_research_runtime.clock`` with the other
+  shared primitives; a module named after the report floor should not be the
+  place you look for the clock.
+- The ``src/`` sys.path bootstrap. That is ``_runtime.py``'s single job; this
+  module imports it rather than repeating the three lines.
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
-from datetime import datetime, timezone
-from pathlib import Path
 
-_SRC = Path(__file__).resolve().parents[1] / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+import _runtime  # noqa: F401  — the one home of the src/ sys.path bootstrap
 
 from tri_research_runtime.errors import StateError  # noqa: E402, F401  — re-export (ADR-0015)
 
@@ -30,7 +36,3 @@ def source_threshold(value: str) -> int:
     if parsed < MIN_REPORT_SOURCES:
         raise argparse.ArgumentTypeError(f"至少为 {MIN_REPORT_SOURCES}")
     return parsed
-
-
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="minutes")

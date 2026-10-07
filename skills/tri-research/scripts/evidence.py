@@ -36,8 +36,9 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from _common import StateError, now_iso  # noqa: E402
+from _common import StateError  # noqa: E402
 from _report_parse import canonicalize_url, parse_report  # noqa: E402
+from tri_research_runtime.clock import now_iso  # noqa: E402
 from state_machine import (  # noqa: E402
     StateStore,
     default_state_dir,

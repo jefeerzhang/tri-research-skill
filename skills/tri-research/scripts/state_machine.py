@@ -27,10 +27,10 @@ if str(_SCRIPT_DIR) not in sys.path:
 from _common import (  # noqa: E402
     MIN_REPORT_SOURCES,
     StateError,
-    now_iso,
     source_threshold,
 )
 from required_backends import require_required_backends  # noqa: E402
+from tri_research_runtime.clock import now_iso  # noqa: E402
 from validate_report import ReportValidationError  # noqa: E402
 
 SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")

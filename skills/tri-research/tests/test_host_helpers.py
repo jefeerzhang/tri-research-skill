@@ -175,5 +175,24 @@ class RequirementDeclarationTests(unittest.TestCase):
         return list(stmt.targets)
 
 
+class SourcePathBootstrapConsolidationTests(unittest.TestCase):
+    """`src/` 的引导必须有且只有一个家（候选 5）。
+
+    同技能脚本各自把 `_SCRIPT_DIR` 放到 `sys.path` 是**另一件事**：每个脚本要能
+    被 `python scripts/x.py` 直接调用。本闸门只钉「把打包运行时的 `src/` 放上
+    sys.path」这一个动作，它此前在 `_common.py` 与 `_runtime.py` 各写了一份。
+    """
+
+    SRC_BOOTSTRAP = "sys.path.insert(0, str(_SRC))"
+
+    def test_src_bootstrap_has_exactly_one_home(self) -> None:
+        homes = [name for name, source in _script_sources() if self.SRC_BOOTSTRAP in source]
+        self.assertEqual(
+            homes,
+            ["_runtime.py"],
+            "把 src/ 放上 sys.path 这件事只许有一个家：_runtime.py（轮到的调用方 import 它即可）",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

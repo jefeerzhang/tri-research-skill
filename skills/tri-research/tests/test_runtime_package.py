@@ -60,6 +60,28 @@ class RuntimePackageTests(unittest.TestCase):
         self.assertNotIn("tri-research", text.lower())
         self.assertNotIn("parents[", text)
 
+    def test_package_exports_the_shared_clock(self) -> None:
+        """候选 5：``now_iso`` 是共享时钟原语，其家与格式都只有一个。
+
+        它此前住在 ``scripts/_common.py``（一个以报告来源下限自述的模块），
+        调用方无从预期。现在与 errors / 截断上限并列，并在此钉住格式。
+        """
+        import re
+
+        import tri_research_runtime as runtime
+
+        self.assertTrue(hasattr(runtime, "now_iso"), "运行时包未导出 now_iso")
+        stamp = runtime.now_iso()
+        # UTC ISO-8601，分钟精度：YYYY-MM-DDTHH:MM+00:00
+        self.assertRegex(stamp, re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\+00:00$"), stamp)
+
+        import _common
+
+        self.assertFalse(
+            hasattr(_common, "now_iso"),
+            "_common 不应再持有 now_iso：时钟的家是 tri_research_runtime.clock",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
