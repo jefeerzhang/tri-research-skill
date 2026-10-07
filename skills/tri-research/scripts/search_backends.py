@@ -1,6 +1,6 @@
-"""Shared search-backend module for tri-research (Exa + Tavily).
+"""Shared search-backend module for tri-research (Exa + Tavily + OpenAlex).
 
-Exa and Tavily backends are declared here over the shared CLI skeleton in
+Exa, Tavily and OpenAlex backends are declared here over the shared CLI skeleton in
 `_search_cli.py`. SerpApi lives in `skills/serpapi/scripts/serpapi_cli.py`
 because its CLI surface (key loading, proxy handling, three extra commands)
 is substantially wider than Exa / Tavily — co-locating the full SerpApi
@@ -20,7 +20,12 @@ SDK call into its output (see ADR-0002 for why SerpApi stays unmanaged).
 
 from __future__ import annotations
 
+import json
+import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -274,3 +279,154 @@ except ValueError:
 # Expose global --no-proxy to Exa/Tavily via Registry (expand keeps old JSON shape)
 EXA_BACKEND.global_flags = REGISTRY.global_flags  # type: ignore[assignment]
 TAVILY_BACKEND.global_flags = REGISTRY.global_flags  # type: ignore[assignment]
+
+
+# ---------------------------------------------------------------------------
+# OpenAlex
+# ---------------------------------------------------------------------------
+
+
+def _openalex_abstract(inverted_index: Any) -> str:
+    """Rebuild the abstract from OpenAlex's ``{word: [positions]}`` index."""
+    if not isinstance(inverted_index, dict):
+        return ""
+    words: dict[int, str] = {}
+    for word, positions in inverted_index.items():
+        for position in positions or []:
+            words[position] = word
+    return " ".join(words[i] for i in sorted(words))
+
+
+def _openalex_url(work: dict[str, Any]) -> str:
+    """First legal http(s) URL: landing page, then DOI, then the OpenAlex id."""
+    landing = (work.get("primary_location") or {}).get("landing_page_url")
+    for candidate in (landing, work.get("doi"), work.get("id")):
+        if isinstance(candidate, str) and candidate.startswith(("http://", "https://")):
+            return candidate
+    return ""
+
+
+def _openalex_normalize_work(work: dict[str, Any]) -> dict[str, Any]:
+    title = work.get("display_name") or work.get("title") or ""
+    snippet = _openalex_abstract(work.get("abstract_inverted_index")) or title
+    return {
+        "title": title,
+        "url": _openalex_url(work),
+        "snippet": _search_cli.truncate(snippet, _search_cli.SNIPPET_LIMIT),
+        "published_date": work.get("publication_date") or "",
+        "score": work.get("relevance_score"),
+        "engine_meta": {
+            "openalex_id": work.get("id"),
+            "doi": work.get("doi"),
+            "cited_by_count": work.get("cited_by_count"),
+            "is_oa": (work.get("open_access") or {}).get("is_oa"),
+        },
+    }
+
+
+OPENALEX_MAX_PER_PAGE = 100  # official `per_page` ceiling
+
+
+def _openalex_params(query: str, options: dict[str, Any]) -> dict[str, Any]:
+    """Map CLI options onto the ``works?search=`` query parameters."""
+    params: dict[str, Any] = {"search": query}
+    if options.get("num_results") is not None:
+        params["per_page"] = min(int(options["num_results"]), OPENALEX_MAX_PER_PAGE)
+    filters: list[str] = []
+    if options.get("from_year") is not None:
+        filters.append(f"from_publication_date:{int(options['from_year'])}-01-01")
+    if options.get("to_year") is not None:
+        filters.append(f"to_publication_date:{int(options['to_year'])}-12-31")
+    if options.get("open_access"):
+        filters.append("is_oa:true")
+    if options.get("work_type"):
+        filters.append(f"type:{options['work_type']}")
+    if filters:
+        params["filter"] = ",".join(filters)
+    return params
+
+
+OPENALEX_WORKS_URL = "https://api.openalex.org/works"
+OPENALEX_HTTP_TIMEOUT = 30.0
+
+
+class _OpenAlexClient:
+    """Plain GET client for ``/works``; identity (key, mailto) is optional."""
+
+    def __init__(self, api_key: str = "", mailto: str = "") -> None:
+        self.api_key = api_key
+        self.mailto = mailto
+
+    def get_works(self, params: dict[str, Any]) -> dict[str, Any]:
+        query = dict(params)
+        if self.mailto:
+            query["mailto"] = self.mailto
+        url = f"{OPENALEX_WORKS_URL}?{urllib.parse.urlencode(query, safe=':,')}"
+        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        if self.api_key:
+            # Header, not query string: keeps the key out of URLs and logs.
+            request.add_header("Authorization", f"Bearer {self.api_key}")
+        try:
+            with urllib.request.urlopen(request, timeout=OPENALEX_HTTP_TIMEOUT) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # "HTTP <code>" is the token the shared skeleton classifies on:
+            # 429 / 5xx retry, other 4xx fail immediately.
+            raise RuntimeError(f"HTTP {exc.code}: {exc.reason}") from exc
+        except urllib.error.URLError as exc:
+            raise ConnectionError(f"network error: {exc.reason}") from exc
+
+
+def _openalex_make_client(api_key: str) -> _OpenAlexClient:
+    return _OpenAlexClient(api_key, os.environ.get("OPENALEX_MAILTO", ""))
+
+
+class OpenAlexBackend(_search_cli.Backend):
+    name = "OpenAlex"
+    help = "OpenAlex works search CLI for tri-research"
+    sdk = urllib.request  # stdlib HTTP is always present: no SdkMissing
+    missing_sdk_message = "OpenAlex HTTP client unavailable"
+    env_key = "OPENALEX_API_KEY"
+    env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
+    requirement = _search_cli.BackendRequirementLevel.OPTIONAL
+    apply_url = "https://openalex.org/settings/api"
+    verify_cmd = "python scripts/openalex_search.py check"
+    configure_hint = f"optional: export {env_key}=<key> ({apply_url})"
+    client_factory = staticmethod(_openalex_make_client)
+    flags = [
+        _search_cli.Flag("num_results", ("--num-results",), "Number of results (default: 5, max 100)", type=int, default=5),
+        _search_cli.Flag("from_year", ("--from-year",), "Only works published in or after this year", type=int),
+        _search_cli.Flag("to_year", ("--to-year",), "Only works published in or before this year", type=int),
+        _search_cli.Flag("open_access", ("--open-access",), "Only open-access works", action="store_true"),
+        _search_cli.Flag("work_type", ("--type",), "OpenAlex work type: article, book, dissertation, ..."),
+    ]
+
+    def require_setup(self, *, cli_key: str | None = None) -> str:
+        """Anonymous is a first-class mode: a missing key resolves to ``""``.
+
+        Only OpenAlex relaxes this; Exa / Tavily / SerpApi keep raising
+        ``KeyMissing`` from the shared assembly.
+        """
+        try:
+            return super().require_setup(cli_key=cli_key)
+        except _search_cli.KeyMissing:
+            return ""
+
+    def probe(self, client: Any) -> bool:
+        client.get_works({"search": "test", "per_page": 1})
+        return True
+
+    def search(self, client: Any, query: str, options: dict[str, Any]) -> dict[str, Any]:
+        resp = client.get_works(_openalex_params(query, options))
+        results = [_openalex_normalize_work(w) for w in resp.get("results", [])]
+        return {"num_results": len(results), "results": results}
+
+
+OPENALEX_BACKEND = OpenAlexBackend()
+
+try:
+    REGISTRY.register(BackendSpec(name="openalex", backend=OPENALEX_BACKEND))
+except ValueError:
+    pass  # already registered (module re-imported in tests)
+
+OPENALEX_BACKEND.global_flags = REGISTRY.global_flags  # type: ignore[assignment]

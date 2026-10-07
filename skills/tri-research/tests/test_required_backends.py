@@ -9,6 +9,7 @@ gate walks ``requirement=required`` descriptors; changing a backend's
 from __future__ import annotations
 
 import inspect
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,7 +19,7 @@ from _test_helpers import load_module, patch_required_backends
 
 import _search_cli  # noqa: E402 — _test_helpers puts scripts/ on sys.path
 from _search_cli import BackendRequirementLevel  # noqa: E402
-from search_backends import EXA_BACKEND, TAVILY_BACKEND  # noqa: E402
+from search_backends import EXA_BACKEND, OPENALEX_BACKEND, TAVILY_BACKEND  # noqa: E402
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
@@ -233,6 +234,16 @@ class RequiredDescriptorsDataDrivenTests(unittest.TestCase):
         self.assertIn("Tavily", all_names)
         self.assertEqual(TAVILY_BACKEND.requirement, BackendRequirementLevel.OPTIONAL)
         self.assertNotIn("Tavily", tuple(d.name for d in self.rb.iter_required_descriptors()))
+
+    def test_openalex_is_on_the_list_but_optional_and_never_blocks_start(self) -> None:
+        self.assertIn("OpenAlex", tuple(d.name for d in self.rb.iter_readiness_descriptors()))
+        self.assertEqual(OPENALEX_BACKEND.requirement, BackendRequirementLevel.OPTIONAL)
+        self.assertNotIn("OpenAlex", tuple(d.name for d in self.rb.iter_required_descriptors()))
+        self.assertFalse(OPENALEX_BACKEND.start_probe)
+        with mock.patch.object(OPENALEX_BACKEND, "env_file", Path("no-such.env")):
+            with mock.patch.dict("os.environ"):
+                os.environ.pop("OPENALEX_API_KEY", None)
+                self.assertEqual(OPENALEX_BACKEND.readiness(), [])
 
     def test_anysearch_is_not_a_machine_descriptor(self) -> None:
         names = {d.name for d in self.rb.iter_readiness_descriptors()}

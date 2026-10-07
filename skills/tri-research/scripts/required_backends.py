@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Required Backend gate: walk ``requirement=required`` descriptors before start.
 
-Machine Web Backends (Exa / Tavily / SerpApi) declare ``requirement`` and
+Machine Web Backends (Exa / Tavily / SerpApi / OpenAlex) declare ``requirement`` and
 ``readiness()`` on ``Backend``. SciVerse is an academic SDK path, not a Web
 Backend: it is a ``SciVerseReadiness`` descriptor on the **same** list, and
 must not be registered into ``SearchBackendRegistry`` (ADR-0006).
@@ -9,7 +9,7 @@ must not be registered into ``SearchBackendRegistry`` (ADR-0006).
 - Exa: K+S via ``Backend.client()`` (same assembly as every other lane).
 - SciVerse: K+S via KeyProvider + SDK import (no client to assemble).
 - SerpApi: ``client()`` plus ``start_probe`` (ADR-0007 narrow exception).
-- Tavily stays ``optional``; AnySearch ``recommended`` stays documentation-only.
+- Tavily / OpenAlex stay ``optional``; AnySearch ``recommended`` stays documentation-only.
 
 Called from ``StateStore.start_session``. No user/env escape hatch — tests
 patch this module's ``require_required_backends`` or supply stub SDKs + keys
@@ -124,7 +124,7 @@ class _MissingBackendReadiness:
 
 def declared_backends() -> list:
     """Machine Web Backends the gate knows about (SerpApi via the sibling skill)."""
-    from search_backends import EXA_BACKEND, TAVILY_BACKEND
+    from search_backends import EXA_BACKEND, OPENALEX_BACKEND, TAVILY_BACKEND
 
     try:
         serpapi = _get_serpapi_backend()
@@ -138,7 +138,7 @@ def declared_backends() -> list:
             env_key="SERPAPI_KEY",
             verify_cmd="python skills/serpapi/scripts/serpapi_cli.py check",
         )
-    return [EXA_BACKEND, TAVILY_BACKEND, serpapi]
+    return [EXA_BACKEND, TAVILY_BACKEND, serpapi, OPENALEX_BACKEND]
 
 
 def iter_readiness_descriptors() -> tuple[ReadinessDescriptor, ...]:
