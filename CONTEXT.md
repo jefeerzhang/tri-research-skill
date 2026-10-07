@@ -9,11 +9,11 @@
 _Avoid_: 任务、会话 id 混称
 
 **Search Backend**:
-一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。只覆盖 **Machine Backend**（Exa / Tavily / SerpApi），不是六源的统称。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。必要性由 `Backend.requirement` 申报，就绪判定走 `Backend.readiness()`（与 `client()` 同一套 SDK→key 装配判断，住在 `require_setup`；SerpApi 另 `start_probe`）。分级见 `BackendRequirementLevel`。
+一个可通过 CLI 调用的网页搜索适配器，满足 `_search_cli.Backend` interface（`probe` / `search` + flags + `env_file` 自报自家 `.env` 位置）。只覆盖 **Machine Backend**（Exa / Tavily / SerpApi / OpenAlex），不是点名名单的统称。客户端装配（SDK 在场 → key 可解析 → 构建）只住在 `Backend.client()` 一处，失败抛 `ClientSetupError`（`SdkMissing` / `KeyMissing`），输出方言仍归各条命令；只有 key 持有者的后端（SerpApi）单用 `Backend.api_key()` 半边。必要性由 `Backend.requirement` 申报，就绪判定走 `Backend.readiness()`（与 `client()` 同一套 SDK→key 装配判断，住在 `require_setup`；SerpApi 另 `start_probe`）。分级见 `BackendRequirementLevel`。
 _Avoid_: 搜索引擎、search provider 混称、把 AnySearch / SciVerse / WebSearch 叫成 Search Backend
 
 **SearchBackendRegistry**:
-深 Module，只管理 **Machine Backend**（Exa / Tavily / SerpApi）的注册、Result 归一与探活，interface 为 `register / get / list_backends / search / batch_search / check`。它**只转接**客户端装配（调 `Backend.client()`）而不另定一套规则。定位为**程序化 seam**（测试与直接 import 的调用方），**不是** Lead Agent 主路径，**不是** 六源统一总线。Agent 消费的命令行表面走 `_search_cli`；AnySearch / SciVerse / WebSearch 不注册。两条路不得混用错误契约。
+深 Module，只管理 **Machine Backend**（Exa / Tavily / SerpApi / OpenAlex）的注册、Result 归一与探活，interface 为 `register / get / list_backends / search / batch_search / check`。它**只转接**客户端装配（调 `Backend.client()`）而不另定一套规则。定位为**程序化 seam**（测试与直接 import 的调用方），**不是** Lead Agent 主路径，**不是** 六源统一总线。Agent 消费的命令行表面走 `_search_cli`；AnySearch / SciVerse / WebSearch 不注册。两条路不得混用错误契约。
 _Avoid_: backend manager、search service、六源 Registry 总线、把 Registry 当 Lead 主路径
 
 **SearchResult**:
@@ -33,7 +33,7 @@ Search Backend 的三档必要性分级，以可执行枚举住在 `_search_cli.
 _Avoid_: 必选/可选二分、优先级混称、文档-only 约束、在门禁里手抄各家常量
 
 **Machine Backend**:
-仓内实现 `_search_cli.Backend` 的网页检索能力：Exa / Tavily / SerpApi。Lead 主路径走各家 CLI（`exa_search.py` / `tavily_search.py` / `serpapi_cli.py`），经 `_search_cli` 骨架拿超时/重试/熔断；`SearchBackendRegistry` 不是这条主路径。有子代理时 Lead 用这三家（外加 Host 的 WebSearch）；子代理只用其中的 Exa。
+仓内实现 `_search_cli.Backend` 的网页检索能力：Exa / Tavily / SerpApi / OpenAlex。Lead 主路径走各家 CLI（`exa_search.py` / `tavily_search.py` / `serpapi_cli.py` / `openalex_search.py`），经 `_search_cli` 骨架拿超时/重试/熔断；`SearchBackendRegistry` 不是这条主路径。有子代理时 Lead 用这四家（外加 Host 的 WebSearch）；子代理用其中的 Exa 与 OpenAlex。
 _Avoid_: 把六源都叫 Machine、把 Registry 当 Machine 的 Agent 入口
 
 **External Tool**:
@@ -57,7 +57,7 @@ _Avoid_: 把 runtime 包当成六源总线、把 npx 安装当成 pip、把进�
 _Avoid_: 托管任务、wrapped command、managed handler 混称
 
 **Evidence Ledger**:
-会话级 append-only 证据流水账，记录研究会话中每波搜索见过的 URL 及其出处（backend / query），与会话状态文件并列存放、以 `session_id` 标识；只追加不修改，是 Evidence Audit 的对账依据。Machine 后端（Exa / Tavily / SerpApi）在 `search` / `batch_search` 传入 `--session` 时于成功路径自动追加 `seen` 行，写入失败则 CLI 失败（ADR-0010）；无 `--session` 保持裸搜。
+会话级 append-only 证据流水账，记录研究会话中每波搜索见过的 URL 及其出处（backend / query），与会话状态文件并列存放、以 `session_id` 标识；只追加不修改，是 Evidence Audit 的对账依据。Machine 后端（Exa / Tavily / SerpApi / OpenAlex）在 `search` / `batch_search` 传入 `--session` 时于成功路径自动追加 `seen` 行，写入失败则 CLI 失败（ADR-0010）；无 `--session` 保持裸搜。
 _Avoid_: 搜索日志、引用缓存、结果收藏混称
 
 **Evidence Record**:
@@ -81,7 +81,7 @@ _Avoid_: 全局当前任务、把指针当并行会话身份、用锁代替显�
 _Avoid_: 各家自持的正则、把任一消费方的解析当权威
 
 **Report Validation**:
-报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等；「搜索源使用」点名名单见 ADR-0009：六源全点名，Tavily 可写 `0/跳过`），`validate → errors[]` 为其 test surface；语法一律读 `Report Parse`，本模块只留判定；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
+报告硬门禁集合，由 `validate_report.py` 强制（7 章节、引用闭环、双语、搜索源使用行等；「搜索源使用」点名名单见 ADR-0009 / ADR-0016：七源全点名，Tavily / OpenAlex 可写 `0/跳过`），`validate → errors[]` 为其 test surface；语法一律读 `Report Parse`，本模块只留判定；`verify_proof_integrity` 为其完整性复核半区——按与建据一致的原始字节重算 SHA-256 并比对 DONE 指纹，区分 `ReportTamperedError`（内容变）与 `ReportMissingError`（文件不可读）。
 _Avoid_: report check 泛称
 
 **Google Scholar（间接能力）**:
@@ -91,3 +91,7 @@ _Avoid_: 把 SerpApi 与 Google Scholar 混为一谈（接了 SerpApi ≠ 补了
 **SciVerse（学术 SDK 路径）**:
 学术书目与语义检索的唯一 SD 路径（Python SDK `AgentToolsClient`，禁止 MCP），属 **External Tool**，承担「学术面」。**不是** OpenAlex 的代名词——即使底层可能复用 OpenAlex 类覆盖，术语上不得把 SciVerse 改名为 OpenAlex。Required 门禁通过 `SciVerseReadiness` 描述符挂到与 Machine 后端同一轮询列表，**不是** Search Backend，不得注册进 `SearchBackendRegistry`（ADR-0006 / ADR-0011）。
 _Avoid_: SciVerse 与 OpenAlex 混称、把 SciVerse 当成 Web Backend / 塞进 Registry、宿主 MCP
+
+**OpenAlex**:
+公开学术图谱的 Machine Backend（`GET https://api.openalex.org/works?search=`），承担书目元数据面（DOI / OA / 年份 / 被引），与 SciVerse 的语义 SDK 路径互补。`requirement=optional`，匿名即可搜；可选 `OPENALEX_API_KEY`（Bearer）与 `OPENALEX_MAILTO`。Lead 与子代理均可调用。注册进 `SearchBackendRegistry`；研究主路径 `--session` 自动入账，`来源:` 词汇为 `OpenAlex`。不升 `required`，无 `start_probe`（ADR-0016；重开 ADR-0007§6）。
+_Avoid_: 把 OpenAlex 叫成 SciVerse、做成 External Tool、升为 required、引入 pyalex / 兄弟 skill

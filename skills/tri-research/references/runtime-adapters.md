@@ -15,18 +15,18 @@ Read this reference only when concrete tool names, install paths, or rendering b
 
 | Abstract           | Claude Code                                                                                                                     | Hermes Agent             | Codex / OpenCode                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------- |
-| `SEARCH`（任意源） | 任意独立搜索后端（AnySearch CLI / **Tavily Python SDK** / **SciVerse Python SDK** / Exa SDK / SerpApi CLI / `web_search` 工具） | 任意独立搜索后端         | 任意独立搜索后端 + 宿主内置 WebSearch |
+| `SEARCH`（任意源） | 任意独立搜索后端（AnySearch CLI / **Tavily Python SDK** / **SciVerse Python SDK** / Exa SDK / OpenAlex HTTP CLI / SerpApi CLI / `web_search` 工具） | 任意独立搜索后端         | 任意独立搜索后端 + 宿主内置 WebSearch |
 | `FETCH`            | 任意独立 fetch 后端（AnySearch extract / **Tavily extract（Python SDK）** / Exa contents / `web_fetch` 工具）                   | `tavily.extract`         | 宿主内置 WebFetch / HTTP client       |
 | `RENDER`           | Playwright MCP                                                                                                                  | Playwright MCP           | Playwright                            |
 | `DISPATCH`         | `Task(...)`                                                                                                                     | `delegate_to_agent(...)` | collaboration subagent mechanism      |
 
-**重要：六源是点名名单，不是一条 Registry 总线（ADR-0013）。** 能力类分三路：Machine Backend（Exa / Tavily / SerpApi，仓内 `_search_cli`；Registry 仅程序化 seam）/ External Tool（AnySearch CLI/HTTP · SciVerse Python SDK，禁止 MCP）/ Host（Runtime WebSearch）。点名名单仍是 AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch（ADR-0009）。
+**重要：七源是点名名单，不是一条 Registry 总线（ADR-0013 / ADR-0016）。** 能力类分三路：Machine Backend（Exa / Tavily / SerpApi / OpenAlex，仓内 `_search_cli`；Registry 仅程序化 seam）/ External Tool（AnySearch CLI/HTTP · SciVerse Python SDK，禁止 MCP）/ Host（Runtime WebSearch）。点名名单是 AnySearch / Tavily / SciVerse / Exa / SerpApi / OpenAlex / Runtime WebSearch（ADR-0009，经 ADR-0016 扩为七源）。OpenAlex 与 SciVerse 禁止混称。
 
 **重要：Runtime WebSearch 与 Tavily 是两个独立的源。** **Tavily 是独立的搜索服务**（需 `TAVILY_API_KEY`，通过 `tavily-python` SDK 调用，CLI 封装见 `tri-research/scripts/tavily_search.py`，**仅 Lead Agent**），**Runtime WebSearch 是宿主内置的抽象搜索能力**（不同宿主可能用 Tavily/Bing/Google/Brave/DuckDuckGo 等任意一种实现）。这两个源**独立配置、独立降级、独立计费**，不能混用；也不能把 Tavily 当作 Runtime WebSearch 的"实现细节"。
 
 **重要：Exa / SciVerse 是 `required` K+S 硬门禁**（Lead + 子代理），**SerpApi 是 `required` Key + 探活硬门禁**（仅 Lead）：`state_machine start` 前按描述符 `requirement` 字段遍历（ADR-0011）。Exa / SciVerse 须 Key 可解析且 SDK 可 import（K+S，ADR-0006），SerpApi 须 `SERPAPI_KEY` 可解析 + 轻量探活成功（ADR-0007），均无用户降级逃逸。Exa 就绪与 `Backend.client()` 同一套装配判断（`require_setup`，不在 start 时构造 SDK client）。Exa：`pip install exa-py` + `EXA_API_KEY`（`scripts/exa_search.py`）；SciVerse：`pip install sciverse` + `SCIVERSE_API_TOKEN`（仅 Python SDK，禁止 MCP；`SciVerseReadiness` 描述符，**不是** Registry 中的 Web Backend）；SerpApi：`export SERPAPI_KEY=<key>`（`skills/serpapi/scripts/serpapi_cli.py`，无需额外 SDK）。分级见 `CONTEXT.md` 的 `BackendRequirementLevel`（ADR-0001 / ADR-0006 / ADR-0007 / ADR-0011）。Google Scholar 是 SerpApi 的间接能力，非独立后端。
 
-**重要：检索成功与 Evidence Ledger 因果绑定（ADR-0010）。** Lead 研究主路径调用 Exa / Tavily / SerpApi 的 `search` / `batch_search` 时必须传 `--session`：成功即追加 `seen` 行，台账写入失败则 CLI 非零退出。无 `--session` 的裸搜不是研究主路径。AnySearch / SciVerse / WebSearch 本波不改外部包，仍用 `evidence.py add` 标准模板登记。Audit 算法仍是 ADR-0005。
+**重要：检索成功与 Evidence Ledger 因果绑定（ADR-0010 / ADR-0016）。** Lead 研究主路径调用 Exa / Tavily / SerpApi / OpenAlex 的 `search` / `batch_search` 时必须传 `--session`：成功即追加 `seen` 行，台账写入失败则 CLI 非零退出。无 `--session` 的裸搜不是研究主路径。AnySearch / SciVerse / WebSearch 不改外部包，仍用 `evidence.py add` 标准模板登记。Audit 算法仍是 ADR-0005。OpenAlex 匿名可搜；可选 `OPENALEX_API_KEY` 与 `OPENALEX_MAILTO`（`scripts/openalex_search.py`）。
 
 **重要：SciVerse v6.0.0 起只走 Python SDK，不走 MCP。** `mcp__sciverse__*` 工具在 Proma 协作子会话中**实测不继承父会话工具**，是不可靠通道；MCP 服务端进程（`sciverse-mcp-server` npm 包）v6.0.0 起**已弃用**。**唯一受支持的通道是 Python SDK**：`pip install sciverse` + `from sciverse import AgentToolsClient` + `SCIVERSE_API_TOKEN` 环境变量（若设 `SCIVERSE_HOME` 亦可读 `$SCIVERSE_HOME/.env`）。`~/.claude/mcp.json` 里**不应**包含 `sciverse` 段。
 

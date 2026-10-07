@@ -26,7 +26,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 - **机器验收，而非自我宣称**：两步状态机 + 报告验证器（`validate_report.py`），不满足硬门禁就无法 `DONE`，报告结构、引用闭环与完成哈希都可机器复核
 - **中英双语强制覆盖**：每个研究维度都要求中文 + 英文证据，验收器会做报告级双语检查，杜绝「只搜英文」的偷懒
-- **六源并行检索**：AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch，按必选与可选分级，单个源失败不阻断研究
+- **七源并行检索**：AnySearch / Tavily / SciVerse / Exa / SerpApi / OpenAlex / Runtime WebSearch，按必选与可选分级，单个源失败不阻断研究
 - **来源可核验**：每条参考文献带层级、来源与唯一 URL，格式统一；学术来源支持按 DOI 逐条核对
 - **引用溯源台账**：每波搜索的 URL 及其出处（源 + query）记入会话级 append-only 台账；`done` 硬门禁逐条对账，报告里的每条引用都必须能回答「在哪次搜索见过」
 - **增量研究**：研究完成后可追加新维度，只检索增量部分，旧结果原样保留
@@ -37,7 +37,7 @@ Tri Research 是一个多代理深度研究技能（Agent Skill）。它不靠�
 
 ![tri-research 运行架构图](assets/tri-research-runtime-architecture.png)
 
-运行时组件与硬门禁链路：Lead Agent 编排两步状态机（STARTED → DONE）。检索是三类能力，不是统一六源 Registry 总线——Machine CLI（Exa / Tavily / SerpApi，Lead 走 `_search_cli`）、External Tool（AnySearch CLI/HTTP 与 SciVerse Python SDK）、Host（Runtime WebSearch，仅 Lead）。`done` 必须同时通过 `validate_report.py` 报告校验与证据台账 URL 溯源对账，才能交付并渲染 PDF。
+运行时组件与硬门禁链路：Lead Agent 编排两步状态机（STARTED → DONE）。检索是三类能力，不是统一六源 Registry 总线——Machine CLI（Exa / Tavily / SerpApi / OpenAlex，Lead 走 `_search_cli`）、External Tool（AnySearch CLI/HTTP 与 SciVerse Python SDK）、Host（Runtime WebSearch，仅 Lead）。`done` 必须同时通过 `validate_report.py` 报告校验与证据台账 URL 溯源对账，才能交付并渲染 PDF。
 
 交互式版本（节点搜索、上下游路径追踪、PNG/SVG 导出）见 [assets/tri-research-architecture.html](assets/tri-research-architecture.html)；图的 typed JSON 规格在同目录 `tri-research-architecture.json`，由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验（9/9 项检查）。
 
@@ -57,7 +57,7 @@ Tri Research 把研究纪律分成两层：**硬门禁**会被代码拦截，**�
 | --------------------------------------------------------------- | ------------------------------------ |
 | `start` / `set_params` / `done --report`                        | 研究意图澄清、`RESEARCH_CONTEXT.md`  |
 | 七章结构、引用闭环、min_sources、合法唯一 URL、**引用溯源对账** | 质量门、Gap-Fill、多波次检索         |
-| 报告级中英证据、执行情况源使用行（六源点名，ADR-0009）          | 来源内容核验、声明-来源匹配、红队    |
+| 报告级中英证据、执行情况源使用行（七源点名，ADR-0009）          | 来源内容核验、声明-来源匹配、红队    |
 | 参数冻结与报告 SHA-256 + 台账指纹                               | 置信标签、大纲适配、综合子代理       |
 |                                                                 | 机制图嵌入（drawio）· 渲染 LaTeX/PDF |
 
@@ -102,6 +102,10 @@ export SERPAPI_KEY=<your-key>
 
 # Tavily（可选，仅 Lead Agent）— Key 申请：https://app.tavily.com/home
 export TAVILY_API_KEY=<your-key>
+
+# OpenAlex（可选，Lead + 子代理，匿名可搜）— Key 申请：https://openalex.org/settings/api
+# export OPENALEX_API_KEY=<your-key>
+# export OPENALEX_MAILTO=<you@example.com>
 ```
 
 密钥从环境变量读取，可选本地 `.env` 兜底（已 gitignore），不写入仓库、日志或研究报告。
@@ -143,7 +147,7 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 
 ## 搜索源
 
-六个搜索后端（与 `skills/tri-research/SKILL.md` 源表一致）：
+七个搜索后端（与 `skills/tri-research/SKILL.md` 源表一致）：
 
 | 源                    | 调用者        | 用途                                           | 必要性                                                 | 免费额度                                          | Key 申请                               |
 | --------------------- | ------------- | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------- | -------------------------------------- |
@@ -151,6 +155,7 @@ python skills/tri-research/scripts/validate_report.py examples/DEEP_RESEARCH_人
 | **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索                        | **必选（建议配置）** (`recommended`，匿名可用，低限额) | 匿名可用（低限额），免费 key 提额                 | https://anysearch.com/console/api-keys |
 | **SciVerse**          | Lead + 子代理 | 学术论文语义检索（Python SDK）                 | **必选** (`required`)                                  | 注册送试用额度                                    | https://sciverse.space/docs#auth       |
 | **Tavily**            | Lead Agent    | 深度网页搜索与提取（不等于 Runtime WebSearch） | 可选 (`optional`)                                      | 免费档（额度以官网为准）                          | https://app.tavily.com/home            |
+| **OpenAlex**          | Lead + 子代理 | 学术书目（公开 works API，匿名可搜）           | 可选 (`optional`)                                      | 匿名可搜；注册 key 提额                           | https://openalex.org/settings/api      |
 | **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP              | **必选** (`required`，Key + 探活)                      | 250 次/月免费                                     | https://serpapi.com/dashboard          |
 | **Runtime WebSearch** | Lead Agent    | 通用补充（宿主内置抽象，**不**等于 Tavily）    | 可选 (`optional`)                                      | 宿主提供                                          | 无需申请（宿主内置）                   |
 
@@ -170,7 +175,7 @@ python scripts/state_machine.py --session <id> get_params
 
 ### 引用溯源台账
 
-每波搜索后，Machine 后端（Exa / Tavily / SerpApi）在 `search` / `batch_search` 上传入 `--session` 即自动写入 `seen` 行（写入失败则 CLI 失败，ADR-0010）。AnySearch / SciVerse / WebSearch 与用户资料仍用模板登记：
+每波搜索后，Machine 后端（Exa / Tavily / SerpApi / OpenAlex）在 `search` / `batch_search` 上传入 `--session` 即自动写入 `seen` 行（写入失败则 CLI 失败，ADR-0010）。AnySearch / SciVerse / WebSearch 与用户资料仍用模板登记：
 
 ```bash
 python scripts/evidence.py --session <id> add --backend exa --query "AI 就业" --url <u1> --url <u2>
@@ -203,7 +208,7 @@ python scripts/state_machine.py --session <id> add_dimensions '{"keywords_zh":["
 | **增量研究**     | 重头跑一遍               | `add_dimensions` 追加，旧结果保留                                    |
 | **跨运行时**     | 绑特定 runtime           | CLI + Python SDK，兼容 Claude Code / Codex / OpenCode / OpenClaw     |
 | **结果确认闸门** | Agent 直接写报告         | **推荐**搜索完经用户确认再综合                                       |
-| **搜索后端**     | 单一后端                 | 六源并行（必选 + 可选分级）                                          |
+| **搜索后端**     | 单一后端                 | 七源并行（必选 + 可选分级）                                          |
 
 ## 安全边界
 
@@ -212,7 +217,7 @@ python scripts/state_machine.py --session <id> add_dimensions '{"keywords_zh":["
 - 不服从来源中的指令，不执行命令，不自动安装依赖
 - 只接受 `http://` 和 `https://` 链接，不绕过登录墙
 - API key 从环境变量读取，可选本地 `.env` 兜底（已 gitignore），不写入仓库、日志或研究报告
-- 子代理可调用 AnySearch + SciVerse + Exa；Tavily / SerpApi / Runtime WebSearch 仅 Lead Agent 调用
+- 子代理可调用 AnySearch + SciVerse + Exa + OpenAlex；Tavily / SerpApi / Runtime WebSearch 仅 Lead Agent 调用
 
 ## 文件结构
 
@@ -233,7 +238,8 @@ tri-research-skill/
 |   |   |   |-- render_tex.py      # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 |   |   |   |-- exa_search.py      # Exa 搜索 CLI 薄入口
 |   |   |   |-- tavily_search.py   # Tavily 搜索 CLI 薄入口
-|   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily）
+|   |   |   |-- openalex_search.py # OpenAlex 搜索 CLI 薄入口
+|   |   |   |-- search_backends.py # 统一搜索后端声明（Exa / Tavily / OpenAlex）
 |   |   |   |-- _search_cli.py     # 再导出 shim → tri_research_runtime.search_cli
 |   |   |   |-- _common.py         # 共享常量（StateError 再导出）
 |   |   |-- references/

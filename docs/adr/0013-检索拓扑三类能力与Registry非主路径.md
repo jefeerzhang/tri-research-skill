@@ -23,3 +23,4 @@
 - 合约测试钉住架构 JSON / CONTEXT / ADR 关键词。
 - ADR-0010 的台账通道不变：Machine 三家 `--session` 自动入账；AnySearch / SciVerse / WebSearch 仍用 `evidence.py add` 模板。
 - 不在本 ADR 落地：ADR-0014（proof / exception / active-session）、打包（ADR-0015）、改 `required_backends` 行为。
+- **部分被 ADR-0016 演进**：Machine Backend 名单变为 Exa / Tavily / SerpApi / OpenAlex；有子代理时子代理亦可调 OpenAlex。三类能力划分、Registry 非主路径、SciVerse 不进 Registry 不变。

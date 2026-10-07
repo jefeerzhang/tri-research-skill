@@ -65,13 +65,13 @@ class SkillContractTests(unittest.TestCase):
         self.assertEqual(v, rel.group(1), "CHANGELOG 最新发布版本与 frontmatter 不一致")
 
     def test_six_source_table_present(self) -> None:
-        for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "WebSearch"):
+        for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "OpenAlex", "WebSearch"):
             self.assertIn(name, self.skill)
             self.assertIn(name, self.readme)
             if self.root_readme:
                 self.assertIn(name, self.root_readme)
-        self.assertIn("六个搜索后端", self.skill)
-        self.assertIn("六个搜索后端", self.readme)
+        self.assertIn("七个搜索后端", self.skill)
+        self.assertIn("七个搜索后端", self.readme)
 
     def test_skill_is_concise(self) -> None:
         self.assertLessEqual(len(self.skill.splitlines()), 450)
@@ -349,7 +349,7 @@ class SkillContractTests(unittest.TestCase):
             self.assertNotIn("record_result", blob, msg=blob_name)
 
     def test_tavily_listed_in_main_skill(self) -> None:
-        # v6.3.1：Tavily 为六源之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa
+        # Tavily 为点名名单之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa+OpenAlex
         self.assertIn("Tavily", self.skill)
         self.assertNotIn("Tavily", self.subagent)
 
@@ -620,6 +620,73 @@ class SkillContractTests(unittest.TestCase):
 
         pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn("tri-research-runtime", pyproject)
+
+    def test_adr_0016_openalex_machine_backend(self) -> None:
+        """ADR-0016：OpenAlex 为 optional Machine；重开 0007§6；七源点名与调用矩阵。"""
+        adr = (REPO_ROOT / "docs" / "adr" / "0016-openalex-machine-backend.md").read_text(
+            encoding="utf-8"
+        )
+        for phrase in (
+            "OpenAlex",
+            "optional",
+            "Machine Backend",
+            "重开",
+            "0007",
+            "0009",
+            "0010",
+            "0013",
+            "SciVerse",
+            "不进",
+            "Registry",
+            "被拒",
+        ):
+            self.assertIn(phrase, adr)
+
+        context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+        openalex_blk = context.split("**OpenAlex**", 1)[1]
+        self.assertIn("Machine Backend", openalex_blk)
+        self.assertIn("optional", openalex_blk)
+        self.assertIn("SciVerse", openalex_blk)
+        self.assertIn("_Avoid_", openalex_blk)
+        self.assertIn("**不是** OpenAlex", context)
+        self.assertIn("SciVerse 与 OpenAlex 混称", context)
+
+        self.assertIn("OpenAlex", self.skill)
+        self.assertIn("openalex_search.py", self.skill)
+        self.assertIn("OpenAlex", self.subagent)
+        self.assertIn("openalex_search.py", self.subagent)
+        self.assertNotIn("Tavily", self.subagent)
+
+        adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
+        self.assertIn("OpenAlex", adapters)
+        self.assertIn("ADR-0016", adapters)
+        self.assertIn("七源是点名名单", adapters)
+        self.assertIn("OpenAlex", self.readme)
+        self.assertIn("OpenAlex", self.root_readme)
+        self.assertIn("七个搜索后端", self.root_readme)
+        self.assertIn("不是统一六源 Registry 总线", self.root_readme)
+
+        for evolved in (
+            "0007-serpapi-required-key-探活与Scholar间接.md",
+            "0009-源覆盖硬门禁单一名单.md",
+            "0010-检索成功路径与证据台账因果绑定.md",
+            "0013-检索拓扑三类能力与Registry非主路径.md",
+        ):
+            blob = (REPO_ROOT / "docs" / "adr" / evolved).read_text(encoding="utf-8")
+            self.assertIn("部分被 ADR-0016 演进", blob, msg=evolved)
+
+        arch = json.loads((REPO_ROOT / "assets" / "tri-research-architecture.json").read_text(encoding="utf-8"))
+        labels = {c["id"]: c for c in arch["components"]}
+        self.assertIn("openalex", labels)
+        self.assertIn("OpenAlex", labels["openalex"]["label"])
+        self.assertIn("Machine", labels["openalex"]["sublabel"])
+        machine = next(b for b in arch["boundaries"] if b["label"] == "Machine Backend")
+        self.assertIn("openalex", machine["wraps"])
+        edges = {(c["from"], c["to"]) for c in arch["connections"]}
+        self.assertIn(("search_cli", "openalex"), edges)
+        self.assertNotIn(("subagent", "openalex"), edges)
+        cards = " ".join(item for card in arch["cards"] for item in [card["title"], *card["items"]])
+        self.assertIn("OpenAlex", cards)
 
 
 if __name__ == "__main__":

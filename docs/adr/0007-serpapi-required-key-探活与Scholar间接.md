@@ -24,6 +24,7 @@ ADR-0006 把 Exa / SciVerse 定为 `required` 的 K+S 机器硬门禁（Key + SD
 - 未配 `SERPAPI_KEY` 或探活失败 → `ERROR:` + exit 1，错误文本点名 `SERPAPI_KEY`、申请链接（serpapi.com/dashboard）与验证命令（`serpapi_cli.py check`）。
 - `Google Scholar` 只在 SKILL/README 以「SerpApi 间接能力」呈现；Evidence Ledger / `来源:` 词汇稳定为 `SerpApi`。
 - 文档（SKILL / README / runtime-adapters / CONTEXT）档位表与引导同步；删除「SerpApi 可选 / 静默跳过」措辞。
+- **部分被 ADR-0016 演进**：§6 OpenAlex out of scope 被重开，独立 OpenAlex Machine Backend 落地。SciVerse 术语不是 OpenAlex 代名词、SerpApi `required` + 探活、Scholar 间接能力仍然有效。
 
 ## Considered Options
 

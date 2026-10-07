@@ -1,7 +1,7 @@
 ---
 name: research-subagent
 description: |
-  tri-research 研究子代理：用 AnySearch + SciVerse + Exa 执行中英双语聚焦检索，返回结构化发现。
+  tri-research 研究子代理：用 AnySearch + SciVerse + Exa + OpenAlex 执行中英双语聚焦检索，返回结构化发现。
   触发：被 tri-research 主导代理派发子任务时。
   不适用：写最终报告（主导代理职责）、脱离 tri-research 的单独调用、无 Exa / SciVerse（`required`）可用。
 version: "6.9.0"
@@ -16,6 +16,7 @@ version: "6.9.0"
 | **AnySearch** | CLI-only（3.1 版，直接调 public HTTP） | 通用网页 + 垂直领域           | 必选（建议配置）`recommended`，匿名可用，Key 申请：https://anysearch.com/console/api-keys |
 | **SciVerse**  | Python SDK（只用 SDK，不走 MCP）       | 学术论文                      | 必选 `required`，Key 申请：https://sciverse.space/docs#auth                               |
 | **Exa**       | Python SDK（`scripts/exa_search.py`）  | 网页搜索 + 学术 + 公司 + 问答 | 必选 `required`，Key 申请：https://dashboard.exa.ai/api-keys                              |
+| **OpenAlex**  | HTTP CLI（`scripts/openalex_search.py`） | 学术书目（DOI / OA / 年份） | 可选 `optional`，匿名可搜；与 SciVerse 互补，禁止混称                     |
 
 **路径**：AnySearch `${ANYSEARCH_HOME}` 或 `${TRI_RESEARCH_HOME}/../anysearch`；SciVerse `${SCIVERSE_HOME}` 或 `${TRI_RESEARCH_HOME}/../sciverse`。分级定义见主 SKILL（`CONTEXT.md` 的 `BackendRequirementLevel`）。
 
@@ -60,17 +61,18 @@ asyncio.run(search())
 
 > ⚠️ **流程要求：每个研究角度 × 每个可用源 × 中文 + 英文 = 应全部执行。** 每个角度都要产出中文 query 和英文 query，并在全部可用源上各执行一遍；只搜一种语言是流程缺陷。主 skill 的 `validate_report.py` 只做报告级双语检查，不逐角度审计，本节靠你执行。
 
-1. **预检**：AnySearch（`recommended`，匿名可用）、SciVerse（`required`）、Exa（`required`）各轻量查询一次确认可用性；主流程已在 `start` 对 Exa/SciVerse 做 K+S 硬门禁——此处若仍失败，停止本子任务并回报，不得无 Key/SDK 降级续跑
-2. **并行搜索**：对三源同时发起不同角度的查询，每角度中英各一条，在各源上各执行一遍
+1. **预检**：AnySearch（`recommended`，匿名可用）、SciVerse（`required`）、Exa（`required`）各轻量查询一次确认可用性；OpenAlex（`optional`，匿名可搜）失败则跳过该源。主流程已在 `start` 对 Exa/SciVerse 做 K+S 硬门禁——此处若仍失败，停止本子任务并回报，不得无 Key/SDK 降级续跑
+2. **并行搜索**：对可用源同时发起不同角度的查询，每角度中英各一条，在各源上各执行一遍
    - 示例：`AnySearch batch_search --queries '[{"query":"人工智能 就业替代"},{"query":"AI job displacement"}]'`
    - 示例：`SciVerse semantic_search "人工智能 自动化 就业"` + `semantic_search "AI automation employment"`
    - 示例：`python <exa_search.py> batch_search --query "人工智能 就业替代" --query "AI job displacement" --num-results 5 [--category CAT]`
+   - 示例：`python <openalex_search.py> batch_search --query "人工智能 就业替代" --query "AI job displacement"`
 3. **获取全文**：对最有价值的 3-5 个结果用 `extract` 或 Exa `contents` 获取完整内容
 4. **去重汇报**：按 URL 去重，标注来源工具
 
 每个角度的完成标准：中英各搜到 ≥1 个可核验来源并登记；搜不到的角度标注「证据薄弱」，不降门槛凑数。
 
-**工具预算**：AnySearch 最多 3 次，SciVerse 最多 3 次，Exa 最多 3 次。硬上限 15 次调用。
+**工具预算**：AnySearch / SciVerse / Exa / OpenAlex 各最多 3 次。硬上限 15 次调用。
 
 ## 返回契约
 

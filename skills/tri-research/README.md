@@ -26,12 +26,13 @@
 
 ## 能力边界
 
-六个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / Runtime WebSearch）：
+七个搜索后端（AnySearch / Tavily / SciVerse / Exa / SerpApi / OpenAlex / Runtime WebSearch）：
 
 | 渠道                  | 调用者        | 作用                                                                       | 必要性   | Key 申请                               |
 | --------------------- | ------------- | -------------------------------------------------------------------------- | -------- | -------------------------------------- |
 | **AnySearch**         | Lead + 子代理 | 通用网页 + 垂直领域搜索（CLI-only，3.1 版，直接调 public HTTP）            | **必选** | https://anysearch.com/console/api-keys |
 | **Tavily**            | Lead Agent    | 深度网页搜索与提取（`tavily-python` SDK，通过 `scripts/tavily_search.py`） | 可选     | https://app.tavily.com/home            |
+| **OpenAlex**          | Lead + 子代理 | 学术书目（公开 works API，匿名可搜；`scripts/openalex_search.py`）         | 可选     | https://openalex.org/settings/api      |
 | **SciVerse**          | Lead + 子代理 | 学术论文语义检索（**Python SDK 必选**，禁止 MCP）                          | **必选** | https://sciverse.space/docs#auth       |
 | **Exa**               | Lead + 子代理 | 网页 + 学术 + 公司 + 问答（Python SDK / `exa_search.py`）                  | **必选** | https://dashboard.exa.ai/api-keys      |
 | **SerpApi**           | Lead Agent    | Google Scholar（间接）+ 垂直 SERP 补强                                     | **必选** | https://serpapi.com/dashboard          |
@@ -52,7 +53,7 @@
 
 ![tri-research 运行架构图](../../assets/tri-research-runtime-architecture.png)
 
-检索按三类能力接入（ADR-0013）：Machine CLI（Exa / Tavily / SerpApi）、External Tool（AnySearch CLI/HTTP · SciVerse SDK）、Host（WebSearch）。`SearchBackendRegistry` 只是测试/library 的程序化 seam，不是 Lead 主路径，也不是六源总线。
+检索按三类能力接入（ADR-0013 / ADR-0016）：Machine CLI（Exa / Tavily / SerpApi / OpenAlex）、External Tool（AnySearch CLI/HTTP · SciVerse SDK）、Host（WebSearch）。`SearchBackendRegistry` 只是测试/library 的程序化 seam，不是 Lead 主路径，也不是六源总线。
 
 交互式版本（节点搜索、聚焦、上下游路径追踪、PNG/SVG 导出）见 [assets/tri-research-architecture.html](../../assets/tri-research-architecture.html)；图的 typed JSON 规格在同目录 `tri-research-architecture.json`，由 [Archify](https://github.com/tt-a1i/archify) 生成并通过 showcase 级校验（9/9 项检查）。
 
@@ -64,7 +65,7 @@
   → 源检测 + 检索计划确认
   → state_machine.py start
   → state_machine.py set_params：冻结 topic、双语关键词、min_sources
-  → 并行搜索（可选 1-6 子代理；Exa/Tavily/SerpApi 带 `--session` 自动入账）
+  → 并行搜索（可选 1-6 子代理；Exa/Tavily/SerpApi/OpenAlex 带 `--session` 自动入账）
   → External 源与用户资料用 evidence.py add 登记（ADR-0010）
   → （推荐）结果确认 / 质量门 / 核验 / Gap-Fill
   → 主导综合撰写最终报告
@@ -107,7 +108,7 @@ npx skills add https://github.com/jefeerzhang/tri-research-skill --skill researc
 共享骨架 `tri_research_runtime`（ADR-0015）。仓内可 `pip install -e .`；`npx skills add` 不装 wheel。
 
 **必选（`start` 硬门禁）**：`EXA_API_KEY` + `exa-py`，`SCIVERSE_API_TOKEN` + `sciverse`，`SERPAPI_KEY`（探活成功）。
-可选：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`。
+可选：`ANYSEARCH_API_KEY`、`TAVILY_API_KEY`、`OPENALEX_API_KEY`（匿名可搜）。
 
 ```bash
 pip install sciverse && export SCIVERSE_API_TOKEN=<your-token>   # required
@@ -138,7 +139,7 @@ tri-research/
 │   ├── _report_parse.py           # 报告语法单一 seam（章节 / 参考文献 / 行内 span / URL 方言）
 │   ├── _search_cli.py             # 再导出 shim → tri_research_runtime.search_cli
 │   ├── _search_registry.py        # 程序化 seam：Result 归一 + KeyProvider 再导出 + 后端注册表
-│   ├── search_backends.py         # 统一搜索后端声明（Exa + Tavily 对称骨架；SerpApi 自包含于 serpapi skill）
+│   ├── search_backends.py         # 统一搜索后端声明（Exa + Tavily + OpenAlex；SerpApi 自包含于 serpapi skill）
 │   ├── required_backends.py       # start 前的 Required Backend 硬门禁（K+S / Key+探活）
 │   ├── state_machine.py
 │   ├── state_machine.sh
@@ -147,7 +148,8 @@ tri-research/
 │   ├── evidence.py                # 引用溯源台账（add / list / audit）
 │   ├── render_tex.py              # 报告 LaTeX/PDF 渲染器（自动跳过 drawio 图）
 │   ├── tavily_search.py           # Tavily 搜索 CLI 薄入口
-│   └── exa_search.py              # Exa 搜索 CLI 薄入口
+│   ├── exa_search.py              # Exa 搜索 CLI 薄入口
+│   └── openalex_search.py         # OpenAlex 搜索 CLI 薄入口
 ├── references/
 │   ├── report-format.md           # 报告验收格式契约
 │   ├── runtime-adapters.md        # 跨运行时适配
