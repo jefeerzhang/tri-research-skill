@@ -102,9 +102,10 @@ class SearchParamsTests(unittest.TestCase):
     def test_query_goes_to_the_search_parameter(self) -> None:
         self.assertEqual(self.sent("AI 就业")["search"], "AI 就业")
 
-    def test_num_results_maps_to_per_page_and_is_capped_at_100(self) -> None:
+    def test_num_results_maps_to_per_page_within_the_api_bounds(self) -> None:
         self.assertEqual(self.sent(num_results=7)["per_page"], 7)
         self.assertEqual(self.sent(num_results=500)["per_page"], 100)
+        self.assertEqual(self.sent(num_results=0)["per_page"], 1)
 
     def test_year_range_oa_and_type_combine_into_one_filter(self) -> None:
         params = self.sent(from_year=2020, to_year=2024, open_access=True, work_type="article")
@@ -185,6 +186,12 @@ class AnonymousAccessTests(KeylessEnvMixin, unittest.TestCase):
         params = self.client.calls[0]
         self.assertEqual(params["per_page"], 3)
         self.assertEqual(sorted(params["filter"].split(",")), ["from_publication_date:2020-01-01", "is_oa:true"])
+
+    def test_global_no_proxy_flag_clears_proxy_env_for_the_run(self) -> None:
+        os.environ["HTTPS_PROXY"] = "http://proxy.invalid:8080"
+        out, code = run_cli(["--no-proxy", "check"])
+        self.assertEqual((out, code), ({"available": True}, 0))
+        self.assertNotIn("HTTPS_PROXY", os.environ)
 
     def test_key_from_env_is_handed_to_the_client(self) -> None:
         os.environ["OPENALEX_API_KEY"] = "env-key"
@@ -302,9 +309,6 @@ class RegistryWiringTests(KeylessEnvMixin, unittest.TestCase):
 
         with mock.patch.object(OPENALEX, "client_factory", lambda key: FakeOpenAlexClient()):
             self.assertEqual(REGISTRY.check("openalex"), {"available": True})
-
-    def test_global_no_proxy_flag_is_exposed(self) -> None:
-        self.assertTrue(any(f.dest == "no_proxy" for f in OPENALEX.global_flags))
 
 
 class CliEntryPointTests(unittest.TestCase):

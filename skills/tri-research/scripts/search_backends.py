@@ -331,7 +331,7 @@ def _openalex_params(query: str, options: dict[str, Any]) -> dict[str, Any]:
     """Map CLI options onto the ``works?search=`` query parameters."""
     params: dict[str, Any] = {"search": query}
     if options.get("num_results") is not None:
-        params["per_page"] = min(int(options["num_results"]), OPENALEX_MAX_PER_PAGE)
+        params["per_page"] = max(1, min(int(options["num_results"]), OPENALEX_MAX_PER_PAGE))
     filters: list[str] = []
     if options.get("from_year") is not None:
         filters.append(f"from_publication_date:{int(options['from_year'])}-01-01")
@@ -384,8 +384,7 @@ def _openalex_make_client(api_key: str) -> _OpenAlexClient:
 class OpenAlexBackend(_search_cli.Backend):
     name = "OpenAlex"
     help = "OpenAlex works search CLI for tri-research"
-    sdk = urllib.request  # stdlib HTTP is always present: no SdkMissing
-    missing_sdk_message = "OpenAlex HTTP client unavailable"
+    sdk = urllib.request  # stdlib HTTP is always present: never SdkMissing
     env_key = "OPENALEX_API_KEY"
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
     requirement = _search_cli.BackendRequirementLevel.OPTIONAL
