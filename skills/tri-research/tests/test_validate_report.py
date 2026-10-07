@@ -8,9 +8,9 @@ from _test_helpers import load_module
 SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_report.py"
 MODULE = load_module(SCRIPT, "validate_report")
 
-# 合法「搜索源使用」单元格：六源全点名（ADR-0009 / R-A）；未用写 0。
+# 合法「搜索源使用」单元格：七源全点名（ADR-0009 / R-A + OpenAlex）；未用写 0。
 USAGE_CELL = (
-    "AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条"
+    "AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / OpenAlex: 0条 / WebSearch: 0条"
 )
 
 
@@ -82,7 +82,7 @@ def language_report(entries: list[str]) -> str:
 |------|------|
 | 执行流程 | 预检 → 搜索 → 综合 → 验证 |
 | 子代理派发 | 否 |
-| 搜索源使用 | AnySearch: {len(entries)}条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条 |
+| 搜索源使用 | AnySearch: {len(entries)}条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / OpenAlex: 0条 / WebSearch: 0条 |
 | 耗时 | 3.0 分钟 |
 | 报告位置 | ~/tri-research-reports/report.md |
 """
@@ -102,12 +102,12 @@ class ReportValidatorTests(unittest.TestCase):
     def test_rejects_execution_summary_missing_exa(self) -> None:
         """## 执行情况 必须报告 Exa 检索过程（可写 0 条 / 跳过，不可省略）。
 
-        SKILL 契约：搜索源使用行含 USAGE_ROSTER 六源。
+        SKILL 契约：搜索源使用行含 USAGE_ROSTER 七源。
         Agent 常漏写 Exa，导致最终报告无法审阅 Exa 是否被调用。
         """
         report = valid_report().replace(
             f"| 搜索源使用 | {USAGE_CELL} |",
-            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条 |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / SerpApi: 0条 / Tavily: 0条 / OpenAlex: 0条 / WebSearch: 0条 |",
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(
@@ -119,7 +119,7 @@ class ReportValidatorTests(unittest.TestCase):
         """ADR-0009 R-A：Tavily 即使 optional、即使 0 次调用，也必须出现在点名行。"""
         report = valid_report().replace(
             f"| 搜索源使用 | {USAGE_CELL} |",
-            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / WebSearch: 0条 |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / OpenAlex: 0条 / WebSearch: 0条 |",
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(
@@ -127,12 +127,24 @@ class ReportValidatorTests(unittest.TestCase):
             f"缺少 Tavily 的执行情况应被拒: {errors}",
         )
 
+    def test_rejects_execution_summary_missing_openalex(self) -> None:
+        """OpenAlex 是第七源：optional，未用也必须点名。"""
+        report = valid_report().replace(
+            f"| 搜索源使用 | {USAGE_CELL} |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条 |",
+        )
+        errors = MODULE.validate(report, 2)
+        self.assertTrue(
+            any("OpenAlex" in e and "搜索源使用" in e for e in errors),
+            f"缺少 OpenAlex 的执行情况应被拒: {errors}",
+        )
+
     def test_accepts_optional_source_recorded_as_zero_or_skipped(self) -> None:
         """optional 源未用可写 0 / 跳过；点名即过，不要求实际调用。"""
         for cell in (
             USAGE_CELL,
-            "AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0/跳过 / WebSearch: 0条",
-            "AnySearch: 2 / SciVerse: 0 / Exa: 0 / SerpApi: 0 / Tavily: 跳过 / WebSearch: 0",
+            "AnySearch: 2条 / SciVerse: 0条 / Exa: 0条 / SerpApi: 0条 / Tavily: 0/跳过 / OpenAlex: 0条 / WebSearch: 0条",
+            "AnySearch: 2 / SciVerse: 0 / Exa: 0 / SerpApi: 0 / Tavily: 跳过 / OpenAlex: 跳过 / WebSearch: 0",
         ):
             with self.subTest(cell=cell):
                 report = valid_report().replace(
@@ -165,7 +177,7 @@ class ReportValidatorTests(unittest.TestCase):
         """
         report = valid_report().replace(
             f"| 搜索源使用 | {USAGE_CELL} |",
-            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Example: 0条 / SerpApi: 0条 / Tavily: 0条 / WebSearch: 0条 |",
+            "| 搜索源使用 | AnySearch: 2条 / SciVerse: 0条 / Example: 0条 / SerpApi: 0条 / Tavily: 0条 / OpenAlex: 0条 / WebSearch: 0条 |",
         )
         errors = MODULE.validate(report, 2)
         self.assertTrue(
@@ -176,8 +188,8 @@ class ReportValidatorTests(unittest.TestCase):
     def test_backend_name_adjacent_to_cjk_still_counts(self) -> None:
         """词边界不能误伤紧邻中文的后端名（如 'Exa：0条' 全角冒号 / 'Exa未配置'）。"""
         for cell in (
-            "AnySearch：2 / SciVerse：0 / Exa：0 / SerpApi：0 / Tavily：0 / WebSearch：0",
-            "AnySearch 2条、SciVerse 0条、Exa未配置、SerpApi 0条、Tavily跳过、WebSearch 0条",
+            "AnySearch：2 / SciVerse：0 / Exa：0 / SerpApi：0 / Tavily：0 / OpenAlex：0 / WebSearch：0",
+            "AnySearch 2条、SciVerse 0条、Exa未配置、SerpApi 0条、Tavily跳过、OpenAlex跳过、WebSearch 0条",
         ):
             with self.subTest(cell=cell):
                 report = valid_report().replace(

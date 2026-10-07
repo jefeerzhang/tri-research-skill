@@ -10,13 +10,14 @@ from _test_helpers import load_module
 ROOT = Path(__file__).parents[1]
 REPO_ROOT = ROOT.parents[1]
 
-# 产品锁（2026-09-11 R-A）：点名名单恰好这六源，不得增删改名。
+# 产品锁（R-A + OpenAlex）：点名名单恰好这七源，不得增删改名。
 LOCKED_USAGE_ROSTER = (
     "AnySearch",
     "SciVerse",
     "Exa",
     "SerpApi",
     "Tavily",
+    "OpenAlex",
     "WebSearch",
 )
 SOURCE_NAME_RE = re.compile(r"\b(?:" + "|".join(re.escape(name) for name in LOCKED_USAGE_ROSTER) + r")\b")
@@ -88,12 +89,8 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("## Summary", self.skill)
 
     def test_source_allocation(self) -> None:
-        self.assertIn("AnySearch", self.skill)
-        self.assertIn("SciVerse", self.skill)
-        self.assertIn("Exa", self.skill)
-        self.assertIn("SerpApi", self.skill)
-        self.assertIn("Tavily", self.skill)
-        self.assertIn("WebSearch", self.skill)
+        for name in LOCKED_USAGE_ROSTER:
+            self.assertIn(name, self.skill)
 
     def test_usage_roster_hard_gate_cannot_drift(self) -> None:
         """ADR-0009 R-A：SKILL 硬门禁点名名单与 validate_report.USAGE_ROSTER 不得漂移。
@@ -146,7 +143,7 @@ class SkillContractTests(unittest.TestCase):
 
         adr = (REPO_ROOT / "docs" / "adr" / "0009-源覆盖硬门禁单一名单.md").read_text(encoding="utf-8")
         self.assertIn("R-A", adr)
-        for name in LOCKED_USAGE_ROSTER:
+        for name in ("AnySearch", "SciVerse", "Exa", "SerpApi", "Tavily", "WebSearch"):
             self.assertIn(name, adr)
 
         self.assertNotIn("五名称", self.skill)

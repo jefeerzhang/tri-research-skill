@@ -21,7 +21,7 @@
 ## 未来研究方向（基于多源凝练后的下一步研究路径）
 
 ## 参考文献
-每条单行：`[N] 作者/来源, "标题", 出处/期刊, 年份, 层级: 1/2/3, 来源: AnySearch/Tavily/SciVerse/Exa/SerpApi/WebSearch, URL: https://...`
+每条单行：`[N] 作者/来源, "标题", 出处/期刊, 年份, 层级: 1/2/3, 来源: AnySearch/Tavily/SciVerse/Exa/SerpApi/OpenAlex/WebSearch, URL: https://...`
 - 层级：1=权威、2=可信、3=补充；编号从 1 连续，正文 `[N]`
 
 ## 执行情况（表格形式）
@@ -29,7 +29,7 @@
 | 项目 | 说明 |
 |------|------|
 | 执行流程 | 源检测 → 计划确认 → 搜索 → 综合撰写 → 验证 |
-| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / Tavily: N / WebSearch: N（六源全点名；Tavily 可写 0/跳过，不得省略） |
+| 搜索源使用 | AnySearch: N / SciVerse: N / Exa: N / SerpApi: N / Tavily: N / OpenAlex: N / WebSearch: N（七源全点名；Tavily / OpenAlex 可写 0/跳过，不得省略） |
 | 覆盖质量 | 中文 N / 英文 N / … |
 | 维度覆盖 | … |
 | 耗时 | … | 报告位置 | ~/tri-research-reports/DEEP_RESEARCH_*.md |
