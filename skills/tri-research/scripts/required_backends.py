@@ -63,11 +63,19 @@ class SciVerseReadiness:
     configure_hint = f"pip install sciverse && export {env_key}=<token> ({apply_url})"
 
     def readiness(self) -> list[str]:
+        """Gap list in the house order: missing SDK first, then missing key.
+
+        ADR-0008's corrected behaviour (v6.9.0) is "name the missing SDK first";
+        the managed commands and ``Registry.search`` were aligned then. SciVerse
+        accumulates both gaps because it has no client to short-circuit on, but
+        the order must match — otherwise two readiness judgments hand the user a
+        different first fix for the same situation (candidate 6).
+        """
         gaps: list[str] = []
-        if not KeyProvider.resolve(None, self.env_key, _sciverse_env_file()):
-            gaps.append(f"{self.name}: {self.env_key} not set")
         if not _sdk_importable(self.sdk_module):
             gaps.append(f"{self.name}: {self.sdk_module} SDK not installed")
+        if not KeyProvider.resolve(None, self.env_key, _sciverse_env_file()):
+            gaps.append(f"{self.name}: {self.env_key} not set")
         return gaps
 
 

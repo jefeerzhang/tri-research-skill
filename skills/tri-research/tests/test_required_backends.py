@@ -178,6 +178,34 @@ class RequiredBackendsGateTests(unittest.TestCase):
         self.assertIn("SCIVERSE_API_TOKEN not set", msg)
         self.assertIn("sciverse SDK not installed", msg)
         self.assertIn("SERPAPI_KEY not set", msg)
+        # 相对顺序也是契约（候选 6）：SDK 缺口先于 key 缺口。
+        self.assertLess(
+            msg.index("sciverse SDK not installed"),
+            msg.index("SCIVERSE_API_TOKEN not set"),
+            "SciVerse 缺口顺序应为 SDK 先于 key（ADR-0008 房规）",
+        )
+
+    def test_sdk_gap_precedes_key_gap_when_both_are_missing(self) -> None:
+        """房规：SDK 与 key 同时缺时先报 SDK（ADR-0008 更正后的行为）。
+
+        Machine 后端在 ``require_setup`` 里短路，所以只报 SDK 一条；SciVerse
+        把两条都累积（更有用），但顺序必须与房规一致。v6.9.0 已把 managed 命令
+        与 ``Registry.search`` 统一为「先 SDK」并加了钉子
+        （``test_missing_sdk_is_named_before_missing_key``）；``SciVerseReadiness``
+        是最后一条仍先报 key 的路径（架构审查候选 6）。本测试把顺序钉成房规，
+        免得两套就绪判定再次悄悄分叉。
+        """
+        with mock.patch.object(self.rb.KeyProvider, "resolve", return_value=None):
+            with mock.patch.object(self.rb, "_sdk_importable", return_value=False):
+                gaps = self.rb.SCIVERSE_READINESS.readiness()
+        self.assertEqual(
+            gaps,
+            [
+                "SciVerse: sciverse SDK not installed",
+                "SciVerse: SCIVERSE_API_TOKEN not set",
+            ],
+            "SciVerse 缺口顺序应为 SDK 先于 key（ADR-0008 房规）",
+        )
 
     def test_backend_requirement_contract_is_declarative(self) -> None:
         cli = load_module(SCRIPTS_DIR / "_search_cli.py", "search_cli_requirement_contract")
