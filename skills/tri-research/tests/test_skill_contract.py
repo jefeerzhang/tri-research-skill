@@ -1,3 +1,17 @@
+"""Skill 合约的真实不变量（架构审查候选 2）。
+
+本文件只钉两类东西：
+
+1. **有程序化真源的不变量** —— 名册、档位、版本、章节、计数。断言读真源本身
+   （``validate_report.USAGE_ROSTER`` / ``validate_report.REQUIRED_HEADINGS`` /
+   ``Backend.requirement`` / SKILL frontmatter / discover 计数），不另写一份字面量。
+2. **决定守卫** —— 曾被明确否决的做法不得回潮：MCP 通道、``ALLOW_DEGRADED``
+   逃生口、已删除的 ledger API、required 降级措辞、单技能即就绪措辞。
+
+不钉散文措辞。ADR 是决策记录，因此只钉「哪份 ADR 记了哪个决定」这一最小事实
+（见 ``test_each_adr_records_its_decision``）——重写一句话不该让 CI 变红。
+"""
+
 from __future__ import annotations
 
 import json
@@ -36,6 +50,21 @@ ROSTER_BEARING_FILES = (
     ROOT / "test-prompts.json",
     REPO_ROOT / "assets" / "tri-research-architecture.json",
     REPO_ROOT / "CONTEXT.md",
+)
+
+# ADR 是决策记录。只钉「哪份 ADR 记了哪个决定」这一个最小事实（候选 2），
+# 不再逐条钉散文措辞——重写一句话不该让 CI 变红。
+# 锚点取该决定的核心名词，验的是「这决定还在」，不是「这句话是这样写的」。
+ADR_DECISIONS = (
+    ("0007-serpapi-required-key-探活与Scholar间接.md", ("SerpApi", "required")),
+    ("0009-源覆盖硬门禁单一名单.md", ("R-A", "USAGE_ROSTER")),
+    ("0010-检索成功路径与证据台账因果绑定.md", ("--session", "ADR-0005")),
+    ("0011-BackendRequirementLevel可执行化.md", ("BackendRequirementLevel", "SciVerseReadiness")),
+    ("0012-tri-research与serpapi交付单元契约.md", ("D1", "ADR-0015")),
+    ("0013-检索拓扑三类能力与Registry非主路径.md", ("Machine Backend", "External Tool", "Host")),
+    ("0014-DONE门面与active-session身份.md", ("build_proof", "active-session")),
+    ("0015-共享运行时打包.md", ("tri_research_runtime", "pip install")),
+    ("0016-openalex-machine-backend.md", ("OpenAlex", "optional")),
 )
 
 
@@ -80,7 +109,8 @@ class SkillContractTests(unittest.TestCase):
         self.assertIsNotNone(rel, "CHANGELOG 缺少已发布版本条目")
         self.assertEqual(v, rel.group(1), "CHANGELOG 最新发布版本与 frontmatter 不一致")
 
-    def test_six_source_table_present(self) -> None:
+    def test_source_roster_is_documented_across_docs(self) -> None:
+        """点名名册必须在 SKILL / skill README / 根 README 出现（读产品锁，不写第二份）。"""
         for name in LOCKED_USAGE_ROSTER:
             self.assertIn(name, self.skill)
             self.assertIn(name, self.skill)
@@ -204,7 +234,7 @@ class SkillContractTests(unittest.TestCase):
 
         adr = (REPO_ROOT / "docs" / "adr" / "0009-源覆盖硬门禁单一名单.md").read_text(encoding="utf-8")
         self.assertIn("R-A", adr)
-        for name in ("AnySearch", "SciVerse", "Exa", "SerpApi", "Tavily", "WebSearch"):
+        for name in LOCKED_USAGE_ROSTER:
             self.assertIn(name, adr)
 
         self.assertNotIn("五名称", self.skill)
@@ -271,9 +301,8 @@ class SkillContractTests(unittest.TestCase):
         """Scholar 是 SerpApi 的间接能力；仅人文社科强制至少一轮 google_scholar。"""
         self.assertIn("google_scholar", self.skill)
         self.assertIn("人文社科", self.skill)
-        self.assertIn("Google Scholar", self.skill)
         self.assertIn("STEM", self.skill)  # STEM 主题不强制 google_scholar
-        # 不得宣称 Scholar 是独立后端，或无差别地让所有主题强制。
+        # 决定守卫：不得宣称 Scholar 是独立后端。
         self.assertNotIn("Google Scholar 是独立", self.skill)
 
     def test_required_backends_have_no_degrade_escape(self) -> None:
@@ -329,41 +358,28 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("Exa", self.subagent)
         self.assertNotIn("SerpApi", self.subagent)
 
-    def test_lead_uses_anysearch_when_no_subagent(self) -> None:
-        # Lead Agent should be able to use AnySearch directly
-        self.assertIn("Lead Agent + 子代理", self.skill)
-        # AnySearch must be mandatory for all agents
-        self.assertIn("必选搜索源", self.skill)
-        # Fallback chain must be documented
-        self.assertIn("fallback", self.skill.lower())
-
     def test_search_execution_spec(self) -> None:
-        # Search execution spec must be documented
+        """搜索执行纪律的关键决定词（无程序化真源，故为决定守卫）。
+
+        「中英双补」「全源覆盖」是执行纪律的判定词；validate_report 只做报告级
+        双语检查，逐维度逐源不审计（SKILL 自己写明），所以这里钉的是决定本身。
+        """
         self.assertIn("搜索执行规范", self.skill)
-        # Bilingual requirement - must be prominent (leading words only;
-        # sentence-level wording is free to evolve)
         self.assertIn("中英双补", self.skill)
         self.assertIn("全源覆盖", self.skill)
-        # Full source coverage per dimension; both AnySearch and SciVerse mandatory
-        self.assertIn("必选搜索源", self.skill)
-        # SciVerse must have a bilingual usage example
         self.assertIn("semantic_search", self.skill)
 
     def test_report_format_disclosed_to_reference(self) -> None:
-        # 格式契约下放到 references/report-format.md；SKILL.md 保留 context pointer，
-        # 七章节锚点改在 reference 上断言。
+        """格式契约下放到 references/report-format.md。
+
+        章节名单读 ``validate_report.REQUIRED_HEADINGS``（真源），不手写第二份
+        七章节字面量——手写那份在改章节名时必然过期（候选 2）。
+        """
         self.assertIn("references/report-format.md", self.skill)
         reference = (ROOT / "references" / "report-format.md").read_text(encoding="utf-8")
-        for section in (
-            "## 概述",
-            "## 已有事实",
-            "## 主要文献观点",
-            "## 主要矛盾与冲突点",
-            "## 未来研究方向",
-            "## 参考文献",
-            "## 执行情况",
-        ):
-            self.assertIn(section, reference)
+        validator = load_module(ROOT / "scripts" / "validate_report.py", "validate_report_sections_contract")
+        missing = [heading for heading in validator.REQUIRED_HEADINGS if f"## {heading}" not in reference]
+        self.assertEqual(missing, [], f"report-format.md 缺章节（真源 REQUIRED_HEADINGS）: {missing}")
         self.assertIn("层级:", reference)
         self.assertIn("来源:", reference)
 
@@ -372,19 +388,15 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("runtime.conf", self.subagent)
 
     def test_sciverse_python_sdk_not_mcp(self) -> None:
-        # v6.0.0 起 SciVerse 走 Python SDK 必选路径
+        """SciVerse 唯一通道是 Python SDK；MCP 调用形式是决定守卫（禁止回潮）。"""
         self.assertIn("SciVerse 调用规范", self.skill)
         self.assertIn("pip install sciverse", self.skill)
         self.assertIn("AgentToolsClient", self.skill)
         self.assertIn("SCIVERSE_API_TOKEN", self.skill)
-        # 禁止项:不应包含 SciVerse 工具调用形式 (e.g. mcp__sciverse__semantic_search)
+        # 决定守卫：不应出现 MCP 工具调用形式。
         self.assertNotIn("mcp__sciverse__semantic_search", self.skill)
         self.assertNotIn("mcp__sciverse__search_papers", self.skill)
         self.assertNotIn("mcp__sciverse__read_content", self.skill)
-        # 必含 "Python SDK" 作为必选路径明示
-        self.assertIn("Python SDK", self.skill)
-        # 必含 "禁止" 的反例黑名单
-        self.assertIn("禁止", self.skill)
 
     def test_state_machine_is_two_step(self) -> None:
         state_script = (ROOT / "scripts" / "state_machine.py").read_text(encoding="utf-8")
@@ -394,14 +406,14 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("record_result", state_script)
 
     def test_hard_gates_documented(self) -> None:
-        # Soft policies must not be presented as the only completion criteria
-        self.assertIn("硬门禁", self.skill)
-        self.assertIn("推荐流程", self.skill)
-        self.assertIn("代码不审计", self.skill)
-        self.assertIn("报告级", self.skill)
-        # validate_report scope must be explicit
+        """硬门禁与推荐流程必须分开写，且 validate_report 的范围必须写明。
+
+        用章节结构钉（两个小节真的存在），而不是钉「代码不审计」这类句子。
+        """
+        self.assertIn("## 硬门禁与推荐流程", self.skill)
+        self.assertIn("### 硬门禁（代码强制）", self.skill)
+        self.assertIn("### 推荐流程（非硬门禁）", self.skill)
         self.assertIn("validate_report.py", self.skill)
-        self.assertIn("只做报告级", self.skill)
 
     def test_docs_do_not_promise_removed_ledger_apis(self) -> None:
         # v6 removed dispatch ledger from state_machine; docs/prompts must not require it
@@ -414,67 +426,51 @@ class SkillContractTests(unittest.TestCase):
             self.assertNotIn("record_dispatch", blob, msg=blob_name)
             self.assertNotIn("record_result", blob, msg=blob_name)
 
-    def test_tavily_listed_in_main_skill(self) -> None:
-        # Tavily 为点名名单之一，仅 Lead Agent；subagent 用 AnySearch+SciVerse+Exa+OpenAlex
-        self.assertIn("Tavily", self.skill)
+    def test_tavily_is_lead_only_not_in_subagent(self) -> None:
+        # 分配决定：Tavily 在点名名单内但仅 Lead Agent，子代理不得出现。
+        # （「Tavily 在主 SKILL 里」由名册覆盖测试负责，这里不再重复正向断言。）
         self.assertNotIn("Tavily", self.subagent)
 
     def test_adr_0010_session_ledger_bind_is_documented(self) -> None:
-        """ADR-0010：研究主路径必须 --session；External 登记模板不得失踪。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0010-检索成功路径与证据台账因果绑定.md").read_text(encoding="utf-8")
-        self.assertIn("ADR-0005", adr)
-        self.assertIn("台账写入失败则 CLI 非零退出", adr)
-        self.assertIn("--session", adr)
+        """ADR-0010 的可执行契约：External 登记模板不得失踪。
 
-        self.assertIn("ADR-0010", self.skill)
-        self.assertIn("必须", self.skill)
-        self.assertIn("--session", self.skill)
-        self.assertIn("不是研究主路径", self.skill)
+        ADR 措辞由 test_each_adr_records_its_decision 统一覆盖；这里只留
+        「模板真的在 SKILL 里」与「主路径必须 --session」两件可执行事实。
+        """
         for backend in ("AnySearch", "SciVerse", "WebSearch"):
             self.assertIn(
                 f"add --backend {backend}",
                 self.skill,
                 msg=f"missing External registration template for {backend}",
             )
-        self.assertIn("台账写入失败", self.skill)
-        self.assertIn("ADR-0010", self.readme)
-        self.assertIn("ADR-0010", (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8"))
+        self.assertIn("--session", self.skill)
 
     def test_adr_0011_requirement_level_is_executable(self) -> None:
-        """ADR-0011：档位可执行；runtime-adapters 钉住 WebBackend / ExternalTool 清单。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0011-BackendRequirementLevel可执行化.md").read_text(encoding="utf-8")
-        self.assertIn("SciVerseReadiness", adr)
-        self.assertIn("ALLOW_DEGRADED", adr)
-        self.assertIn("SearchBackendRegistry", adr)
-        self.assertIn("REGISTRY.register", adr)
-
+        """ADR-0011：档位可执行；runtime-adapters 钉住扩展清单；门禁无降级开关。"""
         adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         self.assertIn("## WebBackend 扩展清单", adapters)
         self.assertIn("## ExternalTool 扩展清单", adapters)
         self.assertIn("iter_readiness_descriptors", adapters)
         self.assertIn("SciVerseReadiness", adapters)
 
-        self.assertIn("ADR-0011", self.skill)
         self.assertIn("requirement=required", self.skill)
         gate = (ROOT / "scripts" / "required_backends.py").read_text(encoding="utf-8")
         self.assertIn("iter_required_descriptors", gate)
+        # 决定守卫：不得出现降级逃生开关（ADR-0006 / 0011 明确否决）。
         self.assertNotIn("ALLOW_DEGRADED", gate)
 
     def test_adr_0012_companion_install_contract(self) -> None:
-        """ADR-0012 D1：最小安装是 tri-research + serpapi；禁止单技能即就绪 / 可回退措辞。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0012-tri-research与serpapi交付单元契约.md").read_text(encoding="utf-8")
-        self.assertIn("D1", adr)
-        self.assertIn("ADR-0015", adr)
-        self.assertIn("不足以", adr)
-        self.assertIn("state_machine start", adr)
+        """ADR-0012 D1：最小安装是 tri-research + serpapi；禁止可回退措辞。
 
+        ``pin`` 与 ``forbidden`` 是**决定守卫**（D1 的措辞就是决定本身，无法用
+        程序化真源表达）；ADR 文件全文措辞交由 test_each_adr_records_its_decision。
+        """
         pin = "不足以 `state_machine start`"
         self.assertIn(pin, self.root_readme)
         self.assertIn(pin, self.readme)
         self.assertIn(pin, self.skill)
         self.assertIn("--skill serpapi", self.root_readme)
         self.assertIn("--skill serpapi", self.readme)
-        self.assertIn("ADR-0012", self.skill)
         self.assertIn("research-subagent", self.root_readme)
 
         marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
@@ -487,7 +483,6 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("**Delivery Unit**", context)
 
         serpapi_skill = (ROOT.parent / "serpapi" / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("当被 tri-research 引用时升为 required，不可回退", serpapi_skill)
         self.assertIn("cli > env > .env", serpapi_skill)
         forbidden = (
             "只安装 tri-research",
@@ -508,34 +503,15 @@ class SkillContractTests(unittest.TestCase):
                 self.assertNotIn(phrase, blob, msg=f"{name} still allows conflicting install wording: {phrase!r}")
 
     def test_adr_0013_retrieval_topology(self) -> None:
-        """ADR-0013：三类能力 + Registry 非 Lead 主路径；架构图禁止 MCP 误标。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0013-检索拓扑三类能力与Registry非主路径.md").read_text(encoding="utf-8")
-        for phrase in (
-            "Machine Backend",
-            "External Tool",
-            "Host",
-            "SearchBackendRegistry",
-            "程序化 seam",
-            "不是** Lead",
-            "AnySearch",
-            "SciVerse",
-            "WebSearch",
-            "Exa",
-            "SerpApi",
-            "Tavily",
-            "标成「宿主 MCP」",
-            "被拒",
-        ):
-            self.assertIn(phrase, adr)
+        """ADR-0013：三类能力 + Registry 非 Lead 主路径；架构图禁止 MCP 误标。
 
+        CONTEXT 部分只钉**结构**（三个术语词条存在、Registry 词条带 `_Avoid_`），
+        不钉 `_Avoid_` 行里写了哪几句话；ADR 全文措辞交由 ADR 决策表。
+        """
         context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("**Machine Backend**", context)
         self.assertIn("**External Tool**", context)
         self.assertIn("**Host**", context)
-        self.assertIn("不是** Lead Agent 主路径", context)
-        self.assertIn("不是** 六源统一总线", context)
-        self.assertIn("六源 Registry 总线", context)
-        self.assertIn("宿主 MCP", context)  # Avoid 词必须出现
         registry = next(
             (blk for blk in context.split("**") if blk.startswith("SearchBackendRegistry")),
             "",
@@ -543,8 +519,6 @@ class SkillContractTests(unittest.TestCase):
         self.assertTrue(registry, "CONTEXT 缺少 SearchBackendRegistry 词条")
         avoid = context.split("**SearchBackendRegistry**", 1)[1].split("**SearchResult**", 1)[0]
         self.assertIn("_Avoid_", avoid)
-        self.assertIn("六源 Registry 总线", avoid)
-        self.assertIn("Lead 主路径", avoid)
 
         arch_path = REPO_ROOT / "assets" / "tri-research-architecture.json"
         arch = json.loads(arch_path.read_text(encoding="utf-8"))
@@ -597,37 +571,19 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("宿主 MCP", html)
         self.assertNotIn("MCP 工具调用", html)
 
-        self.assertIn("不是统一六源 Registry 总线", self.root_readme)
-        self.assertIn("ADR-0013", self.readme)
         adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         self.assertIn("## Host 能力", adapters)
-        self.assertIn("ADR-0013", adapters)
 
     def test_adr_0014_control_plane_polish(self) -> None:
-        """ADR-0014：异常分类、DONE 门面、citations 软层、并行必须 --session。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0014-DONE门面与active-session身份.md").read_text(encoding="utf-8")
-        for phrase in (
-            "EvidenceError",
-            "ReportValidationError",
-            "build_proof",
-            "audit=True",
-            "citations",
-            "validate_report",
-            "--session",
-            "active-session",
-            "P1-6",
-            "P1-7",
-            "被拒",
-        ):
-            self.assertIn(phrase, adr)
+        """ADR-0014：citations 是薄解释层，不得独立枚举章节或名册。
 
+        本测试的实质是**经真源**验证 citations 没有变成第二份规则清单
+        （读 REQUIRED_HEADINGS / USAGE_ROSTER），不是钉 ADR 的措辞。
+        """
         context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("**Evidence Error**", context)
         self.assertIn("**Active Session Pointer**", context)
-        self.assertIn("ReportValidationError", context)
-        self.assertIn("并行", context)
 
-        self.assertIn("ADR-0014", self.skill)
         self.assertIn("并行会话", self.skill)
         self.assertIn("--session", self.skill)
         self.assertIn("active-session", self.skill)
@@ -649,28 +605,11 @@ class SkillContractTests(unittest.TestCase):
         )
 
     def test_adr_0015_shared_runtime_package(self) -> None:
-        """ADR-0015：可安装 runtime 包；serpapi 走包 import；熔断是进程级。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0015-共享运行时打包.md").read_text(encoding="utf-8")
-        for phrase in (
-            "tri_research_runtime",
-            "pip install",
-            "npx skills add",
-            "KeyProvider",
-            "StateError",
-            "process-level",
-            "CITATION_TEXT_LIMIT",
-            "EXTRACT_CONTENT_LIMIT",
-            "剩余",
-            "被拒",
-            "scripts/",
-        ):
-            self.assertIn(phrase, adr)
-
+        """ADR-0015：可安装 runtime 包；serpapi 走包 import（不再是「待 ADR-0015」）。"""
         context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
         self.assertIn("**Shared Runtime**", context)
         self.assertIn("tri_research_runtime", context)
 
-        self.assertIn("ADR-0015", self.skill)
         self.assertIn("pip install -e .", self.root_readme)
         adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         self.assertIn("tri_research_runtime", adapters)
@@ -678,55 +617,32 @@ class SkillContractTests(unittest.TestCase):
 
         serpapi_skill = (ROOT.parent / "serpapi" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("tri_research_runtime", serpapi_skill)
+        # 决定守卫：路径耦合的「待 ADR-0015」待办标记必须已解决，不得回潮。
         self.assertNotIn("待 ADR-0015", serpapi_skill)
 
         pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn("tri-research-runtime", pyproject)
 
     def test_adr_0016_openalex_machine_backend(self) -> None:
-        """ADR-0016：OpenAlex 为 optional Machine；重开 0007§6；七源点名与调用矩阵。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0016-openalex-machine-backend.md").read_text(
-            encoding="utf-8"
-        )
-        for phrase in (
-            "OpenAlex",
-            "optional",
-            "Machine Backend",
-            "重开",
-            "0007",
-            "0009",
-            "0010",
-            "0013",
-            "SciVerse",
-            "不进",
-            "Registry",
-            "被拒",
-        ):
-            self.assertIn(phrase, adr)
+        """ADR-0016：OpenAlex 为 optional Machine；重开 0007§6；调用矩阵不进子代理。
 
+        ADR 全文措辞交由 ADR 决策表；这里钉 CONTEXT 词条结构、调用矩阵
+        （架构 JSON 的 components / boundaries / edges）与被演进的 ADR 标记。
+        """
         context = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
         openalex_blk = context.split("**OpenAlex**", 1)[1]
         self.assertIn("Machine Backend", openalex_blk)
         self.assertIn("optional", openalex_blk)
-        self.assertIn("SciVerse", openalex_blk)
         self.assertIn("_Avoid_", openalex_blk)
-        self.assertIn("**不是** OpenAlex", context)
-        self.assertIn("SciVerse 与 OpenAlex 混称", context)
 
-        self.assertIn("OpenAlex", self.skill)
         self.assertIn("openalex_search.py", self.skill)
         self.assertIn("OpenAlex", self.subagent)
         self.assertIn("openalex_search.py", self.subagent)
+        # 分配决定：Tavily 仍仅 Lead。
         self.assertNotIn("Tavily", self.subagent)
 
         adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         self.assertIn("OpenAlex", adapters)
-        self.assertIn("ADR-0016", adapters)
-        self.assertIn("七源是点名名单", adapters)
-        self.assertIn("OpenAlex", self.readme)
-        self.assertIn("OpenAlex", self.root_readme)
-        self.assertIn("七个搜索后端", self.root_readme)
-        self.assertIn("不是统一六源 Registry 总线", self.root_readme)
 
         for evolved in (
             "0007-serpapi-required-key-探活与Scholar间接.md",
@@ -749,6 +665,33 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn(("subagent", "openalex"), edges)
         cards = " ".join(item for card in arch["cards"] for item in [card["title"], *card["items"]])
         self.assertIn("OpenAlex", cards)
+
+    def test_each_adr_records_its_decision(self) -> None:
+        """每份 ADR 仍然记着它的决定（候选 2：只钉决定，不钉措辞）。
+
+        取代原先逐份 ADR 的「散文短语必须出现」清单（0013 一份就钉了 14 条）。
+        断言的是决定的核心名词，不是某句原话。
+        """
+        missing: list[str] = []
+        for filename, anchors in ADR_DECISIONS:
+            path = REPO_ROOT / "docs" / "adr" / filename
+            if not path.exists():
+                missing.append(f"{filename}: 文件缺失")
+                continue
+            blob = path.read_text(encoding="utf-8")
+            absent = [anchor for anchor in anchors if anchor not in blob]
+            if absent:
+                missing.append(f"{filename} 缺: {' / '.join(absent)}")
+        self.assertEqual(missing, [], "ADR 决策记录缺失:\n  " + "\n  ".join(missing))
+
+    def test_every_adr_keeps_rejected_options(self) -> None:
+        """被拒选项是 ADR 的价值所在。用结构钉，不用「被拒」二字钉。"""
+        missing: list[str] = []
+        for path in sorted((REPO_ROOT / "docs" / "adr").glob("[0-9][0-9][0-9][0-9]-*.md")):
+            blob = path.read_text(encoding="utf-8")
+            if "Considered Options" not in blob and "被拒" not in blob:
+                missing.append(path.name)
+        self.assertEqual(missing, [], "以下 ADR 缺少被拒选项记录:\n  " + "\n  ".join(missing))
 
 
 if __name__ == "__main__":
