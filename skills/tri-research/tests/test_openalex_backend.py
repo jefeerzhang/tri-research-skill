@@ -311,6 +311,90 @@ class RegistryWiringTests(KeylessEnvMixin, unittest.TestCase):
             self.assertEqual(REGISTRY.check("openalex"), {"available": True})
 
 
+class OpenAlexLedgerBindTests(KeylessEnvMixin, unittest.TestCase):
+    """Issue #32: research-path ``--session`` writes ``seen`` rows as OpenAlex."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        import tempfile
+
+        import state_machine
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.state_dir = Path(self._tmp.name) / "state"
+        self.state_dir.mkdir()
+        self.store = state_machine.StateStore(self.state_dir)
+        with mock.patch.object(state_machine, "require_required_backends", lambda: None):
+            self.store.start_session("oa-sess")
+        self.client = FakeOpenAlexClient({"results": [_work()]})
+        factory = mock.patch.object(OPENALEX, "client_factory", lambda key: self.client)
+        factory.start()
+        self.addCleanup(factory.stop)
+
+    def records(self, session: str = "oa-sess") -> list[dict]:
+        path = self.state_dir / f"{session}.evidence.jsonl"
+        if not path.is_file():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+    def search(self, extra: list[str], *, session: str | None = "oa-sess") -> tuple[dict, int]:
+        argv = ["search", "open access"]
+        if session:
+            argv.extend(["--session", session, "--state-dir", str(self.state_dir)])
+        argv.extend(extra)
+        return run_cli(argv)
+
+    def test_search_with_session_writes_openalex_seen_row(self) -> None:
+        out, code = self.search([])
+        self.assertEqual(code, 0, out)
+        (row,) = self.records()
+        self.assertEqual(row["kind"], "seen")
+        self.assertEqual(row["backend"], "OpenAlex")
+        self.assertEqual(row["query"], "open access")
+        self.assertEqual(row["url"], "https://peerj.com/articles/4375")
+        self.assertEqual(row["title"], "The state of OA")
+        self.assertIn("ts", row)
+
+    def test_batch_search_with_session_writes_each_query(self) -> None:
+        out, code = run_cli(
+            [
+                "batch_search",
+                "--query",
+                "q1",
+                "--query",
+                "q2",
+                "--session",
+                "oa-sess",
+                "--state-dir",
+                str(self.state_dir),
+            ]
+        )
+        self.assertEqual(code, 0, out)
+        rows = self.records()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({r["query"] for r in rows}, {"q1", "q2"})
+        self.assertTrue(all(r["backend"] == "OpenAlex" for r in rows))
+
+    def test_without_session_does_not_write_ledger(self) -> None:
+        out, code = self.search([], session=None)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.records(), [])
+        self.assertFalse((self.state_dir / "oa-sess.evidence.jsonl").exists())
+
+    def test_unknown_session_fails_closed(self) -> None:
+        out, code = self.search([], session="ghost")
+        self.assertNotEqual(code, 0)
+        self.assertIn("evidence ledger write failed", out["error"])
+        self.assertEqual(self.records("ghost"), [])
+
+    def test_empty_hits_succeed_without_ledger_file(self) -> None:
+        self.client.payload = {"results": []}
+        out, code = self.search([])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.records(), [])
+
+
 class CliEntryPointTests(unittest.TestCase):
     def test_script_exposes_search_with_openalex_flags(self) -> None:
         import subprocess
