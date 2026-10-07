@@ -11,6 +11,9 @@ ROOT = Path(__file__).parents[1]
 REPO_ROOT = ROOT.parents[1]
 
 # 产品锁（R-A + OpenAlex）：点名名单恰好这七源，不得增删改名。
+# 这是**唯一一处有意的冻结点**——它的职责就是让「增删改名册」这个产品决定红掉。
+# 运行时可执行真源是 validate_report.USAGE_ROSTER（ADR-0009）；
+# test_usage_roster_hard_gate_cannot_drift 断言两者相等。
 LOCKED_USAGE_ROSTER = (
     "AnySearch",
     "SciVerse",
@@ -21,6 +24,19 @@ LOCKED_USAGE_ROSTER = (
     "WebSearch",
 )
 SOURCE_NAME_RE = re.compile(r"\b(?:" + "|".join(re.escape(name) for name in LOCKED_USAGE_ROSTER) + r")\b")
+
+# 名册棘轮的**覆盖清单**（候选 1）：凡在正文里逐一点名七源的文档与资产，
+# 都必须登记在这里。棘轮覆盖面 = 这份清单，不再靠「记得改哪几个文件」。
+ROSTER_BEARING_FILES = (
+    ROOT / "SKILL.md",
+    ROOT / "README.md",
+    REPO_ROOT / "README.md",
+    ROOT / "references" / "report-format.md",
+    ROOT / "references" / "runtime-adapters.md",
+    ROOT / "test-prompts.json",
+    REPO_ROOT / "assets" / "tri-research-architecture.json",
+    REPO_ROOT / "CONTEXT.md",
+)
 
 
 class SkillContractTests(unittest.TestCase):
@@ -65,13 +81,40 @@ class SkillContractTests(unittest.TestCase):
         self.assertEqual(v, rel.group(1), "CHANGELOG 最新发布版本与 frontmatter 不一致")
 
     def test_six_source_table_present(self) -> None:
-        for name in ("AnySearch", "Tavily", "SciVerse", "Exa", "SerpApi", "OpenAlex", "WebSearch"):
+        for name in LOCKED_USAGE_ROSTER:
+            self.assertIn(name, self.skill)
             self.assertIn(name, self.skill)
             self.assertIn(name, self.readme)
             if self.root_readme:
                 self.assertIn(name, self.root_readme)
         self.assertIn("七个搜索后端", self.skill)
         self.assertIn("七个搜索后端", self.readme)
+
+    @staticmethod
+    def _executable_tiers() -> dict[str, str]:
+        """档位的可执行真源：``Backend.requirement``（ADR-0011）。
+
+        文档表格里的「必选 / 可选」是散文，真源是 backend 上的枚举字段。
+        这里把两者连起来，免得档位期望在文档里再手写一遍。
+        """
+        backends = load_module(ROOT / "scripts" / "search_backends.py", "search_backends_contract")
+        return {
+            backends.EXA_BACKEND.name: str(backends.EXA_BACKEND.requirement),
+            backends.TAVILY_BACKEND.name: str(backends.TAVILY_BACKEND.requirement),
+            backends.OPENALEX_BACKEND.name: str(backends.OPENALEX_BACKEND.requirement),
+        }
+
+    def test_executable_tiers_are_the_single_owner(self) -> None:
+        """档位只有一个家：**Backend.requirement**（候选 1）。
+
+        下方 Exa / SerpApi 的文档档位测试把手写期望建在这份真源上；
+        真源一变，期望随之失效，而不是两处各自相信自己的记忆。
+        """
+        self.assertEqual(
+            self._executable_tiers(),
+            {"Exa": "required", "Tavily": "optional", "OpenAlex": "optional"},
+            "Backend.requirement 档位漂移：ADR-0001（Exa required）、ADR-0016（OpenAlex optional）、Tavily optional 是唯一真源",
+        )
 
     def test_skill_is_concise(self) -> None:
         self.assertLessEqual(len(self.skill.splitlines()), 450)
@@ -88,9 +131,27 @@ class SkillContractTests(unittest.TestCase):
         self.assertNotIn("## TL;DR", self.skill)
         self.assertNotIn("## Summary", self.skill)
 
-    def test_source_allocation(self) -> None:
-        for name in LOCKED_USAGE_ROSTER:
-            self.assertIn(name, self.skill)
+    def test_roster_reach_covers_every_roster_bearing_doc(self) -> None:
+        """候选 1：棘轮的覆盖面必须等于名册的重复面。
+
+        ADR-0009 只钉了 SKILL 硬门禁行 / report-format / skill README 三处，
+        但逐一点名七源的还有根 README、runtime-adapters、test-prompts.json、
+        架构 JSON 与 CONTEXT。接入 OpenAlex 这条第七条时改了十来个文件，却只有
+        3 个被闸门读到；本测试把覆盖面显式化，让棘轮与重复面同宽。
+
+        清单是**显式**的，不做自动发现。原因：CHANGELOG、docs/adr/、tests/ 与
+        examples/ 里的历史报告也会逐一点名七源，但它们是**记录**而不是**声明**——
+        回填历史记录不是本棘轮的职责，自动发现只会制造误报。
+        """
+        missing: list[str] = []
+        for path in ROSTER_BEARING_FILES:
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            self.assertTrue(path.exists(), f"ROSTER_BEARING_FILES 登记了不存在的文件: {rel}")
+            blob = path.read_text(encoding="utf-8")
+            absent = [name for name in LOCKED_USAGE_ROSTER if not SOURCE_NAME_RE.search(blob)]
+            if absent:
+                missing.append(f"{rel} 缺: {' / '.join(absent)}")
+        self.assertEqual(missing, [], "名册覆盖清单里有点名不全的文件:\n  " + "\n  ".join(missing))
 
     def test_usage_roster_hard_gate_cannot_drift(self) -> None:
         """ADR-0009 R-A：SKILL 硬门禁点名名单与 validate_report.USAGE_ROSTER 不得漂移。
@@ -152,10 +213,15 @@ class SkillContractTests(unittest.TestCase):
     def test_exa_is_required_tier_across_docs(self) -> None:
         """ADR-0001 把 Exa 提升为 required；各处文档表格/引导不得再标可选。
 
-        合约测试此前只查六源名字（test_six_source_table_present /
-        test_source_allocation），不查档位，于是 skill README / runtime-adapters
+        期望不再手写：它读 ``Backend.requirement``（候选 1），真源一变这里就红。
+        合约测试此前只查六源名字，不查档位，于是 skill README / runtime-adapters
         把 Exa 悄悄留成「可选」也没人拦。
         """
+        self.assertEqual(
+            self._executable_tiers()["Exa"],
+            "required",
+            "ADR-0001：Exa 的可执行档位应为 required（真源是 Backend.requirement）",
+        )
         runtime_adapters = (ROOT / "references" / "runtime-adapters.md").read_text(encoding="utf-8")
         docs = (
             ("skill", self.skill),
@@ -396,9 +462,7 @@ class SkillContractTests(unittest.TestCase):
 
     def test_adr_0012_companion_install_contract(self) -> None:
         """ADR-0012 D1：最小安装是 tri-research + serpapi；禁止单技能即就绪 / 可回退措辞。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0012-tri-research与serpapi交付单元契约.md").read_text(
-            encoding="utf-8"
-        )
+        adr = (REPO_ROOT / "docs" / "adr" / "0012-tri-research与serpapi交付单元契约.md").read_text(encoding="utf-8")
         self.assertIn("D1", adr)
         self.assertIn("ADR-0015", adr)
         self.assertIn("不足以", adr)
@@ -445,9 +509,7 @@ class SkillContractTests(unittest.TestCase):
 
     def test_adr_0013_retrieval_topology(self) -> None:
         """ADR-0013：三类能力 + Registry 非 Lead 主路径；架构图禁止 MCP 误标。"""
-        adr = (REPO_ROOT / "docs" / "adr" / "0013-检索拓扑三类能力与Registry非主路径.md").read_text(
-            encoding="utf-8"
-        )
+        adr = (REPO_ROOT / "docs" / "adr" / "0013-检索拓扑三类能力与Registry非主路径.md").read_text(encoding="utf-8")
         for phrase in (
             "Machine Backend",
             "External Tool",

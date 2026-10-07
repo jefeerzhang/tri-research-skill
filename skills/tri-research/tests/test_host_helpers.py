@@ -24,6 +24,7 @@ is only for Evidence Ledger / Registry.
 
 from __future__ import annotations
 
+import ast
 import unittest
 from pathlib import Path
 
@@ -132,6 +133,46 @@ class ResultTruncationConsolidationTests(unittest.TestCase):
                     source,
                     f"{name} must call truncate(value, LIMIT) instead of hard-coding {literal}",
                 )
+
+
+class RequirementDeclarationTests(unittest.TestCase):
+    """One tier fact per backend class (ADR-0011).
+
+    A second ``requirement =`` in the same class body silently wins over the
+    first, and the only reader that matters — ``required_backends.
+    iter_required_descriptors()`` — would change gate membership without any
+    contract test noticing, because the contract tests read *docs*, not class
+    bodies. CHANGELOG 6.10.0 records this exact merge leftover being removed
+    from ``SerpApiBackend``; ``ExaBackend`` and ``TavilyBackend`` kept theirs.
+
+    Source gate rather than a runtime test: the failure mode is invisible until
+    someone edits only one of the two assignments.
+    """
+
+    def test_each_backend_class_declares_requirement_at_most_once(self) -> None:
+        for name, source in _script_sources():
+            tree = ast.parse(source, filename=name)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                hits = [
+                    stmt
+                    for stmt in node.body
+                    if isinstance(stmt, (ast.Assign, ast.AnnAssign))
+                    and any(getattr(t, "id", None) == "requirement" for t in self._targets(stmt))
+                ]
+                self.assertLessEqual(
+                    len(hits),
+                    1,
+                    f"{name}:{node.name} declares `requirement` {len(hits)}× in one class body — "
+                    "the tier has exactly one home per backend (ADR-0011)",
+                )
+
+    @staticmethod
+    def _targets(stmt: ast.Assign | ast.AnnAssign) -> list[ast.expr]:
+        if isinstance(stmt, ast.AnnAssign):
+            return [stmt.target]
+        return list(stmt.targets)
 
 
 if __name__ == "__main__":

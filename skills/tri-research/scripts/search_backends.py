@@ -82,7 +82,6 @@ class ExaBackend(_search_cli.Backend):
     env_key = "EXA_API_KEY"
     requirement = _search_cli.BackendRequirementLevel.REQUIRED
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
-    requirement = _search_cli.BackendRequirementLevel.REQUIRED
     apply_url = "https://dashboard.exa.ai/api-keys"
     verify_cmd = "python scripts/exa_search.py check"
     configure_hint = f"pip install exa-py && export {env_key}=<key> ({apply_url})"
@@ -195,7 +194,6 @@ class TavilyBackend(_search_cli.Backend):
     env_key = "TAVILY_API_KEY"
     requirement = _search_cli.BackendRequirementLevel.OPTIONAL
     env_file = _SCRIPT_DIR.parent / ".env"  # this skill's own .env (ADR-0004)
-    requirement = _search_cli.BackendRequirementLevel.OPTIONAL
     apply_url = "https://app.tavily.com/home"
     verify_cmd = "python scripts/tavily_search.py check"
     configure_hint = f"pip install tavily-python && export {env_key}=<key> ({apply_url})"
