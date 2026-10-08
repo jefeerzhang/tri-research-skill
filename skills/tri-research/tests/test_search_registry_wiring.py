@@ -49,21 +49,15 @@ class RegistryWiringTests(unittest.TestCase):
     def test_batch_uniform_shape_via_registry_fake(self) -> None:
         # Use registry's own batch with a fake backend to prove uniform shape
         from _search_registry import BackendSpec, SearchBackendRegistry
-        import _search_cli
+        from _test_helpers import FakeBackend as SharedFakeBackend
 
-        class Fake(_search_cli.Backend):
+        class Fake(SharedFakeBackend):
             name = "Fake2"
             help = "fake2"
-            sdk = object()
             missing_sdk_message = "x"
             env_key = "FAKE2_KEY"
-            client_factory = staticmethod(lambda k: object())
-            flags = ()
 
-            def probe(self, client):  # type: ignore[override]
-                return True
-
-            def search(self, client, query, options):  # type: ignore[override]
+            def search(self, client: object, query: str, options: dict) -> dict:
                 if query == "bad":
                     raise RuntimeError("HTTP 400 Bad Request")
                 return {"results": [{"title": "ok", "url": "https://example.com"}]}

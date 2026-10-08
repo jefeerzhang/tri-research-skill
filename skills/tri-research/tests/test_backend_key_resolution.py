@@ -27,26 +27,21 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
-from _test_helpers import load_module  # noqa: E402
+from _test_helpers import FakeBackend, load_module  # noqa: E402
 
 ENV_KEY = "FAKE_KEYPATH_KEY"
 
 
-class _KeyBackend(_search_cli.Backend):
-    name = "Fake"
+class _KeyBackend(FakeBackend):
+    """Only what key resolution cares about differs from the shared double."""
+
     help = "Fake backend for key-resolution tests"
-    sdk = object()
-    missing_sdk_message = "fake-sdk not installed"
     env_key = ENV_KEY
     env_file = None  # explicit: undeclared backend resolves env-only
     client_factory = staticmethod(lambda key: {"key": key})
-    flags = ()
 
     def probe(self, client) -> bool:
         return bool(client.get("key"))
-
-    def search(self, client, query, options):  # pragma: no cover - unused here
-        return {"results": []}
 
 
 class BackendKeyResolutionTests(unittest.TestCase):

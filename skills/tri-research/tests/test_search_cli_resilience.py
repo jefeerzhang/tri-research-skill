@@ -25,24 +25,21 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
+from _test_helpers import FakeBackend as SharedFakeBackend  # noqa: E402
 
 
-class FakeBackend(_search_cli.Backend):
-    name = "Fake"
+class FakeBackend(SharedFakeBackend):
+    """Adds the failure shapes resilience tests drive: hang, fail_times, error.
+
+    The `--no-proxy` global flag is this file's own concern (proxy clearing is
+    asserted here); everything else — SDK present, zero backoff, 5s call timeout
+    — is the shared double's.
+    """
+
     help = "Fake backend for resilience tests"
-    sdk = object()
-    missing_sdk_message = "fake-sdk not installed"
-    env_key = "FAKE_SEARCH_KEY"
-    client_factory = staticmethod(lambda key: object())
-    flags = ()
     global_flags = (
         _search_cli.Flag("no_proxy", ("--no-proxy",), "Clear proxy env vars for this run", action="store_true"),
     )
-    max_attempts = 3
-    retry_backoff = 0.0
-    call_timeout = 5.0
-    circuit_threshold = 5
-    circuit_cooldown = 60.0
 
     def __init__(self) -> None:
         self.calls = 0

@@ -15,31 +15,34 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from _test_helpers import load_module, patch_required_backends
+from _test_helpers import FakeBackend, load_module, patch_required_backends
 
-import _search_cli  # noqa: E402 — _test_helpers puts scripts/ on sys.path
 from _search_cli import BackendRequirementLevel  # noqa: E402
 from search_backends import EXA_BACKEND, OPENALEX_BACKEND, TAVILY_BACKEND  # noqa: E402
 
 SCRIPTS_DIR = Path(__file__).parents[1] / "scripts"
 
 
-class _FakeSerpApiBackend(_search_cli.Backend):
+class _FakeSerpApiBackend(FakeBackend):
     """Minimal stand-in for SerpApiBackend, used to isolate the gate seam.
 
     `_get_serpapi_backend` is patched to return one of these so the real
     ``serpapi_cli`` is never imported and the probe never touches the network.
-    Subclassing the shared ``Backend`` is deliberate: the gate assembles the
-    client through ``Backend.client()``, so a duck-typed stand-in would drift
-    from what production actually does.
+    Deriving from the shared double is deliberate: the gate assembles the client
+    through ``Backend.client()``, so a duck-typed stand-in would drift from what
+    production actually does.
+
+    What the gate reads is the ``required`` shape: ``env_file`` (KeyProvider is
+    handed exactly this), ``requirement``, ``start_probe``, and the three
+    configure-hint fields. The name is ``SerpApi`` because the gate's error
+    messages name the backend.
     """
 
     name = "SerpApi"
     env_key = "SERPAPI_KEY"
     env_file = Path("serpapi.env")
-    sdk = object()  # truthy → treat as "requests" installed
     missing_sdk_message = "requests not installed"
-    call_timeout = 60.0
+    call_timeout = 60.0  # SerpApi's own timeout, not Backend's 30.0
     requirement = BackendRequirementLevel.REQUIRED
     start_probe = True
     apply_url = "https://serpapi.com/dashboard"

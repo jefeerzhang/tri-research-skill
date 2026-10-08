@@ -30,28 +30,17 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import _search_cli  # noqa: E402
-from _test_helpers import load_module  # noqa: E402
+from _test_helpers import FakeBackend, load_module  # noqa: E402
 
 ENV_KEY = "FAKE_MANAGED_KEY"
 
 
-class FakeManagedBackend(_search_cli.Backend):
-    name = "Fake"
+class FakeManagedBackend(FakeBackend):
+    """Managed-command tests only need a distinguishable client shape."""
+
     help = "Fake backend for managed-command tests"
-    sdk = object()
-    missing_sdk_message = "fake-sdk not installed"
     env_key = ENV_KEY
     client_factory = staticmethod(lambda key: {"built_with": key})
-    flags = ()
-    max_attempts = 3
-    retry_backoff = 0.0
-    call_timeout = 5.0
-
-    def probe(self, client) -> bool:  # pragma: no cover - unused here
-        return True
-
-    def search(self, client, query, options):  # pragma: no cover - unused here
-        return {"results": []}
 
 
 def _managed_command(body, name="go", echo=lambda args: {"query": args.query}):

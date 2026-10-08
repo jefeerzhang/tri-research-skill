@@ -12,8 +12,64 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from _report_parse import parse_report  # noqa: E402
+from _search_cli import Backend  # noqa: E402
 
 REQUIRED_SDK_STUBS = Path(__file__).resolve().parent / "_stubs" / "required_sdks"
+
+#: Name the Backend test doubles inherit from. Referenced by name (not by
+#: import) from the consolidation gate, so the gate does not create the very
+#: import it is checking.
+SHARED_FAKE_BACKEND_NAME = "FakeBackend"
+
+
+class FakeBackend(Backend):
+    """The one Backend test double; subclasses declare only what they vary.
+
+    Six test modules used to declare their own ``Backend`` subclass, and six of
+    those assignments restated a value that is already the production default
+    (``max_attempts = 3``, ``circuit_threshold = 5``, ``circuit_cooldown =
+    60.0``). Nothing read them — the tests that care set the field on the
+    instance. They were copies of numbers owned by ``Backend``, so a default
+    change left the doubles exercising the old value.
+
+    What this base sets, and why each is load bearing:
+
+    * ``sdk = object()`` — ``Backend.require_setup`` short-circuits on
+      ``sdk is None`` with :class:`SdkMissing`. A double that omitted it would
+      test the SDK-missing branch instead of the branch it was written for.
+    * ``retry_backoff = 0.0`` / ``call_timeout = 5.0`` — production waits 0.5s
+      between retries and 30s per call. A double inheriting those turns a unit
+      test into a sleep, so these two are genuinely the double's own values,
+      not copies. They are the only fields where a test double is *not*
+      "whatever ``Backend`` says".
+    * ``name`` / ``help`` / ``env_key`` / ``missing_sdk_message`` / ``flags`` —
+      required for a usable declaration. Subclasses that assert on the name
+      (``FakeRegistry``, ``SerpApi``) override it.
+    * ``probe`` / ``search`` — minimal working bodies. The previous six copies
+      each returned the same two things.
+
+    Everything else (``max_attempts``, ``circuit_threshold``,
+    ``circuit_cooldown``, ``env_file``, ``requirement``, ``global_flags``,
+    ``results_key``) is deliberately left at whatever ``Backend`` declares, so
+    a production default change reaches the tests instead of being shadowed
+    here. Set those per test, on the instance where possible.
+    """
+
+    name = "Fake"
+    help = "Fake backend for tests"
+    sdk = object()  # truthy: "the SDK is installed"
+    missing_sdk_message = "fake-sdk not installed"
+    env_key = "FAKE_SEARCH_KEY"
+    client_factory = staticmethod(lambda key: object())
+    flags = ()
+    retry_backoff = 0.0  # never sleep between retries
+    call_timeout = 5.0  # fail fast when a double hangs
+
+    def probe(self, client: object) -> bool:
+        return True
+
+    def search(self, client: object, query: str, options: dict) -> dict:
+        return {"results": []}
 
 
 def required_backend_cli_env(base: dict[str, str] | None = None) -> dict[str, str]:

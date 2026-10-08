@@ -18,21 +18,18 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import _search_cli  # noqa: E402
 from _search_registry import KeyProvider, SearchBackendRegistry, SearchResult  # noqa: E402
+from _test_helpers import FakeBackend as SharedFakeBackend  # noqa: E402
 
 
-class FakeBackend(_search_cli.Backend):
-    name = "Fake"
+class FakeBackend(SharedFakeBackend):
+    """Adds the failure shapes registry tests drive: hang, fail_times, error.
+
+    Circuit tuning is left to ``_registry_with_fake`` on the instance, which is
+    where these tests actually vary it.
+    """
+
     help = "Fake backend for registry tests"
-    sdk = object()
-    missing_sdk_message = "fake-sdk not installed"
     env_key = "FAKE_REGISTRY_KEY"
-    client_factory = staticmethod(lambda key: object())
-    flags = ()
-    max_attempts = 3
-    retry_backoff = 0.0
-    call_timeout = 5.0
-    circuit_threshold = 5
-    circuit_cooldown = 60.0
 
     def __init__(self) -> None:
         self.calls = 0

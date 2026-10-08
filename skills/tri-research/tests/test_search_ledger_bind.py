@@ -18,7 +18,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from _test_helpers import required_backend_cli_env
+from _test_helpers import FakeBackend as SharedFakeBackend, required_backend_cli_env
 
 SCRIPT_DIR = Path(__file__).parents[1] / "scripts"
 if str(SCRIPT_DIR) not in sys.path:
@@ -31,17 +31,11 @@ STATE_MACHINE = SCRIPT_DIR / "state_machine.py"
 SERPAPI = Path(__file__).parents[2] / "serpapi" / "scripts" / "serpapi_cli.py"
 
 
-class FakeBackend(_search_cli.Backend):
-    name = "Fake"
+class FakeBackend(SharedFakeBackend):
+    """Returns a configurable result list; one attempt so a retry cannot mask it."""
+
     help = "Fake backend for ledger-bind tests"
-    sdk = object()
-    missing_sdk_message = "fake-sdk not installed"
-    env_key = "FAKE_SEARCH_KEY"
-    client_factory = staticmethod(lambda key: object())
-    flags = ()
-    max_attempts = 1
-    retry_backoff = 0.0
-    call_timeout = 5.0
+    max_attempts = 1  # a retried search would write the seen row twice
 
     def __init__(self, results: list[dict] | None = None) -> None:
         self.results = results if results is not None else [{"title": "ok", "url": "https://publisher.org/item"}]
