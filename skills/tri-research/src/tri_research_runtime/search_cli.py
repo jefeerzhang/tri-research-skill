@@ -60,6 +60,47 @@ from tri_research_runtime.key_provider import KeyProvider
 
 _T = TypeVar("_T")
 
+# The module's interface, declared once (候选 7). Without it, ``import *``
+# re-exports every public name in this module — including ``argparse``,
+# ``json``, ``threading``, ``Path`` and the typing helpers — so a star import
+# turned stdlib into part of the published surface.
+#
+# Deliberately NOT here: ``KeyProvider``, ``search_options`` and
+# ``build_parser`` are reached at their real homes (``.key_provider``, or the
+# package top level), not through the CLI shim.
+__all__ = (
+    # Declarations: backend spec and CLI shape
+    "Backend",
+    "BackendRequirementLevel",
+    "Command",
+    "Flag",
+    # Error family: callers tell "SDK missing" from "key missing" from "circuit"
+    "CircuitOpenError",
+    "ClientSetupError",
+    "CommandError",
+    "KeyMissing",
+    "SdkMissing",
+    # Result width limits (ADR-0008 single home)
+    "CITATION_TEXT_LIMIT",
+    "CONTENT_LIMIT",
+    "EXTRACT_CONTENT_LIMIT",
+    "SNIPPET_LIMIT",
+    # Search lanes and their thin wrappers
+    "batch_search",
+    "bind_successful_search_to_ledger",
+    "check",
+    "json_error",
+    "run",
+    "run_managed_command",
+    "search",
+    # Shared primitives
+    "clear_proxy_vars",
+    "invoke",
+    "run_with_timeout",
+    "truncate",
+    "wants_no_proxy",
+)
+
 
 def json_error(message: str) -> NoReturn:
     """Print a JSON error and exit 1 — the wrapper contract for failures."""
