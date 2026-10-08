@@ -17,6 +17,7 @@ from tri_research_runtime.errors import (
     SdkMissing,
     StateError,
 )
+from tri_research_runtime.hashing import sha256_bytes
 from tri_research_runtime.key_provider import KeyProvider, key_from_env_file
 from tri_research_runtime.search_cli import (
     CITATION_TEXT_LIMIT,
@@ -52,5 +53,6 @@ __all__ = (
     "key_from_env_file",
     "now_iso",
     "run",
+    "sha256_bytes",
     "truncate",
 )

@@ -136,6 +136,46 @@ class RuntimePackageTests(unittest.TestCase):
         undeclared = sorted(used - set(pkg.__all__))
         self.assertEqual(undeclared, [], f"这些属性在用但未在 __all__ 声明: {undeclared}")
 
+    def test_generic_hasher_lives_in_the_runtime_package(self) -> None:
+        """候选 4：通用哈希的家是运行时包。
+
+        ``sha256_bytes`` 曾定义在 ``validate_report``（报告判定）里，于是
+        ``evidence``（台账）不得不从报告模块 import 一个与报告无关的工具——
+        把 ADR-0014 刚解开的耦合又接上了。它与 ``StateError``、截断上限、
+        ``now_iso`` 同属共享原语，因此归运行时包。
+        """
+        import hashlib
+
+        from tri_research_runtime import hashing
+
+        self.assertTrue(hasattr(hashing, "sha256_bytes"), "运行时包缺少 hashing.sha256_bytes")
+        self.assertEqual(hashing.sha256_bytes(b"abc"), hashlib.sha256(b"abc").hexdigest())
+
+        import tri_research_runtime as runtime
+
+        self.assertIs(runtime.sha256_bytes, hashing.sha256_bytes, "包顶层应导出同一个哈希函数")
+
+        validator = (TRI_ROOT / "scripts" / "validate_report.py").read_text(encoding="utf-8")
+        self.assertNotIn(
+            "def sha256_bytes",
+            validator,
+            "validate_report 不得再定义通用哈希：它的家是 tri_research_runtime.hashing",
+        )
+
+    def test_no_module_imports_the_hasher_from_validate_report(self) -> None:
+        """台账与报告判定之间不得为通用工具互相 import（候选 4）。"""
+        pattern = re.compile(r"from\s+validate_report\s+import\s+\(?[^)]*sha256_bytes", re.DOTALL)
+        offenders: list[str] = []
+        for folder in (TRI_ROOT / "scripts", TRI_ROOT.parent / "serpapi" / "scripts"):
+            for path in sorted(folder.glob("*.py")):
+                if pattern.search(path.read_text(encoding="utf-8")):
+                    offenders.append(path.name)
+        self.assertEqual(
+            offenders,
+            [],
+            f"这些模块仍从 validate_report 取通用哈希（应改读 tri_research_runtime.hashing）: {offenders}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import re
 import sys
 from pathlib import Path
@@ -19,6 +18,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 from _common import MIN_REPORT_SOURCES, source_threshold  # noqa: E402
 from _report_parse import REFERENCES_TITLE, Reference, citation_numbers, parse_report, section_of  # noqa: E402
 from tri_research_runtime.clock import now_iso  # noqa: E402
+from tri_research_runtime.hashing import sha256_bytes  # noqa: E402
 
 CHINESE_RE = re.compile(r"[\u4e00-\u9fff]")
 ENGLISH_WORD_RE = re.compile(r"\b[A-Za-z]{4,}\b")
@@ -211,10 +211,6 @@ def validate(text: str, min_sources: int, *, expected_topic: str | None = None) 
         if marker.lower() in text.lower():
             errors.append(f"禁止标记: {marker}")
     return errors
-
-
-def sha256_bytes(content: bytes) -> str:
-    return hashlib.sha256(content).hexdigest()
 
 
 def validate_and_build_proof(

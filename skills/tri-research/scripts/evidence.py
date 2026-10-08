@@ -39,12 +39,12 @@ if str(_SCRIPT_DIR) not in sys.path:
 from _common import StateError  # noqa: E402
 from _report_parse import canonicalize_url, parse_report  # noqa: E402
 from tri_research_runtime.clock import now_iso  # noqa: E402
+from tri_research_runtime.hashing import sha256_bytes  # noqa: E402
 from state_machine import (  # noqa: E402
     StateStore,
     default_state_dir,
     validate_session_id,
 )
-from validate_report import sha256_bytes  # noqa: E402
 
 KIND_SEEN = "seen"
 KIND_USER_PROVIDED = "user_provided"
